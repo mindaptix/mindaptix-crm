@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { startTransition, useActionState, useEffect, useEffectEvent } from "react";
+import { startTransition, useActionState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { applyLeaveRequest, deleteLeaveRequest, reviewLeaveRequest } from "@/features/dashboard/actions/leaves";
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
@@ -35,7 +35,7 @@ export function LeavesPanel({ canApply, canReview, data }: LeavesPanelProps) {
   const isLeadershipReviewView = !canApply;
   const isEmployeeHistoryView = canApply && !canReview;
   const displayedLeaves = [...data.leaves];
-  const refreshLeavesView = useEffectEvent(() => {
+  const refreshLeavesView = useCallback(() => {
     if (typeof document !== "undefined" && document.visibilityState !== "visible") {
       return;
     }
@@ -43,14 +43,14 @@ export function LeavesPanel({ canApply, canReview, data }: LeavesPanelProps) {
     startTransition(() => {
       router.refresh();
     });
-  });
+  }, [router]);
 
   useEffect(() => {
     if (state.success) {
       emitDashboardSync("leave-applied");
       refreshLeavesView();
     }
-  }, [state.success]);
+  }, [state.success, refreshLeavesView]);
 
   return (
     <div className="space-y-6 overflow-x-hidden px-5 py-5 sm:px-7 sm:py-6">
