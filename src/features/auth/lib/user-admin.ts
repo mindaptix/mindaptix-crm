@@ -117,7 +117,7 @@ export function assertSuperAdmin(session: AuthenticatedSession | null): asserts 
 }
 
 export function assertAdminOrManager(session: AuthenticatedSession | null): asserts session is AuthenticatedSession {
-  if (!session || session.user.role !== "MANAGER") {
+  if (!session || (session.user.role !== "SUPER_ADMIN" && session.user.role !== "MANAGER")) {
     throw new Error("Admin access required.");
   }
 }

@@ -53,6 +53,15 @@ input {
   background: rgba(59, 130, 246, 0.45);
 }
 
+/* override browser autofill blue/gray tint */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827;
+}
+
 .crm-panel {
   background: #1f1f1f;
   box-shadow:
@@ -67,4 +76,80 @@ input {
 
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-14px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 16px 2px rgba(45,212,191,0.18); }
+  50%       { box-shadow: 0 0 32px 6px rgba(45,212,191,0.38); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes orb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(30px, -20px) scale(1.08); }
+  66%       { transform: translate(-20px, 15px) scale(0.95); }
+}
+
+.animate-float {
+  animation: float 3.2s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 4.2s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.animate-orb {
+  animation: orb-drift 10s ease-in-out infinite;
+}
+
+.animate-orb-2 {
+  animation: orb-drift 14s ease-in-out infinite reverse;
+  animation-delay: -4s;
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, #5eead4, #ffffff 40%, #2dd4bf 60%, #ffffff);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+.auth-dot-grid {
+  background-image: radial-gradient(circle, rgba(14,74,106,0.35) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.glass-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-card-strong {
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(45,212,191,0.22);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,11 +28,13 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
   const hasHydrated = useSyncExternalStore(subscribeToHydration, getClientHydrationSnapshot, getServerHydrationSnapshot);
   const navItems = useMemo(() => getDashboardNavItemsForRole(session.user.role), [session.user.role]);
   const lastRefreshAt = useRef(0);
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const desktopSidebarClasses =
     "lg:sticky lg:top-0 lg:h-screen lg:self-start lg:translate-x-0 lg:overflow-y-auto lg:rounded-none lg:border-r lg:border-slate-800/50 lg:shadow-none";
   const activePathname = hasHydrated ? pathname : "";
   const showSidebarOverlay = hasHydrated && isSidebarOpen;
-  const refreshDashboardView = useEffectEvent((force = false) => {
+  const refreshDashboardView = useCallback((force = false) => {
     if (typeof document === "undefined" || document.visibilityState !== "visible") {
       return;
     }
@@ -57,9 +59,9 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
     lastRefreshAt.current = now;
 
     startTransition(() => {
-      router.refresh();
+      routerRef.current.refresh();
     });
-  });
+  }, []);
 
   useEffect(() => {
     const handleWindowFocus = () => {

@@ -22,14 +22,13 @@ import {
 import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
 export async function renderLeadershipDashboardPage(page: DashboardPageKey, session: AuthenticatedSession) {
-  const isReadOnlySuperAdmin = session.user.role === "SUPER_ADMIN";
 
   switch (page) {
     case "employees": {
       const data = await getEmployeesPageData(session);
       return (
         <EmployeesManagementPanel
-          readOnly={isReadOnlySuperAdmin}
+          readOnly={false}
           salesLeadPriorityOptions={data.salesLeadPriorityOptions}
           salesLeadSourceOptions={data.salesLeadSourceOptions}
           salesLeadStatusOptions={data.salesLeadStatusOptions}
@@ -56,15 +55,15 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
     }
     case "tasks": {
       const data = await getTasksPageData(session);
-      return <TasksPanel canAssign={!isReadOnlySuperAdmin} readOnly={isReadOnlySuperAdmin} data={data} />;
+      return <TasksPanel canAssign data={data} readOnly={false} />;
     }
     case "dsr": {
       const data = await getDsrPageData(session);
-      return <DsrPanel data={data} simplifiedReview={isReadOnlySuperAdmin} />;
+      return <DsrPanel data={data} simplifiedReview={false} />;
     }
     case "reports": {
       const data = await getReportsPageData(session);
-      return <ReportsPanel data={data} simplifiedView={isReadOnlySuperAdmin} />;
+      return <ReportsPanel data={data} simplifiedView={false} />;
     }
     case "settings": {
       const data = await getSettingsPageData(session);
