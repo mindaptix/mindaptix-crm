@@ -6,6 +6,8 @@ import { hashPassword, verifyPassword } from "@/features/auth/lib/password";
 import connectDb from "@/database/mongodb/connect";
 import { SettingModel } from "@/database/mongodb/models/setting";
 import { UserModel } from "@/database/mongodb/models/user";
+import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
+import { headers } from "next/headers";
 
 type SettingsState = {
   error?: string;
@@ -15,6 +17,9 @@ type SettingsState = {
     workStart?: string;
     workEnd?: string;
     leavePolicy?: string;
+    workingDays?: string;
+    salaryDay?: string;
+    lateGraceMinutes?: string;
   };
 };
 
@@ -32,6 +37,9 @@ export async function updateCompanySettings(
   const workStart = String(formData.get("workStart") ?? "").trim();
   const workEnd = String(formData.get("workEnd") ?? "").trim();
   const leavePolicy = String(formData.get("leavePolicy") ?? "").trim();
+  const workingDays = parseInt(String(formData.get("workingDays") ?? "26"), 10);
+  const salaryDay = parseInt(String(formData.get("salaryDay") ?? "1"), 10);
+  const lateGraceMinutes = parseInt(String(formData.get("lateGraceMinutes") ?? "15"), 10);
 
   if (companyName.length < 2 || !/^\d{2}:\d{2}$/.test(workStart) || !/^\d{2}:\d{2}$/.test(workEnd)) {
     return {
@@ -49,16 +57,74 @@ export async function updateCompanySettings(
       workStart,
       workEnd,
       leavePolicy: leavePolicy || "Paid Leave and Sick Leave are available for approved requests.",
+      workingDays: isNaN(workingDays) ? 26 : workingDays,
+      salaryDay: isNaN(salaryDay) ? 1 : salaryDay,
+      lateGraceMinutes: isNaN(lateGraceMinutes) ? 15 : lateGraceMinutes,
     },
     { upsert: true, new: true },
   );
+
+  const headerStore = await headers();
+  await AuditLogModel.create({
+    actorUserId: session.user.id,
+    actorName: session.user.fullName,
+    actorRole: session.user.role,
+    action: "SETTINGS_UPDATED",
+    targetName: companyName,
+    detail: `workStart=${workStart}, workEnd=${workEnd}, workingDays=${workingDays}`,
+    ipAddress: headerStore.get("x-forwarded-for") ?? "",
+  });
 
   revalidatePath("/dashboard/settings");
 
   return {
     success: "Settings updated successfully.",
-    values: { companyName, workStart, workEnd, leavePolicy },
+    values: { companyName, workStart, workEnd, leavePolicy, workingDays: String(workingDays), salaryDay: String(salaryDay), lateGraceMinutes: String(lateGraceMinutes) },
   };
+}
+
+type ProfileSettingsState = {
+  error?: string;
+  success?: string;
+  values?: {
+    fullName?: string;
+    email?: string;
+  };
+};
+
+export async function updateAccountProfile(
+  _previousState: ProfileSettingsState,
+  formData: FormData,
+): Promise<ProfileSettingsState> {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return { error: "Please sign in again to update your profile." };
+  }
+
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+
+  if (fullName.length < 2) {
+    return { error: "Full name must be at least 2 characters.", values: { fullName, email } };
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Enter a valid email address.", values: { fullName, email } };
+  }
+
+  await connectDb();
+
+  const existing = await UserModel.findOne({ email, _id: { $ne: session.user.id } }).lean();
+  if (existing) {
+    return { error: "This email is already in use by another account.", values: { fullName, email } };
+  }
+
+  await UserModel.findByIdAndUpdate(session.user.id, { fullName, email });
+
+  revalidatePath("/dashboard/settings");
+
+  return { success: "Profile updated successfully.", values: { fullName, email } };
 }
 
 type PasswordSettingsState = {

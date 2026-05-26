@@ -1,19 +1,25 @@
 import "server-only";
 import { notFound } from "next/navigation";
+import { AnnouncementsPanel } from "@/features/dashboard/components/announcements-panel";
 import { AttendancePanel } from "@/features/dashboard/components/attendance-panel";
 import { DsrPanel } from "@/features/dashboard/components/dsr-panel";
 import { EmployeesManagementPanel } from "@/features/dashboard/components/employees-management-panel";
+import { ExpensesPanel } from "@/features/dashboard/components/expenses-panel";
 import { LeavesPanel } from "@/features/dashboard/components/leaves-panel";
+import { PayrollPanel } from "@/features/dashboard/components/payroll-panel";
 import { ProjectsPanel } from "@/features/dashboard/components/projects-panel";
 import { ReportsPanel } from "@/features/dashboard/components/reports-panel";
 import { SettingsPanel } from "@/features/dashboard/components/settings-panel";
 import { TasksPanel } from "@/features/dashboard/components/tasks-panel";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import {
+  getAnnouncementsPageData,
   getAttendancePageData,
   getDsrPageData,
   getEmployeesPageData,
+  getExpensesPageData,
   getLeavesPageData,
+  getPayrollPageData,
   getProjectsPageData,
   getReportsPageData,
   getSettingsPageData,
@@ -64,6 +70,18 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
     case "reports": {
       const data = await getReportsPageData(session);
       return <ReportsPanel data={data} simplifiedView={false} />;
+    }
+    case "payroll": {
+      const data = await getPayrollPageData(session);
+      return <PayrollPanel data={data} canManage={session.user.role === "SUPER_ADMIN"} />;
+    }
+    case "expenses": {
+      const data = await getExpensesPageData(session);
+      return <ExpensesPanel data={data} />;
+    }
+    case "announcements": {
+      const data = await getAnnouncementsPageData(session);
+      return <AnnouncementsPanel data={data} />;
     }
     case "settings": {
       const data = await getSettingsPageData(session);

@@ -20,18 +20,28 @@ import {
 import { SalesPaymentModel } from "@/database/mongodb/models/sales-payment";
 import { SalesTargetModel } from "@/database/mongodb/models/sales-target";
 import { SettingModel } from "@/database/mongodb/models/setting";
+import { HolidayModel } from "@/database/mongodb/models/system/holiday";
+import { AnnouncementModel } from "@/database/mongodb/models/system/announcement";
+import { SalaryModel } from "@/database/mongodb/models/workforce/salary";
+import { PayslipModel } from "@/database/mongodb/models/workforce/payslip";
+import { ExpenseModel } from "@/database/mongodb/models/workforce/expense";
+import { LeaveBalanceModel } from "@/database/mongodb/models/workforce/leave-balance";
 import { TASK_LABELS, TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
 import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import type {
+  AnnouncementsPageData,
   AttendanceMonthlyRow,
   AttendancePageData,
   DashboardBreakdownSlice,
   DashboardOverviewData,
   DsrPageData,
   EmployeesPageData,
+  ExpensePageData,
+  LeaveBalanceEntry,
   LeaveEmployeeSummary,
   LeavePageData,
+  PayrollPageData,
   PerformanceScoreRow,
   ProjectsPageData,
   ReportsPageData,
@@ -45,6 +55,37 @@ import type {
   SettingsPageData,
   TaskPageData,
 } from "@/features/dashboard/types";
+
+type UnknownRecord = Record<string, unknown>;
+
+function toRecord(value: unknown): UnknownRecord {
+  return typeof value === "object" && value !== null ? (value as UnknownRecord) : {};
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readNumberLike(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const num = Number(trimmed);
+    return Number.isFinite(num) ? num : undefined;
+  }
+
+  return undefined;
+}
 
 export type {
   AttendanceMonthlyRow,
@@ -561,6 +602,27 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
       projectIds: user.projectIds ?? [],
       documentName: user.documentName ?? "",
       documentUrl: user.documentUrl ?? "",
+      employeeId: readString(toRecord(user).employeeId) ?? "",
+      department: readString(toRecord(user).department) ?? "",
+      designation: readString(toRecord(user).designation) ?? "",
+      dateOfBirth: (() => {
+        const raw = toRecord(user).dateOfBirth;
+        if (raw instanceof Date) {
+          return formatDate(raw);
+        }
+        if (typeof raw === "string") {
+          const parsed = new Date(raw);
+          return Number.isNaN(parsed.getTime()) ? "" : formatDate(parsed);
+        }
+        return "";
+      })(),
+      address: readString(toRecord(user).address) ?? "",
+      emergencyContact: readString(toRecord(user).emergencyContact) ?? "",
+      bankAccountNumber: readString(toRecord(user).bankAccountNumber) ?? "",
+      bankName: readString(toRecord(user).bankName) ?? "",
+      bankIfscCode: readString(toRecord(user).bankIfscCode) ?? "",
+      panNumber: readString(toRecord(user).panNumber) ?? "",
+      profilePhotoUrl: readString(toRecord(user).profilePhotoUrl) ?? "",
     })),
     projects: projects.map((project) => ({
       id: project._id.toString(),
@@ -597,9 +659,30 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
   const hasLeadershipAccess = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
 
   if (!hasLeadershipAccess) {
+    // Employee: return only projects assigned to them
+    const myProjects = await ProjectModel.find(
+      { assignedUserIds: session.user.id },
+      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1 },
+    ).sort({ updatedAt: -1 }).lean();
+
     return {
-      summaryCards: [],
-      projects: [],
+      summaryCards: [
+        { label: "My Projects", value: String(myProjects.length), detail: "Projects you have been assigned to." },
+        { label: "In Progress", value: String(myProjects.filter((p) => p.status === "IN_PROGRESS").length), detail: "Currently active projects." },
+        { label: "Completed", value: String(myProjects.filter((p) => p.status === "COMPLETED").length), detail: "Projects you have completed." },
+      ],
+      projects: myProjects.map((project) => ({
+        id: project._id.toString(),
+        name: project.name,
+        summary: project.summary,
+        status: project.status,
+        priority: project.priority,
+        dueDate: formatDate(project.dueDate),
+        techStack: resolveProjectTechStack(project),
+        assignedUserIds: project.assignedUserIds ?? [],
+        assignedUserNames: [],
+        createdByUserId: "",
+      })),
       employeeOptions: [],
       technologyOptions: [...SALES_TECH_OPTIONS],
     };
@@ -707,6 +790,11 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           checkInAt: formatDateTime(todayRecord.checkInAt),
           checkOutAt: formatDateTime(todayRecord.checkOutAt),
           status: todayRecord.status,
+          workMode: readString(toRecord(todayRecord).workMode) ?? "OFFICE",
+          isHalfDay: readBoolean(toRecord(todayRecord).isHalfDay) ?? false,
+          isLate: readBoolean(toRecord(todayRecord).isLate) ?? false,
+          lateByMinutes: readNumberLike(toRecord(todayRecord).lateByMinutes) ?? 0,
+          overtimeMinutes: readNumberLike(toRecord(todayRecord).overtimeMinutes) ?? 0,
         }
       : null,
     todayRecords: activeUsers
@@ -722,6 +810,11 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
             checkInAt: "Not marked",
             checkOutAt: "Not marked",
             status: "NOT_MARKED",
+            workMode: "OFFICE",
+            isHalfDay: false,
+            isLate: false,
+            lateByMinutes: 0,
+            overtimeMinutes: 0,
           };
         }
 
@@ -733,6 +826,11 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           checkInAt: formatDateTime(record.checkInAt),
           checkOutAt: formatDateTime(record.checkOutAt),
           status: record.status,
+          workMode: readString(toRecord(record).workMode) ?? "OFFICE",
+          isHalfDay: readBoolean(toRecord(record).isHalfDay) ?? false,
+          isLate: readBoolean(toRecord(record).isLate) ?? false,
+          lateByMinutes: readNumberLike(toRecord(record).lateByMinutes) ?? 0,
+          overtimeMinutes: readNumberLike(toRecord(record).overtimeMinutes) ?? 0,
         };
       })
       .sort((left, right) => {
@@ -1270,7 +1368,11 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
 export async function getSettingsPageData(session: AuthenticatedSession): Promise<SettingsPageData> {
   await connectDb();
 
-  const settings = await SettingModel.findOne({ key: "company" }).lean();
+  const currentYear = new Date().getFullYear();
+  const [settings, holidays] = await Promise.all([
+    SettingModel.findOne({ key: "company" }).lean(),
+    HolidayModel.find({ year: currentYear }).sort({ date: 1 }).lean(),
+  ]);
 
   return {
     canManageCompany: session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER",
@@ -1281,7 +1383,292 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     workStart: settings?.workStart ?? "09:00",
     workEnd: settings?.workEnd ?? "18:00",
     leavePolicy: settings?.leavePolicy ?? "Paid Leave and Sick Leave are available for approved requests.",
+    workingDays: readNumberLike(toRecord(settings).workingDays) ?? 26,
+    salaryDay: readNumberLike(toRecord(settings).salaryDay) ?? 1,
+    lateGraceMinutes: readNumberLike(toRecord(settings).lateGraceMinutes) ?? 15,
+    holidays: holidays.map((h) => ({
+      id: h._id.toString(),
+      name: h.name,
+      date: h.date,
+      year: h.year,
+      type: h.type,
+      description: h.description ?? "",
+    })),
   };
+}
+
+export async function getPayrollPageData(session: AuthenticatedSession): Promise<PayrollPageData> {
+  await connectDb();
+
+  const today = getTodayDate();
+  const currentMonthKey = today.slice(0, 7);
+
+  if (session.user.role === "EMPLOYEE") {
+    const userId = session.user.id;
+    const [myUser, mySalary, myPayslips] = await Promise.all([
+      UserModel.findById(userId, { fullName: 1, email: 1 }).lean(),
+      SalaryModel.findOne({ userId, status: "ACTIVE" }).lean(),
+      PayslipModel.find({ userId }).sort({ monthKey: -1 }).lean(),
+    ]);
+
+    const gross = mySalary
+      ? mySalary.basicSalary + mySalary.hra + mySalary.transportAllowance + mySalary.medicalAllowance + mySalary.otherAllowances
+      : 0;
+    const net = mySalary ? Math.max(0, gross - mySalary.tds - mySalary.providentFund - mySalary.otherDeductions) : 0;
+    const thisMonthPayslip = myPayslips.find((p) => p.monthKey === currentMonthKey);
+
+    const mapPayslip = (p: (typeof myPayslips)[number]) => ({
+      id: p._id.toString(),
+      userId: p.userId,
+      employeeName: myUser?.fullName ?? "You",
+      employeeEmail: myUser?.email ?? "",
+      monthKey: p.monthKey,
+      basicSalary: p.basicSalary,
+      hra: p.hra,
+      transportAllowance: p.transportAllowance,
+      medicalAllowance: p.medicalAllowance,
+      otherAllowances: p.otherAllowances,
+      grossSalary: p.grossSalary,
+      tds: p.tds,
+      providentFund: p.providentFund,
+      leaveDays: p.leaveDays,
+      leaveDeduction: p.leaveDeduction,
+      lateDays: p.lateDays,
+      lateDeduction: p.lateDeduction,
+      otherDeductions: p.otherDeductions,
+      totalDeductions: p.totalDeductions,
+      netSalary: p.netSalary,
+      presentDays: p.presentDays,
+      workingDays: p.workingDays,
+      status: p.status,
+      paidOn: p.paidOn ?? "",
+      note: p.note ?? "",
+    });
+
+    return {
+      summaryCards: [
+        { label: "Gross Salary", value: formatCurrency(gross), detail: "Your current monthly gross." },
+        { label: "Net Salary", value: formatCurrency(net), detail: "After all deductions." },
+        { label: "Total Payslips", value: String(myPayslips.length), detail: "All payslips generated for you." },
+        { label: "This Month", value: thisMonthPayslip?.status ?? "Not Generated", detail: `Payslip status for ${currentMonthKey}.` },
+      ],
+      salaryStructures: mySalary && myUser
+        ? [{
+            id: mySalary._id.toString(),
+            userId,
+            employeeName: myUser.fullName,
+            employeeEmail: myUser.email,
+            basicSalary: mySalary.basicSalary,
+            hra: mySalary.hra,
+            transportAllowance: mySalary.transportAllowance,
+            medicalAllowance: mySalary.medicalAllowance,
+            otherAllowances: mySalary.otherAllowances,
+            grossSalary: gross,
+            tds: mySalary.tds,
+            providentFund: mySalary.providentFund,
+            otherDeductions: mySalary.otherDeductions,
+            netSalary: net,
+            effectiveFrom: mySalary.effectiveFrom ?? "",
+            status: mySalary.status ?? "ACTIVE",
+            note: mySalary.note ?? "",
+          }]
+        : [],
+      payslips: myPayslips.map(mapPayslip),
+      employeeOptions: [],
+      selectedMonthKey: currentMonthKey,
+    };
+  }
+
+  const [employees, salaryStructures, payslips] = await Promise.all([
+    UserModel.find({ role: { $in: ["EMPLOYEE", "MANAGER"] }, status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean(),
+    SalaryModel.find({ status: "ACTIVE" }).lean(),
+    PayslipModel.find({ monthKey: currentMonthKey }).lean(),
+  ]);
+
+  const salaryMap = new Map(salaryStructures.map((s) => [s.userId, s]));
+  const userMap = new Map(employees.map((e) => [e._id.toString(), e]));
+
+  const totalGross = salaryStructures.reduce((sum, s) => sum + s.basicSalary + s.hra + s.transportAllowance + s.medicalAllowance + s.otherAllowances, 0);
+  const totalNet = payslips.filter((p) => p.status === "GENERATED" || p.status === "PAID").reduce((sum, p) => sum + p.netSalary, 0);
+  const paidCount = payslips.filter((p) => p.status === "PAID").length;
+
+  return {
+    summaryCards: [
+      { label: "Total Employees", value: String(employees.length), detail: "Active employees on payroll." },
+      { label: "Monthly Gross", value: formatCurrency(totalGross), detail: "Total gross salary for all employees." },
+      { label: "Payslips This Month", value: String(payslips.length), detail: `${paidCount} paid, ${payslips.length - paidCount} pending.` },
+      { label: "Net Payable", value: formatCurrency(totalNet), detail: `Net salary processed for ${currentMonthKey}.` },
+    ],
+    salaryStructures: employees.map((emp) => {
+      const s = salaryMap.get(emp._id.toString());
+      const gross = s ? s.basicSalary + s.hra + s.transportAllowance + s.medicalAllowance + s.otherAllowances : 0;
+      const net = s ? gross - s.tds - s.providentFund - s.otherDeductions : 0;
+      return {
+        id: s ? s._id.toString() : emp._id.toString(),
+        userId: emp._id.toString(),
+        employeeName: emp.fullName,
+        employeeEmail: emp.email,
+        basicSalary: s?.basicSalary ?? 0,
+        hra: s?.hra ?? 0,
+        transportAllowance: s?.transportAllowance ?? 0,
+        medicalAllowance: s?.medicalAllowance ?? 0,
+        otherAllowances: s?.otherAllowances ?? 0,
+        grossSalary: gross,
+        tds: s?.tds ?? 0,
+        providentFund: s?.providentFund ?? 0,
+        otherDeductions: s?.otherDeductions ?? 0,
+        netSalary: Math.max(0, net),
+        effectiveFrom: s?.effectiveFrom ?? "",
+        status: s?.status ?? "NOT_SET",
+        note: s?.note ?? "",
+      };
+    }),
+    payslips: payslips.map((p) => {
+      const user = userMap.get(p.userId);
+      return {
+        id: p._id.toString(),
+        userId: p.userId,
+        employeeName: user?.fullName ?? "Unknown",
+        employeeEmail: user?.email ?? "",
+        monthKey: p.monthKey,
+        basicSalary: p.basicSalary,
+        hra: p.hra,
+        transportAllowance: p.transportAllowance,
+        medicalAllowance: p.medicalAllowance,
+        otherAllowances: p.otherAllowances,
+        grossSalary: p.grossSalary,
+        tds: p.tds,
+        providentFund: p.providentFund,
+        leaveDays: p.leaveDays,
+        leaveDeduction: p.leaveDeduction,
+        lateDays: p.lateDays,
+        lateDeduction: p.lateDeduction,
+        otherDeductions: p.otherDeductions,
+        totalDeductions: p.totalDeductions,
+        netSalary: p.netSalary,
+        presentDays: p.presentDays,
+        workingDays: p.workingDays,
+        status: p.status,
+        paidOn: p.paidOn ?? "",
+        note: p.note ?? "",
+      };
+    }),
+    employeeOptions: employees.map((e) => ({ id: e._id.toString(), label: e.fullName })),
+    selectedMonthKey: currentMonthKey,
+  };
+}
+
+export async function getExpensesPageData(session: AuthenticatedSession): Promise<ExpensePageData> {
+  await connectDb();
+
+  const isAdmin = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  const query = isAdmin ? {} : { userId: session.user.id };
+
+  const [expenses, users] = await Promise.all([
+    ExpenseModel.find(query).sort({ createdAt: -1 }).limit(100).lean(),
+    isAdmin ? UserModel.find({}, { fullName: 1, email: 1 }).lean() : Promise.resolve([]),
+  ]);
+
+  const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+
+  const totalPending = expenses.filter((e) => e.status === "PENDING").length;
+  const totalApproved = expenses.filter((e) => e.status === "APPROVED" || e.status === "PAID").reduce((sum, e) => sum + e.amount, 0);
+  const pendingAmount = expenses.filter((e) => e.status === "PENDING").reduce((sum, e) => sum + e.amount, 0);
+
+  return {
+    summaryCards: [
+      { label: "Pending Review", value: String(totalPending), detail: "Expense claims awaiting approval." },
+      { label: "Approved Amount", value: formatCurrency(totalApproved), detail: "Total approved expenses." },
+      { label: "Pending Amount", value: formatCurrency(pendingAmount), detail: "Total amount in pending claims." },
+    ],
+    expenses: expenses.map((e) => {
+      const user = isAdmin ? userMap.get(e.userId) : null;
+      return {
+        id: e._id.toString(),
+        userId: e.userId,
+        employeeName: user?.fullName ?? session.user.fullName,
+        employeeEmail: user?.email ?? session.user.email,
+        title: e.title,
+        category: e.category,
+        amount: e.amount,
+        expenseDate: e.expenseDate,
+        description: e.description ?? "",
+        receiptUrl: e.receiptUrl ?? "",
+        receiptName: e.receiptName ?? "",
+        status: e.status,
+        reviewNote: e.reviewNote ?? "",
+        paidOn: e.paidOn ?? "",
+        createdAt: formatDateTime(e.createdAt),
+      };
+    }),
+    canReview: isAdmin,
+  };
+}
+
+export async function getAnnouncementsPageData(session: AuthenticatedSession): Promise<AnnouncementsPageData> {
+  await connectDb();
+
+  const today = getTodayDate();
+  const announcements = await AnnouncementModel.find({
+    $or: [{ expiresAt: null }, { expiresAt: { $gte: today } }],
+  }).sort({ isPinned: -1, createdAt: -1 }).limit(50).lean();
+
+  return {
+    announcements: announcements.map((a) => ({
+      id: a._id.toString(),
+      title: a.title,
+      body: a.body,
+      type: a.type,
+      isPinned: a.isPinned ?? false,
+      expiresAt: a.expiresAt ?? "",
+      createdByName: a.createdByName,
+      createdAt: formatDateTime(a.createdAt),
+    })),
+    canManage: session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER",
+  };
+}
+
+export async function getLeaveBalanceData(session: AuthenticatedSession): Promise<LeaveBalanceEntry[]> {
+  await connectDb();
+
+  const currentYear = new Date().getFullYear();
+  const isAdmin = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
+  const userIds = isAdmin
+    ? (await UserModel.find({ status: "ACTIVE" }, { _id: 1 }).lean()).map((u) => u._id.toString())
+    : [session.user.id];
+
+  const [balances, users] = await Promise.all([
+    LeaveBalanceModel.find({ userId: { $in: userIds }, year: currentYear }).lean(),
+    UserModel.find({ _id: { $in: userIds } }, { fullName: 1, email: 1 }).lean(),
+  ]);
+
+  const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+  const balanceMap = new Map(balances.map((b) => [b.userId, b]));
+
+  return userIds.map((userId) => {
+    const b = balanceMap.get(userId);
+    const user = userMap.get(userId);
+    return {
+      id: b ? b._id.toString() : userId,
+      userId,
+      employeeName: user?.fullName ?? "Unknown",
+      employeeEmail: user?.email ?? "",
+      year: currentYear,
+      paidLeaveTotal: b?.paidLeaveTotal ?? 12,
+      paidLeaveUsed: b?.paidLeaveUsed ?? 0,
+      paidLeaveRemaining: (b?.paidLeaveTotal ?? 12) - (b?.paidLeaveUsed ?? 0),
+      sickLeaveTotal: b?.sickLeaveTotal ?? 6,
+      sickLeaveUsed: b?.sickLeaveUsed ?? 0,
+      sickLeaveRemaining: (b?.sickLeaveTotal ?? 6) - (b?.sickLeaveUsed ?? 0),
+      casualLeaveTotal: b?.casualLeaveTotal ?? 8,
+      casualLeaveUsed: b?.casualLeaveUsed ?? 0,
+      casualLeaveRemaining: (b?.casualLeaveTotal ?? 8) - (b?.casualLeaveUsed ?? 0),
+      compOffEarned: b?.compOffEarned ?? 0,
+      compOffUsed: b?.compOffUsed ?? 0,
+      compOffRemaining: (b?.compOffEarned ?? 0) - (b?.compOffUsed ?? 0),
+    };
+  });
 }
 
 function buildSalesWorkspaceData({

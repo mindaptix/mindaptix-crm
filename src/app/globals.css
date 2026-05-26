@@ -83,6 +83,22 @@ input:-webkit-autofill:focus {
   50%       { transform: translateY(-10px); }
 }
 
+@keyframes logo-enter {
+  0%   { opacity: 0; transform: translateY(18px) scale(0.88); filter: brightness(0.6); }
+  60%  { opacity: 1; transform: translateY(-4px) scale(1.04); filter: brightness(1.1); }
+  100% { opacity: 1; transform: translateY(0px) scale(1); filter: brightness(1); }
+}
+
+@keyframes logo-glow {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(45,212,191,0.35)) drop-shadow(0 0 20px rgba(45,212,191,0.15)); }
+  50%       { filter: drop-shadow(0 0 18px rgba(45,212,191,0.65)) drop-shadow(0 0 40px rgba(13,148,136,0.3)); }
+}
+
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-12px); }
+}
+
 @keyframes float-slow {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-14px); }
@@ -106,6 +122,13 @@ input:-webkit-autofill:focus {
 
 .animate-float {
   animation: float 3.2s ease-in-out infinite;
+}
+
+.animate-logo {
+  animation:
+    logo-enter 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    logo-float 3.6s ease-in-out 0.85s infinite,
+    logo-glow  3.6s ease-in-out 0.85s infinite;
 }
 
 .animate-float-slow {

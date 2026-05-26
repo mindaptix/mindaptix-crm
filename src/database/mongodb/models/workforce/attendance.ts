@@ -2,7 +2,9 @@ import mongoose, { type InferSchemaType, type Model } from "mongoose";
 import { baseSchemaOptions } from "@/database/mongodb/models/shared/schema-options";
 
 export const ATTENDANCE_STATUSES = ["PRESENT", "COMPLETED"] as const;
+export const WORK_MODES = ["OFFICE", "WFH", "FIELD"] as const;
 export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
+export type WorkMode = (typeof WORK_MODES)[number];
 
 const attendanceSchema = new mongoose.Schema(
   {
@@ -29,6 +31,34 @@ const attendanceSchema = new mongoose.Schema(
       enum: ATTENDANCE_STATUSES,
       default: "PRESENT",
       required: true,
+    },
+    workMode: {
+      type: String,
+      enum: WORK_MODES,
+      default: "OFFICE",
+      required: true,
+    },
+    isHalfDay: {
+      type: Boolean,
+      default: false,
+    },
+    isLate: {
+      type: Boolean,
+      default: false,
+    },
+    lateByMinutes: {
+      type: Number,
+      default: 0,
+    },
+    overtimeMinutes: {
+      type: Number,
+      default: 0,
+    },
+    regularizationReason: {
+      type: String,
+      trim: true,
+      maxlength: 300,
+      default: "",
     },
   },
   baseSchemaOptions,

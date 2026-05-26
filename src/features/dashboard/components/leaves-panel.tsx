@@ -1,10 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { startTransition, useActionState, useCallback, useEffect } from "react";
+import React, { startTransition, useActionState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { applyLeaveRequest, deleteLeaveRequest, reviewLeaveRequest } from "@/features/dashboard/actions/leaves";
-import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
+import { emitDashboardSync, subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
 import { Button } from "@/shared/ui/button";
 import { FormActionButton } from "@/shared/ui/form-action-button";
@@ -51,6 +51,14 @@ export function LeavesPanel({ canApply, canReview, data }: LeavesPanelProps) {
       refreshLeavesView();
     }
   }, [state.success, refreshLeavesView]);
+
+  // Auto-refresh when admin approves/rejects on another tab/device
+  useEffect(() => {
+    const unsub = subscribeDashboardSync(refreshLeavesView);
+    const onVisible = () => { if (document.visibilityState === "visible") refreshLeavesView(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { unsub(); document.removeEventListener("visibilitychange", onVisible); };
+  }, [refreshLeavesView]);
 
   return (
     <div className="space-y-6 overflow-x-hidden px-5 py-5 sm:px-7 sm:py-6">
@@ -457,14 +465,14 @@ function LeadershipLeaveReviewTable({
               <div className="flex flex-wrap gap-2">
                 {canReview && leave.status === "PENDING" ? (
                   <>
-                    <form action={reviewLeaveRequest}>
+                    <form action={reviewLeaveRequest} onSubmit={() => emitDashboardSync("leave-reviewed")}>
                       <input name="leaveId" type="hidden" value={leave.id} />
                       <input name="status" type="hidden" value="APPROVED" />
                       <FormActionButton className="min-w-[94px] rounded-xl px-3 py-2 text-sm shadow-[0_12px_28px_rgba(22,163,74,0.22)]" pendingLabel="Saving..." type="submit">
                         Approve
                       </FormActionButton>
                     </form>
-                    <form action={reviewLeaveRequest}>
+                    <form action={reviewLeaveRequest} onSubmit={() => emitDashboardSync("leave-reviewed")}>
                       <input name="leaveId" type="hidden" value={leave.id} />
                       <input name="status" type="hidden" value="REJECTED" />
                       <FormActionButton
@@ -553,14 +561,14 @@ function LeaveRequestCard({
       <div className="mt-4 flex flex-wrap gap-2">
         {canReview && leave.status === "PENDING" ? (
           <>
-            <form action={reviewLeaveRequest}>
+            <form action={reviewLeaveRequest} onSubmit={() => emitDashboardSync("leave-reviewed")}>
               <input name="leaveId" type="hidden" value={leave.id} />
               <input name="status" type="hidden" value="APPROVED" />
               <FormActionButton className="min-w-[120px] rounded-xl px-4 py-2.5 text-sm shadow-[0_16px_32px_rgba(22,163,74,0.28)] sm:w-auto" pendingLabel="Saving..." type="submit">
                 Approve
               </FormActionButton>
             </form>
-            <form action={reviewLeaveRequest}>
+            <form action={reviewLeaveRequest} onSubmit={() => emitDashboardSync("leave-reviewed")}>
               <input name="leaveId" type="hidden" value={leave.id} />
               <input name="status" type="hidden" value="REJECTED" />
               <FormActionButton
@@ -594,15 +602,66 @@ function LeaveRequestCard({
   );
 }
 
+const OVERVIEW_CARD_CONFIG: Record<string, {
+  gradient: string;
+  shadow: string;
+  icon: React.ReactNode;
+}> = {
+  PENDING: {
+    gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)",
+    shadow: "0 8px 24px rgba(245,158,11,0.3)",
+    icon: (
+      <svg fill="none" height="22" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="22">
+        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+      </svg>
+    ),
+  },
+  APPROVED: {
+    gradient: "linear-gradient(135deg,#10b981,#34d399)",
+    shadow: "0 8px 24px rgba(16,185,129,0.3)",
+    icon: (
+      <svg fill="none" height="22" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24" width="22">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+    ),
+  },
+  REJECTED: {
+    gradient: "linear-gradient(135deg,#ef4444,#f87171)",
+    shadow: "0 8px 24px rgba(239,68,68,0.3)",
+    icon: (
+      <svg fill="none" height="22" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24" width="22">
+        <circle cx="12" cy="12" r="10" /><line x1="15" x2="9" y1="9" y2="15" /><line x1="9" x2="15" y1="9" y2="15" />
+      </svg>
+    ),
+  },
+  HISTORY: {
+    gradient: "linear-gradient(135deg,#6366f1,#818cf8)",
+    shadow: "0 8px 24px rgba(99,102,241,0.3)",
+    icon: (
+      <svg fill="none" height="22" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="22">
+        <rect height="18" rx="2" ry="2" width="18" x="3" y="4" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
+      </svg>
+    ),
+  },
+};
+
 function OverviewCard({ detail, label, value }: { detail: string; label: string; value: string }) {
+  const config = OVERVIEW_CARD_CONFIG[label.toUpperCase()] ?? OVERVIEW_CARD_CONFIG.HISTORY;
   return (
-    <article className="overflow-hidden rounded-[1.7rem] border border-slate-200/80 bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_58%,#fff7ed_100%)] px-5 py-5 shadow-[0_20px_45px_rgba(15,23,42,0.06)]">
+    <article className="relative overflow-hidden rounded-[1.7rem] p-5 text-white shadow-lg"
+      style={{ background: config.gradient, boxShadow: config.shadow }}>
+      {/* decorative circle */}
+      <div className="pointer-events-none absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10" />
+      <div className="pointer-events-none absolute -bottom-4 -left-4 h-16 w-16 rounded-full bg-black/10" />
+
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-blue-600">{label}</p>
-        <span className="h-11 w-11 rounded-2xl bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.32),rgba(14,116,144,0.12)_55%,transparent_70%)]" />
+        <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em] text-white/80">{label}</p>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20">
+          {config.icon}
+        </div>
       </div>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{detail}</p>
+      <p className="mt-3 text-4xl font-black tracking-tight text-white">{value}</p>
+      <p className="mt-2 text-[0.75rem] font-medium leading-5 text-white/70">{detail}</p>
     </article>
   );
 }
@@ -619,11 +678,20 @@ function PanelSection({
   title: string;
 }) {
   return (
-    <section className="min-w-0 rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] p-6 shadow-[0_20px_48px_rgba(15,23,42,0.06)]">
-      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">{eyebrow}</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{title}</h2>
-      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
-      {children}
+    <section className="min-w-0 overflow-hidden rounded-4xl shadow-[0_8px_40px_rgba(15,23,42,0.1)]"
+      style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff" }}>
+      {/* Gradient header band */}
+      <div className="px-6 py-5"
+        style={{
+          background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)",
+          borderBottom: "1px solid rgba(99,102,241,0.1)",
+        }}>
+        <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]"
+          style={{ color: "#6366f1" }}>{eyebrow}</p>
+        <h2 className="mt-1 text-2xl font-bold text-slate-800">{title}</h2>
+        <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
+      </div>
+      <div className="p-6">{children}</div>
     </section>
   );
 }
@@ -637,35 +705,56 @@ type FieldProps = {
 };
 
 function Field({ defaultValue, label, name, placeholder, type = "text" }: FieldProps) {
+  const icon =
+    type === "date" ? (
+      <svg className="shrink-0 text-indigo-400" fill="none" height="16" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="16">
+        <rect height="18" rx="2" ry="2" width="18" x="3" y="4" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
+      </svg>
+    ) : null;
+
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <input
-        className={`w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100 ${
-          type === "date" ? "[color-scheme:light]" : ""
-        }`}
-        defaultValue={defaultValue}
-        name={name}
-        placeholder={placeholder}
-        required
-        type={type}
-      />
-    </label>
+    <div>
+      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>
+        {label}
+      </label>
+      <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
+        {icon && <span className="pointer-events-none absolute left-3.5">{icon}</span>}
+        <input
+          className={`min-w-0 flex-1 bg-transparent py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 ${icon ? "pl-9 pr-4" : "px-4"} ${type === "date" ? "scheme-light" : ""}`}
+          defaultValue={defaultValue}
+          id={name}
+          name={name}
+          placeholder={placeholder}
+          required
+          type={type}
+        />
+      </div>
+    </div>
   );
 }
 
 function TextAreaField({ defaultValue, label, name, placeholder }: Omit<FieldProps, "type">) {
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <textarea
-        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-        defaultValue={defaultValue}
-        name={name}
-        placeholder={placeholder}
-        required
-      />
-    </label>
+    <div>
+      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>
+        {label}
+      </label>
+      <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
+        <span className="pointer-events-none absolute left-3.5 top-3.5">
+          <svg className="text-indigo-400" fill="none" height="16" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="16">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        </span>
+        <textarea
+          className="min-h-28 w-full bg-transparent py-3 pl-9 pr-4 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+          defaultValue={defaultValue}
+          id={name}
+          name={name}
+          placeholder={placeholder}
+          required
+        />
+      </div>
+    </div>
   );
 }
 
@@ -682,21 +771,37 @@ function SelectField({
   name: string;
   options: string[];
 }) {
+  const leaveIcon = (
+    <svg className="shrink-0 text-indigo-400" fill="none" height="16" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="16">
+      <rect height="20" rx="2" ry="2" width="14" x="5" y="2" /><line x1="9" x2="15" y1="7" y2="7" /><line x1="9" x2="15" y1="11" y2="11" /><line x1="9" x2="11" y1="15" y2="15" />
+    </svg>
+  );
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <select
-        className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-        defaultValue={defaultValue}
-        name={name}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {labels?.[option] ?? option}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div>
+      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>
+        {label}
+      </label>
+      <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
+        <span className="pointer-events-none absolute left-3.5">{leaveIcon}</span>
+        <select
+          className="w-full appearance-none bg-transparent py-3 pl-9 pr-8 text-sm text-slate-800 outline-none"
+          defaultValue={defaultValue}
+          id={name}
+          name={name}
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {labels?.[option] ?? option}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-3.5">
+          <svg className="text-slate-400" fill="none" height="14" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" width="14">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </span>
+      </div>
+    </div>
   );
 }
 

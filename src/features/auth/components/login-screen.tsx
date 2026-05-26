@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useActionState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { loginUser } from "@/features/auth/actions";
 import { Feedback } from "@/shared/ui/feedback";
@@ -34,18 +35,21 @@ export function LoginScreen({ registered = false, signupClosed = false }: LoginS
         <div className="animate-orb-2 pointer-events-none absolute -right-20 bottom-0 h-[400px] w-[400px] rounded-full opacity-20"
           style={{ background: "radial-gradient(circle,#0369a1 0%,transparent 65%)" }} />
 
-        {/* Top bar */}
-        <div className="absolute left-0 right-0 top-0 flex items-center justify-between px-10 pt-10">
-          {/* Logo */}
-          <div className="animate-glow-pulse flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-2xl">
-            <span className="text-xl font-black" style={{ color: "#0d3d5a" }}>M</span>
-          </div>
-          {/* 500+ badge */}
+        {/* Main content — centered */}
+        <div className="absolute left-0 right-0 top-0 flex items-center justify-end px-10 pt-10">
           <StatBadge icon={<UsersIcon />} value="500+" label="Active Users" />
         </div>
 
-        {/* Main content — centered */}
-        <div className="relative flex flex-1 flex-col justify-center px-10 pb-10 pt-32">
+        <div className="relative flex flex-1 flex-col justify-center px-10 pb-24 pt-16">
+          <Image
+            alt="Mindaptix Digital"
+            className="animate-logo mb-8 h-auto w-60 object-contain"
+            height={168}
+            priority
+            src="/assets/MINDAPTIX%20DIGITAL%20-%20LOGO%20FINAL%20(1).png"
+            width={240}
+          />
+
           <div className="mb-5 flex items-center gap-2.5">
             <div className="h-[2px] w-8 rounded-full bg-teal-400" />
             <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-teal-400">
@@ -70,7 +74,7 @@ export function LoginScreen({ registered = false, signupClosed = false }: LoginS
           </div>
 
           {/* Mini dashboard preview */}
-          <div className="mt-10 grid grid-cols-2 gap-3 max-w-xs">
+          <div className="hidden">
             <MiniCard
               icon={<TrendIcon />}
               label="Monthly Revenue"
@@ -102,7 +106,7 @@ export function LoginScreen({ registered = false, signupClosed = false }: LoginS
           </div>
         </div>
 
-        <div className="animate-float-slow absolute bottom-10 right-8">
+        <div className="animate-float-slow absolute bottom-16 right-8">
           <div className="glass-card-strong flex items-center gap-3 rounded-2xl px-5 py-3 shadow-2xl">
             <PulseIcon />
             <p className="text-sm font-bold text-white">Live Analytics</p>
@@ -370,13 +374,15 @@ function IconPasswordInput({ icon, ...props }: { icon: React.ReactNode } & React
 function StatBadge({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
   return (
     <div className="glass-card flex items-center gap-2.5 rounded-2xl px-4 py-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-xl"
-        style={{ background: "rgba(45,212,191,0.15)", border: "1px solid rgba(45,212,191,0.25)" }}>
+      <div
+        className="flex h-8 w-8 items-center justify-center rounded-xl"
+        style={{ background: "rgba(45,212,191,0.15)", border: "1px solid rgba(45,212,191,0.25)" }}
+      >
         {icon}
       </div>
       <div className="leading-none">
-        <p className="text-sm font-black text-white">{value}</p>
-        <p className="text-[11px] text-teal-300/80">{label}</p>
+        <p className="text-base font-black text-white">{value}</p>
+        <p className="text-xs text-teal-300">{label}</p>
       </div>
     </div>
   );
@@ -419,6 +425,7 @@ function TrustBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
 function UsersIcon() {
   return <svg fill="none" height="16" stroke="#2dd4bf" strokeWidth="1.8" viewBox="0 0 24 24" width="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
 }
+
 function ShieldIcon() {
   return <svg fill="none" height="12" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="12"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>;
 }

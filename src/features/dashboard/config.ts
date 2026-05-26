@@ -9,6 +9,9 @@ export type DashboardNavKey =
   | "tasks"
   | "dsr"
   | "reports"
+  | "payroll"
+  | "expenses"
+  | "announcements"
   | "settings";
 
 export type DashboardNavItem = {
@@ -26,13 +29,16 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"],
   },
   { key: "employees", label: "Employees", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "MANAGER", "SALES"] },
-  { key: "projects", label: "Projects", href: "/dashboard/projects", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
+  { key: "projects", label: "Projects", href: "/dashboard/projects", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "attendance", label: "Attendance", href: "/dashboard/attendance", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "leaves", label: "Leaves", href: "/dashboard/leaves", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "tasks", label: "Tasks", href: "/dashboard/tasks", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "dsr", label: "DSR", href: "/dashboard/dsr", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
-  { key: "reports", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
-  { key: "settings", label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
+  { key: "reports", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
+  { key: "payroll", label: "Payroll", href: "/dashboard/payroll", allowedRoles: ["SUPER_ADMIN", "EMPLOYEE"] },
+  { key: "expenses", label: "Expenses", href: "/dashboard/expenses", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
+  { key: "announcements", label: "Announcements", href: "/dashboard/announcements", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
+  { key: "settings", label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
 ];
 
 export function getDashboardNavItemsForRole(role: UserRole) {

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useActionState } from "react";
-import { updateAccountPassword, updateCompanySettings } from "@/features/dashboard/actions/settings";
+import { useState, useActionState } from "react";
+import { updateAccountPassword, updateAccountProfile, updateCompanySettings } from "@/features/dashboard/actions/settings";
+import { addHoliday, deleteHoliday } from "@/features/dashboard/actions/holidays";
 import { Feedback } from "@/shared/ui/feedback";
 import { Button } from "@/shared/ui/button";
-import type { SettingsPageData } from "@/features/dashboard/types";
+import type { SettingsPageData, HolidayEntry } from "@/features/dashboard/types";
 
 type SettingsPanelProps = {
   data: SettingsPageData;
@@ -17,16 +17,27 @@ const INITIAL_SETTINGS_STATE = {
     workStart: "09:00",
     workEnd: "18:00",
     leavePolicy: "",
+    workingDays: "26",
+    salaryDay: "1",
+    lateGraceMinutes: "15",
   },
 };
+const INIT_HOLIDAY = { error: undefined, success: undefined };
+const HOLIDAY_TYPES = ["PUBLIC", "OPTIONAL", "COMPANY"] as const;
 
 const INITIAL_PASSWORD_STATE = {
-  values: {
-    confirmPassword: "",
-    currentPassword: "",
-    newPassword: "",
-  },
+  values: { confirmPassword: "", currentPassword: "", newPassword: "" },
 };
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
+}
 
 export function SettingsPanel({ data }: SettingsPanelProps) {
   const [settingsState, settingsAction, settingsPending] = useActionState(updateCompanySettings, {
@@ -36,84 +47,154 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       workStart: data.workStart,
       workEnd: data.workEnd,
       leavePolicy: data.leavePolicy,
+      workingDays: String(data.workingDays ?? 26),
+      salaryDay: String(data.salaryDay ?? 1),
+      lateGraceMinutes: String(data.lateGraceMinutes ?? 15),
     },
   });
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAccountPassword, INITIAL_PASSWORD_STATE);
+  const [profileState, profileAction, profilePending] = useActionState(updateAccountProfile, {
+    values: { fullName: data.currentUserName, email: data.currentUserEmail },
+  });
+  const [holidayAddState, holidayAddAction, holidayAddPending] = useActionState(addHoliday, INIT_HOLIDAY);
+  const [holidayDelState, holidayDelAction, holidayDelPending] = useActionState(deleteHoliday, INIT_HOLIDAY);
+  const [showHolidayForm, setShowHolidayForm] = useState(false);
+
+  const initials = getInitials(data.currentUserName);
 
   return (
-    <div className="space-y-6 px-5 py-5 sm:px-7 sm:py-6">
-      <section className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-500">Account Settings</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Profile And Password</h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          View the signed-in account and set a new password directly from settings.
+    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+      {/* Page header */}
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.26em] text-blue-600">Account Settings</p>
+        <h2 className="mt-2 text-[1.85rem] font-semibold tracking-tight text-slate-950">Profile &amp; Security</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+          Update your personal information and manage your account security settings.
         </p>
+      </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <article className="rounded-[1.7rem] border border-blue-100 bg-[linear-gradient(180deg,#eff6ff_0%,#f8fbff_100%)] p-5">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-blue-600">Signed In Account</p>
-            <div className="mt-5 space-y-4">
-              <InfoBlock label="Full Name" value={data.currentUserName} />
-              <InfoBlock label="Login Email" value={data.currentUserEmail} />
-              <InfoBlock label="Role" value={data.currentUserRoleLabel} />
-            </div>
-          </article>
-
-          <article className="rounded-[1.7rem] border border-slate-100 bg-slate-50 p-5">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-blue-600">Set New Password</p>
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Change Password</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              If you forgot the old password, set a new strong password here for this account.
-            </p>
-
-            <form action={passwordAction} className="mt-5 space-y-4">
-              {passwordState.error ? <Feedback>{passwordState.error}</Feedback> : null}
-              {passwordState.success ? <Feedback tone="success">{passwordState.success}</Feedback> : null}
-
-              <PasswordField
-                defaultValue={passwordState.values?.currentPassword}
-                label="Current Password"
-                name="currentPassword"
-                placeholder="Optional current password"
-              />
-              <PasswordField
-                defaultValue={passwordState.values?.newPassword}
-                label="New Password"
-                name="newPassword"
-                placeholder="Enter new password"
-              />
-              <PasswordField
-                defaultValue={passwordState.values?.confirmPassword}
-                label="Confirm Password"
-                name="confirmPassword"
-                placeholder="Confirm new password"
-              />
-
-              <p className="text-xs leading-5 text-slate-500">
-                Current password optional hai. Fill karoge to verify hoga, blank chhodoge to direct new password set ho jayega.
-              </p>
-
-              <Button className="sm:w-auto" disabled={passwordPending} type="submit">
-                {passwordPending ? "Updating..." : "Update Password"}
-              </Button>
-            </form>
-          </article>
+      {/* Identity banner */}
+      <div className="overflow-hidden rounded-[1.8rem] border border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#f0f9ff_55%,#f8fbff_100%)] shadow-[0_16px_40px_rgba(37,99,235,0.09)]">
+        <div className="flex flex-wrap items-center gap-4 px-6 py-5">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.2rem] bg-[linear-gradient(135deg,#1d4ed8_0%,#0f172a_100%)] text-xl font-bold tracking-wide text-white shadow-[0_14px_32px_rgba(29,78,216,0.36)]">
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xl font-semibold text-slate-950">{data.currentUserName}</p>
+            <p className="mt-0.5 truncate text-sm text-slate-500">{data.currentUserEmail}</p>
+          </div>
+          <span className="inline-flex shrink-0 items-center rounded-full border border-blue-200 bg-white/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 shadow-sm">
+            {data.currentUserRoleLabel}
+          </span>
         </div>
-      </section>
+      </div>
 
-      {data.canManageCompany ? (
-        <section className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-500">Company Settings</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Workspace Controls</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            Manage company name, working hours, and leave policy for the CRM workspace.
+      {/* Profile + Password - 2 col */}
+      <div className="grid gap-5 xl:grid-cols-2">
+        {/* Edit Profile */}
+        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-blue-100 bg-blue-50 text-blue-600">
+              <PersonIcon />
+            </div>
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-blue-600">Personal Info</p>
+              <h3 className="text-lg font-semibold leading-tight text-slate-950">Edit Profile</h3>
+            </div>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Update your display name and login email address.</p>
+
+          <form action={profileAction} className="mt-5 space-y-4">
+            {profileState.error ? <Feedback>{profileState.error}</Feedback> : null}
+            {profileState.success ? <Feedback tone="success">{profileState.success}</Feedback> : null}
+
+            <InputField
+              defaultValue={profileState.values?.fullName ?? data.currentUserName}
+              label="Full Name"
+              name="fullName"
+              placeholder="Enter your full name"
+            />
+            <InputField
+              defaultValue={profileState.values?.email ?? data.currentUserEmail}
+              label="Email Address"
+              name="email"
+              placeholder="Enter your email"
+              type="email"
+            />
+
+            <Button className="sm:w-auto" disabled={profilePending} type="submit">
+              {profilePending ? "Saving..." : "Update Profile"}
+            </Button>
+          </form>
+        </section>
+
+        {/* Change Password */}
+        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-amber-100 bg-amber-50 text-amber-600">
+              <LockIcon />
+            </div>
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-amber-600">Security</p>
+              <h3 className="text-lg font-semibold leading-tight text-slate-950">Change Password</h3>
+            </div>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Leave current password blank to directly set a new one.
           </p>
 
-          <form action={settingsAction} className="mt-6 space-y-4">
+          <form action={passwordAction} className="mt-5 space-y-4">
+            {passwordState.error ? <Feedback>{passwordState.error}</Feedback> : null}
+            {passwordState.success ? <Feedback tone="success">{passwordState.success}</Feedback> : null}
+
+            <PasswordField
+              defaultValue={passwordState.values?.currentPassword}
+              label="Current Password"
+              name="currentPassword"
+              placeholder="Optional — leave blank to skip"
+            />
+            <PasswordField
+              defaultValue={passwordState.values?.newPassword}
+              label="New Password"
+              name="newPassword"
+              placeholder="Enter new password"
+            />
+            <PasswordField
+              defaultValue={passwordState.values?.confirmPassword}
+              label="Confirm Password"
+              name="confirmPassword"
+              placeholder="Re-enter new password"
+            />
+
+            <Button className="sm:w-auto" disabled={passwordPending} type="submit">
+              {passwordPending ? "Updating..." : "Update Password"}
+            </Button>
+          </form>
+        </section>
+      </div>
+
+      {/* Company Settings — admin only */}
+      {data.canManageCompany ? (
+        <>
+        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-emerald-100 bg-emerald-50 text-emerald-600">
+              <BuildingIcon />
+            </div>
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-emerald-600">Workspace</p>
+              <h3 className="text-lg font-semibold leading-tight text-slate-950">Company Settings</h3>
+            </div>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Manage company name, working hours, and leave policy for the entire CRM workspace.
+          </p>
+
+          <form action={settingsAction} className="mt-5 space-y-4">
             {settingsState.error ? <Feedback>{settingsState.error}</Feedback> : null}
             {settingsState.success ? <Feedback tone="success">{settingsState.success}</Feedback> : null}
 
-            <Field
+            <InputField
               defaultValue={settingsState.values?.companyName}
               label="Company Name"
               name="companyName"
@@ -121,15 +202,51 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
             />
 
             <div className="grid gap-4 md:grid-cols-2">
-              <Field defaultValue={settingsState.values?.workStart} label="Work Start" name="workStart" placeholder="09:00" type="time" />
-              <Field defaultValue={settingsState.values?.workEnd} label="Work End" name="workEnd" placeholder="18:00" type="time" />
+              <InputField
+                defaultValue={settingsState.values?.workStart}
+                label="Work Start Time"
+                name="workStart"
+                placeholder="09:00"
+                type="time"
+              />
+              <InputField
+                defaultValue={settingsState.values?.workEnd}
+                label="Work End Time"
+                name="workEnd"
+                placeholder="18:00"
+                type="time"
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <InputField
+                defaultValue={settingsState.values?.workingDays ?? "26"}
+                label="Working Days / Month"
+                name="workingDays"
+                placeholder="26"
+                type="number"
+              />
+              <InputField
+                defaultValue={settingsState.values?.salaryDay ?? "1"}
+                label="Salary Payment Day"
+                name="salaryDay"
+                placeholder="1"
+                type="number"
+              />
+              <InputField
+                defaultValue={settingsState.values?.lateGraceMinutes ?? "15"}
+                label="Late Grace Period (mins)"
+                name="lateGraceMinutes"
+                placeholder="15"
+                type="number"
+              />
             </div>
 
             <TextAreaField
               defaultValue={settingsState.values?.leavePolicy}
               label="Leave Policy"
               name="leavePolicy"
-              placeholder="Write a short leave policy"
+              placeholder="Write a short leave policy for employees"
             />
 
             <Button className="sm:w-auto" disabled={settingsPending} type="submit">
@@ -137,21 +254,69 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
             </Button>
           </form>
         </section>
+
+        {/* Holiday Calendar */}
+        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-violet-100 bg-violet-50 text-violet-600">
+                <CalendarIcon />
+              </div>
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-violet-600">HR Policy</p>
+                <h3 className="text-lg font-semibold leading-tight text-slate-950">Holiday Calendar</h3>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowHolidayForm((v) => !v)}
+              className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100 transition"
+            >
+              {showHolidayForm ? "Cancel" : "+ Add Holiday"}
+            </button>
+          </div>
+
+          {showHolidayForm && (
+            <form action={holidayAddAction} className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4 space-y-3">
+              {holidayAddState.error ? <Feedback>{holidayAddState.error}</Feedback> : null}
+              {holidayAddState.success ? <Feedback tone="success">{holidayAddState.success}</Feedback> : null}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <InputField label="Holiday Name" name="name" placeholder="e.g. Diwali" />
+                <InputField label="Date" name="date" type="date" placeholder="" />
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-slate-700">Type</label>
+                  <select name="type" className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100">
+                    {HOLIDAY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <InputField label="Description (optional)" name="description" placeholder="Brief note about this holiday" />
+              <Button disabled={holidayAddPending} type="submit">
+                {holidayAddPending ? "Adding..." : "Add Holiday"}
+              </Button>
+            </form>
+          )}
+
+          {holidayDelState.error ? <div className="mt-2"><Feedback>{holidayDelState.error}</Feedback></div> : null}
+          {holidayDelState.success ? <div className="mt-2"><Feedback tone="success">{holidayDelState.success}</Feedback></div> : null}
+
+          <div className="mt-4 divide-y divide-slate-100">
+            {data.holidays.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">No holidays added for this year yet.</p>
+            ) : (
+              data.holidays.map((holiday) => (
+                <HolidayRow key={holiday.id} holiday={holiday} deleteAction={holidayDelAction} deletePending={holidayDelPending} />
+              ))
+            )}
+          </div>
+        </section>
+        </>
       ) : null}
     </div>
   );
 }
 
-function InfoBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[1.25rem] border border-white/70 bg-white/90 px-4 py-3 shadow-[0_12px_30px_rgba(37,99,235,0.06)]">
-      <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-blue-500">{label}</p>
-      <p className="mt-2 break-all text-base font-semibold text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-type FieldProps = {
+type InputFieldProps = {
   defaultValue?: string;
   label: string;
   name: string;
@@ -159,12 +324,12 @@ type FieldProps = {
   type?: string;
 };
 
-function Field({ defaultValue, label, name, placeholder, type = "text" }: FieldProps) {
+function InputField({ defaultValue, label, name, placeholder, type = "text" }: InputFieldProps) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <input
-        className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none ${
+        className={`w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100 ${
           type === "time" ? "[color-scheme:light]" : ""
         }`}
         defaultValue={defaultValue}
@@ -177,12 +342,12 @@ function Field({ defaultValue, label, name, placeholder, type = "text" }: FieldP
   );
 }
 
-function TextAreaField({ defaultValue, label, name, placeholder }: Omit<FieldProps, "type">) {
+function TextAreaField({ defaultValue, label, name, placeholder }: Omit<InputFieldProps, "type">) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <textarea
-        className="min-h-32 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none"
+        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
@@ -191,18 +356,13 @@ function TextAreaField({ defaultValue, label, name, placeholder }: Omit<FieldPro
   );
 }
 
-function PasswordField({
-  defaultValue,
-  label,
-  name,
-  placeholder,
-}: Omit<FieldProps, "type">) {
+function PasswordField({ defaultValue, label, name, placeholder }: Omit<InputFieldProps, "type">) {
   const [isVisible, setIsVisible] = useState(false);
 
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3">
+      <div className="flex items-center rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 transition focus-within:border-blue-300 focus-within:ring-4 focus-within:ring-blue-100">
         <input
           className="min-w-0 flex-1 bg-transparent text-slate-900 outline-none"
           defaultValue={defaultValue}
@@ -212,13 +372,92 @@ function PasswordField({
         />
         <button
           aria-label={isVisible ? "Hide password" : "Show password"}
-          className="ml-3 text-sm font-medium text-blue-600"
-          onClick={() => setIsVisible((value) => !value)}
+          className="ml-3 text-sm font-semibold text-blue-600 hover:text-blue-700"
+          onClick={() => setIsVisible((v) => !v)}
           type="button"
         >
           {isVisible ? "Hide" : "Show"}
         </button>
       </div>
     </label>
+  );
+}
+
+function PersonIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M4.5 20c.9-3.5 3.8-6 7.5-6s6.6 2.5 7.5 6" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <rect height="11" rx="2.2" stroke="currentColor" strokeWidth="1.7" width="14" x="5" y="11" />
+      <path d="M8 11V7.5a4 4 0 0 1 8 0V11" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+      <circle cx="12" cy="16.5" fill="currentColor" r="1.2" />
+    </svg>
+  );
+}
+
+function BuildingIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <path d="M3 21h18M4 21V6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v15" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+      <path d="M9 21v-5h6v5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+      <path d="M9 8h1.5M9 12h1.5M13.5 8H15M13.5 12H15" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <rect height="16" rx="2.5" stroke="currentColor" strokeWidth="1.7" width="18" x="3" y="4" />
+      <path d="M3 9h18M8 2v4M16 2v4M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+const HOLIDAY_TYPE_COLORS: Record<string, string> = {
+  PUBLIC: "bg-emerald-100 text-emerald-700",
+  OPTIONAL: "bg-amber-100 text-amber-700",
+  COMPANY: "bg-violet-100 text-violet-700",
+};
+
+function HolidayRow({
+  holiday,
+  deleteAction,
+  deletePending,
+}: {
+  holiday: HolidayEntry;
+  deleteAction: (fd: FormData) => void;
+  deletePending: boolean;
+}) {
+  const [confirm, setConfirm] = useState(false);
+
+  return (
+    <div className="flex items-center justify-between py-3 gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-slate-900 text-sm">{holiday.name}</span>
+          <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${HOLIDAY_TYPE_COLORS[holiday.type] ?? "bg-slate-100 text-slate-500"}`}>
+            {holiday.type}
+          </span>
+        </div>
+        <p className="text-xs text-slate-400 mt-0.5">{holiday.date}{holiday.description ? ` · ${holiday.description}` : ""}</p>
+      </div>
+      {confirm ? (
+        <form action={deleteAction} className="flex items-center gap-2 shrink-0">
+          <input type="hidden" name="holidayId" value={holiday.id} />
+          <button type="submit" disabled={deletePending} className="text-xs text-red-600 font-medium hover:text-red-800">Confirm</button>
+          <button type="button" onClick={() => setConfirm(false)} className="text-xs text-slate-400">Cancel</button>
+        </form>
+      ) : (
+        <button onClick={() => setConfirm(true)} className="shrink-0 text-xs text-red-400 hover:text-red-600">Remove</button>
+      )}
+    </div>
   );
 }

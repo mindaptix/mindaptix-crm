@@ -1,15 +1,13 @@
-"use client";
+﻿"use client";
 
-import type { ReactNode } from "react";
+import React from "react";
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { createSalesLead, type SalesLeadFormState } from "@/features/dashboard/actions/sales-leads";
 import { createManagedUser, deleteManagedUser, updateManagedUserAccess } from "@/features/dashboard/actions/users";
 import { SalesWorkspacePanel } from "@/features/dashboard/components/sales-workspace-panel";
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
 import { Button } from "@/shared/ui/button";
 import { FormActionButton } from "@/shared/ui/form-action-button";
-import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
 import { INITIAL_USER_MANAGEMENT_STATE } from "@/features/auth/lib/user-management-form-state";
 import type {
   EmployeeDirectoryEntry,
@@ -32,8 +30,6 @@ type EmployeesManagementPanelProps = {
   summaryCards: SummaryCard[];
   users: EmployeeDirectoryEntry[];
 };
-const INITIAL_SALES_LEAD_STATE: SalesLeadFormState = {};
-
 export function EmployeesManagementPanel({
   readOnly = false,
   salesLeadPriorityOptions,
@@ -49,22 +45,14 @@ export function EmployeesManagementPanel({
 }: EmployeesManagementPanelProps) {
   const [userState, createUserAction, userPending] = useActionState(createManagedUser, INITIAL_USER_MANAGEMENT_STATE);
   const [updateUserState, updateUserAction, updateUserPending] = useActionState(updateManagedUserAccess, INITIAL_USER_MANAGEMENT_STATE);
-  const [salesLeadState, createSalesLeadAction, salesLeadPending] = useActionState(createSalesLead, INITIAL_SALES_LEAD_STATE);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [selectedUserId, setSelectedUserId] = useState(users[0]?.id ?? "");
-  const salesLabelById = Object.fromEntries(salesOptions.map((salesUser) => [salesUser.id, salesUser.label]));
-  const salesSummaryCards = salesWorkspace.summaryCards.slice(0, 4);
-  const totalTrackedBudget = salesLeadRows.reduce((sum, row) => sum + row.budget, 0);
-  const totalPitchedValue = salesLeadRows.reduce((sum, row) => sum + row.pitchedPrice, 0);
-  const todayMeetingCount = salesLeadRows.filter((row) => row.meetingDate === getTodayDate()).length;
-  const overdueFollowUps = salesWorkspace.followUps.filter(
-    (row) => row.status === "PENDING" && row.followUpDate && row.followUpDate < getTodayDate(),
-  ).length;
-  const openDealCount = salesWorkspace.deals.filter((row) => row.status === "OPEN").length;
-  const pendingCollectionValue = salesWorkspace.payments
-    .filter((row) => row.status === "PENDING" || row.status === "PARTIAL" || row.status === "OVERDUE")
-    .reduce((sum, row) => sum + Math.max(row.amount - row.receivedAmount, 0), 0);
+  const [activeTab, setActiveTab] = useState<"directory" | "create">("directory");
+  const [createSection, setCreateSection] = useState<"account" | "profile" | "bank">("account");
+  const [editSection, setEditSection] = useState<"account" | "profile" | "bank">("account");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [lastUpdateSuccess, setLastUpdateSuccess] = useState<string | null>(null);
   const techSummary = buildTechSummary(users);
 
   const filteredUsers = useMemo(() => {
@@ -104,10 +92,49 @@ export function EmployeesManagementPanel({
   }, [updateUserState.success]);
 
   useEffect(() => {
-    if (salesLeadState.success) {
-      emitDashboardSync("sales-lead-created");
+    if (!isEditModalOpen) {
+      return;
     }
-  }, [salesLeadState.success]);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsEditModalOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isEditModalOpen]);
+
+  useEffect(() => {
+    if (!updateUserState.success) {
+      return;
+    }
+
+    if (updateUserState.success === lastUpdateSuccess) {
+      return;
+    }
+
+    setLastUpdateSuccess(updateUserState.success);
+
+    if (!isEditModalOpen) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsEditModalOpen(false);
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isEditModalOpen, lastUpdateSuccess, updateUserState.success]);
 
   return (
     <div className="space-y-6 px-5 py-5 sm:px-7 sm:py-6">
@@ -117,371 +144,448 @@ export function EmployeesManagementPanel({
         ))}
       </section>
 
-      {canManageWorkspace ? (
-        <section>
-          <PanelSection
-            description="Add employee, admin, or sales accounts with phone, joining date, tech focus, and a basic onboarding document."
-            eyebrow="Employee Management"
-            title="Create Team Account"
-          >
-            <form action={createUserAction} autoComplete="off" className="mt-6 space-y-5">
-              <input autoComplete="username" className="hidden" name="fakeUsername" tabIndex={-1} type="text" />
-              <input autoComplete="new-password" className="hidden" name="fakePassword" tabIndex={-1} type="password" />
-
-              {userState.error ? <Feedback>{userState.error}</Feedback> : null}
-              {userState.success ? <Feedback tone="success">{userState.success}</Feedback> : null}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field defaultValue={userState.values?.fullName} label="Full Name" name="fullName" placeholder="Enter full name" />
-                <Field
-                  autoComplete="off"
-                  defaultValue={userState.values?.email}
-                  label="Email Address"
-                  name="email"
-                  placeholder="Enter email"
-                  type="email"
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field defaultValue={userState.values?.phone} label="Phone" name="phone" placeholder="Enter phone number" />
-                <Field
-                  defaultValue={userState.values?.joiningDate}
-                  fallbackTodayForDate
-                  label="Joining Date"
-                  name="joiningDate"
-                  placeholder="Select joining date"
-                  type="date"
-                />
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.45fr)]">
-                <Field autoComplete="new-password" label="Temporary Password" name="password" placeholder="Create a strong password" type="password" />
-                <SelectField
-                  defaultValue={userState.values?.techStack?.[0] ?? ""}
-                  includePlaceholder
-                  label="Tech Focus"
-                  name="techStack"
-                  options={salesTechnologyOptions}
-                  placeholder="No tech focus"
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <SelectField
-                  defaultValue={userState.values?.role ?? "EMPLOYEE"}
-                  label="Role"
-                  labels={{ EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }}
-                  name="role"
-                  options={["EMPLOYEE", "MANAGER", "SALES"]}
-                />
-                <SelectField
-                  defaultValue={userState.values?.status ?? "ACTIVE"}
-                  label="Status"
-                  name="status"
-                  options={["ACTIVE", "SUSPENDED"]}
-                />
-              </div>
-
-              <FileField label="Document Upload" name="document" />
-
-              <Button className="mt-2 min-w-44 sm:w-auto" disabled={userPending} type="submit">
-                {userPending ? "Creating..." : "Create Account"}
-              </Button>
-            </form>
-          </PanelSection>
-        </section>
-      ) : null}
-
       {shouldShowDirectory ? (
-      <PanelSection
-        description={
-          readOnly
-            ? ""
-            : "Select one employee from the list, then review name, email, role, status, tech focus, and account details from a single editor."
-        }
-        eyebrow={readOnly ? "Workforce Overview" : "Directory"}
-        hideHeader={readOnly}
-        title={readOnly ? "Company Workforce" : "Employee Directory"}
-      >
-        {readOnly ? (
-          <div className="space-y-5">
-            <section className="rounded-[1.7rem] border border-slate-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.9),rgba(255,255,255,0.96))] p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-500">Tech Coverage</p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Employee Tech Mapping</h3>
-                </div>
-                <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {techSummary.length} tech tag(s)
-                </span>
-              </div>
-              <div className="mt-5 flex flex-wrap gap-3">
-                {techSummary.length ? (
-                  techSummary.map((item) => (
-                    <div className="rounded-full border border-blue-100 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.04)]" key={item.label}>
-                      <span className="text-blue-700">{item.label}</span> <span className="text-slate-400">({item.count})</span>
-                    </div>
-                  ))
-                ) : (
-                  null
-                )}
-              </div>
+        <section className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-6">
 
-              <div className="mt-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-blue-500">Search And Filter</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
-                      {filteredUsers.length} result(s)
-                    </span>
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      {roleFilter === "ALL" ? "All Roles" : roleLabel(roleFilter as EmployeeDirectoryEntry["role"])}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.55fr)] xl:items-end">
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-slate-700">Find by name, email, phone, admin, tech, or status</span>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-slate-900 outline-none shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)]"
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="Search workforce records"
-                      value={searchTerm}
-                    />
-                  </label>
-
-                  <div>
-                    <SelectField
-                      defaultValue="ALL"
-                      label="Choose role scope"
-                      labels={{ ALL: "All Roles", EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }}
-                      name="directoryRoleFilter"
-                      onChangeValue={setRoleFilter}
-                      options={["ALL", "EMPLOYEE", "MANAGER", "SALES"]}
-                    />
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <DashboardTable
-              columns={[
-                { label: "Employee", className: "min-w-[180px]" },
-                { label: "Role", className: "min-w-[110px]" },
-                { label: "Tech Focus", className: "min-w-[220px]" },
-                { label: "Manager", className: "min-w-[160px]" },
-                { label: "Today", className: "min-w-[120px]" },
-                { label: "Contact", className: "min-w-[220px]" },
-              ]}
-              emptyMessage="No employees match the current search or filter."
-              hasRows={filteredUsers.length > 0}
-              hideScrollbar
-            >
-              {filteredUsers.map((user) => (
-                <tr key={user.id}>
-                  <DashboardTableCell>
-                    <p className="font-semibold text-slate-900">{user.fullName}</p>
-                    <p className="mt-1 text-xs text-slate-500">{user.joiningDate ? `Joined ${user.joiningDate}` : "Joining date not added"}</p>
-                  </DashboardTableCell>
-                  <DashboardTableCell>
-                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
-                      {roleLabel(user.role)}
-                    </span>
-                  </DashboardTableCell>
-                  <DashboardTableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {user.techStack.length ? (
-                        user.techStack.map((tech) => (
-                          <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700" key={`${user.id}-${tech}`}>
-                            {tech}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">Not set</span>
-                      )}
-                    </div>
-                  </DashboardTableCell>
-                  <DashboardTableCell>{user.managerName || "No admin"}</DashboardTableCell>
-                  <DashboardTableCell>
-                    <span className={getTodayStatusClassName(user.todayStatus)}>{user.todayStatus}</span>
-                  </DashboardTableCell>
-                  <DashboardTableCell>
-                    <p className="text-sm text-slate-900">{user.email}</p>
-                    <p className="mt-1 text-xs text-slate-500">{user.phone || "Phone not added"}</p>
-                  </DashboardTableCell>
-                </tr>
-              ))}
-            </DashboardTable>
-          </div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.55fr)]">
-              <div className="rounded-[1.6rem] border border-slate-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.88),rgba(255,255,255,0.96))] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-blue-500">Search</p>
-                    <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">Search Employees</h3>
-                  </div>
-                  <span className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
-                    {filteredUsers.length} result(s)
-                  </span>
-                </div>
-                <label className="mt-4 block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Find by name, email, phone, admin, tech, or status</span>
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-slate-900 outline-none shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)]"
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search workforce records"
-                    value={searchTerm}
-                  />
-                </label>
-              </div>
-
-              <div className="rounded-[1.6rem] border border-slate-100 bg-[linear-gradient(135deg,rgba(248,250,252,0.94),rgba(255,255,255,0.98))] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-blue-500">Filter</p>
-                    <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">Role Filter</h3>
-                  </div>
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {roleFilter === "ALL" ? "All Roles" : roleLabel(roleFilter as EmployeeDirectoryEntry["role"])}
-                  </span>
-                </div>
-                <div className="mt-4">
-                  <SelectField
-                    defaultValue="ALL"
-                    label="Choose role scope"
-                    labels={{ ALL: "All Roles", EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }}
-                    name="directoryRoleFilter"
-                    onChangeValue={setRoleFilter}
-                    options={["ALL", "EMPLOYEE", "MANAGER", "SALES"]}
-                  />
-                </div>
-              </div>
+          {/* Section header + tab bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-500">
+                {readOnly ? "Workforce Overview" : "Team Management"}
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                {readOnly ? "Company Workforce" : "Employee Directory"}
+              </h2>
             </div>
 
-            <DashboardTable
-              columns={[
-                { label: "Employee" },
-                { label: "Role" },
-                { label: "Status" },
-                { label: "Tech Focus" },
-                { label: "Today" },
-                { label: "Action" },
-              ]}
-              emptyMessage="No employees match the current search or filter."
-              hasRows={filteredUsers.length > 0}
-            >
-              {filteredUsers.map((user) => (
-                <tr className={selectedUser?.id === user.id ? "bg-blue-50/50" : ""} key={user.id}>
-                  <DashboardTableCell>
-                    <p className="font-semibold text-slate-900">{user.fullName}</p>
-                    <p className="mt-1 text-xs text-slate-500">{user.email}</p>
-                  </DashboardTableCell>
-                  <DashboardTableCell>{roleLabel(user.role)}</DashboardTableCell>
-                  <DashboardTableCell>{user.status}</DashboardTableCell>
-                  <DashboardTableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {user.techStack.length ? (
-                        user.techStack.map((tech) => (
-                          <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700" key={`${user.id}-tech-${tech}`}>
-                            {tech}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">Not set</span>
-                      )}
-                    </div>
-                  </DashboardTableCell>
-                  <DashboardTableCell>{user.todayStatus}</DashboardTableCell>
-                  <DashboardTableCell>
-                    <Button className="sm:w-auto" onClick={() => setSelectedUserId(user.id)} type="button">
-                      Edit
-                    </Button>
-                  </DashboardTableCell>
-                </tr>
-              ))}
-            </DashboardTable>
-
-            {selectedUser ? (
-              <section className="rounded-[1.7rem] border border-slate-100 bg-slate-50 p-5" key={selectedUser.id}>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <ReadOnlyField label="Employee Name" value={selectedUser.fullName} />
-                  <ReadOnlyField label="Email" value={selectedUser.email} />
-                  <ReadOnlyField label="Account Status" value={selectedUser.status} />
-                  <ReadOnlyField label="Tech Focus" value={selectedUser.techStack.length ? selectedUser.techStack.join(", ") : "Not set"} />
-                  <ReadOnlyField label="Today Status" value={selectedUser.todayStatus} />
-                  <ReadOnlyField label="Phone" value={selectedUser.phone || "Phone not added"} />
+            {canManageWorkspace ? (
+              <div className="flex items-center gap-3">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                  {users.length} employee{users.length !== 1 ? "s" : ""}
+                </span>
+                <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === "directory" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    onClick={() => setActiveTab("directory")}
+                    type="button"
+                  >
+                    Directory
+                  </button>
+                  <button
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === "create" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    onClick={() => setActiveTab("create")}
+                    type="button"
+                  >
+                    + Add Employee
+                  </button>
                 </div>
-
-                <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-blue-500">Account Controls</p>
-                      <h4 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">Edit Or Remove Account</h4>
-                    </div>
-                    <form action={deleteManagedUser}>
-                      <input name="userId" type="hidden" value={selectedUser.id} />
-                      <FormActionButton className="border border-rose-200 bg-rose-50 text-rose-700 shadow-none hover:bg-rose-100 sm:w-auto" pendingLabel="Deleting..." type="submit" variant="secondary">
-                        Delete Account
-                      </FormActionButton>
-                    </form>
-                  </div>
-
-                  <form action={updateUserAction} className="mt-5 space-y-4">
-                    {updateUserState.error ? <Feedback>{updateUserState.error}</Feedback> : null}
-                    {updateUserState.success ? <Feedback tone="success">{updateUserState.success}</Feedback> : null}
-
-                    <input name="userId" type="hidden" value={selectedUser.id} />
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field defaultValue={selectedUser.fullName} label="Full Name" name="fullName" placeholder="Enter full name" />
-                      <Field defaultValue={selectedUser.email} label="Email Address" name="email" placeholder="Enter email" type="email" />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field defaultValue={selectedUser.phone} label="Phone" name="phone" placeholder="Enter phone number" />
-                      <Field
-                        defaultValue={selectedUser.joiningDate}
-                        fallbackTodayForDate
-                        label="Joining Date"
-                        name="joiningDate"
-                        placeholder="Select joining date"
-                        type="date"
-                      />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <SelectField
-                        defaultValue={selectedUser.role}
-                        label="Role"
-                        labels={{ EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }}
-                        name="role"
-                        options={["EMPLOYEE", "MANAGER", "SALES"]}
-                      />
-                      <SelectField defaultValue={selectedUser.status} label="Status" name="status" options={["ACTIVE", "SUSPENDED"]} />
-                      <SelectField
-                        defaultValue={selectedUser.techStack[0] ?? ""}
-                        includePlaceholder
-                        label="Tech Focus"
-                        name="techStack"
-                        options={salesTechnologyOptions}
-                        placeholder="No tech focus"
-                      />
-                    </div>
-
-                    <Button className="min-w-44 sm:w-auto" disabled={updateUserPending} type="submit">
-                      {updateUserPending ? "Saving..." : "Update Account"}
-                    </Button>
-                  </form>
-                </div>
-              </section>
+              </div>
             ) : null}
           </div>
-        )}
-      </PanelSection>
+
+          {/* CREATE EMPLOYEE TAB — same modal style as Edit */}
+          {canManageWorkspace && activeTab === "create" ? (
+            <div className="mt-6 overflow-hidden rounded-[2rem] bg-white shadow-[0_16px_48px_rgba(15,23,42,0.12)]">
+
+              {/* Gradient header */}
+              <div className="bg-[linear-gradient(135deg,#1d4ed8_0%,#0f172a_100%)] px-6 pb-5 pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[1.1rem] bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">
+                    <svg fill="none" height="24" viewBox="0 0 24 24" width="24">
+                      <path d="M12 5v14M5 12h14" stroke="white" strokeLinecap="round" strokeWidth="2.2" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white/70">New Account</p>
+                    <h3 className="mt-0.5 text-xl font-semibold text-white">Add Team Member</h3>
+                    <p className="mt-0.5 text-sm text-white/60">Fill in all tabs before submitting</p>
+                  </div>
+                </div>
+
+                {/* Tab switcher */}
+                <div className="mt-5 flex rounded-xl bg-white/15 p-1">
+                  {(["account", "profile", "bank"] as const).map((sec) => (
+                    <button
+                      className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
+                        createSection === sec ? "bg-white text-slate-900 shadow-sm" : "text-white/80 hover:text-white"
+                      }`}
+                      key={sec}
+                      onClick={() => setCreateSection(sec)}
+                      type="button"
+                    >
+                      {sec === "account" ? "Account" : sec === "profile" ? "Profile" : "Bank & ID"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Form body */}
+              <form action={createUserAction} autoComplete="off" className="px-6 py-5">
+                <input autoComplete="username" className="hidden" name="fakeUsername" tabIndex={-1} type="text" />
+                <input autoComplete="new-password" className="hidden" name="fakePassword" tabIndex={-1} type="password" />
+
+                {userState.error ? <div className="mb-4"><Feedback>{userState.error}</Feedback></div> : null}
+                {userState.success ? (
+                  <div className="mb-4 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                    <svg className="shrink-0 text-emerald-600" fill="none" height="18" viewBox="0 0 24 24" width="18">
+                      <path d="M5 13l4 4L19 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                    </svg>
+                    <p className="text-sm font-medium text-emerald-700">{userState.success}</p>
+                  </div>
+                ) : null}
+
+                {/* Hidden passthrough fields for inactive tabs */}
+                {createSection !== "profile" ? (
+                  <>
+                    <input name="employeeId" type="hidden" value="" />
+                    <input name="department" type="hidden" value="" />
+                    <input name="designation" type="hidden" value="" />
+                    <input name="dateOfBirth" type="hidden" value="" />
+                    <input name="address" type="hidden" value="" />
+                    <input name="emergencyContact" type="hidden" value="" />
+                  </>
+                ) : null}
+                {createSection !== "bank" ? (
+                  <>
+                    <input name="bankName" type="hidden" value="" />
+                    <input name="bankAccountNumber" type="hidden" value="" />
+                    <input name="bankIfscCode" type="hidden" value="" />
+                    <input name="panNumber" type="hidden" value="" />
+                  </>
+                ) : null}
+
+                {/* ACCOUNT tab */}
+                {createSection === "account" ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field defaultValue={userState.values?.fullName} label="Full Name" name="fullName" placeholder="Enter full name" />
+                      <Field autoComplete="off" defaultValue={userState.values?.email} label="Email Address" name="email" placeholder="Enter email" type="email" />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field defaultValue={userState.values?.phone} label="Phone" name="phone" placeholder="Enter phone number" />
+                      <Field defaultValue={userState.values?.joiningDate} fallbackTodayForDate label="Joining Date" name="joiningDate" placeholder="Select joining date" type="date" />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <SelectField defaultValue={userState.values?.role ?? "EMPLOYEE"} label="Role" labels={{ EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }} name="role" options={["EMPLOYEE", "MANAGER", "SALES"]} />
+                      <SelectField defaultValue={userState.values?.status ?? "ACTIVE"} label="Status" name="status" options={["ACTIVE", "SUSPENDED"]} />
+                      <SelectField defaultValue={userState.values?.techStack?.[0] ?? ""} includePlaceholder label="Tech Focus" name="techStack" options={salesTechnologyOptions} placeholder="No tech focus" />
+                    </div>
+                    <Field autoComplete="new-password" label="Temporary Password" name="password" placeholder="Min 8 chars, upper, lower, number, symbol" type="password" />
+                    <FileField label="Onboarding Document (optional)" name="document" />
+                  </div>
+                ) : null}
+
+                {/* PROFILE tab */}
+                {createSection === "profile" ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <Field label="Employee ID" name="employeeId" placeholder="EMP-001" required={false} />
+                      <Field label="Department" name="department" placeholder="e.g. Engineering" required={false} />
+                      <Field label="Designation" name="designation" placeholder="e.g. Software Engineer" required={false} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Date of Birth" name="dateOfBirth" placeholder="Select date" required={false} type="date" />
+                      <Field label="Emergency Contact" name="emergencyContact" placeholder="Name & phone" required={false} />
+                    </div>
+                    <Field label="Address" name="address" placeholder="Full residential address" required={false} />
+                  </div>
+                ) : null}
+
+                {/* BANK & ID tab */}
+                {createSection === "bank" ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Bank Name" name="bankName" placeholder="e.g. HDFC Bank" required={false} />
+                      <Field label="Account Number" name="bankAccountNumber" placeholder="Account number" required={false} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="IFSC Code" name="bankIfscCode" placeholder="HDFC0001234" required={false} />
+                      <Field label="PAN Number" name="panNumber" placeholder="ABCDE1234F" required={false} />
+                    </div>
+                  </div>
+                ) : null}
+
+                <Button className="mt-6 w-full" disabled={userPending} type="submit">
+                  {userPending ? "Creating Account…" : "Create Account"}
+                </Button>
+              </form>
+
+              {/* Footer cancel */}
+              <div className="border-t border-slate-100 px-6 py-4 text-right">
+                <button
+                  className="text-sm font-medium text-slate-400 transition hover:text-slate-700"
+                  onClick={() => { setActiveTab("directory"); setCreateSection("account"); }}
+                  type="button"
+                >
+                  Cancel — go back to directory
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* DIRECTORY TAB (also shown for readOnly) */}
+          {(!canManageWorkspace || activeTab === "directory") ? (
+            <div className="mt-5 space-y-5">
+              {/* Search + filter row */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="m16.5 16.5 4 4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+                  </svg>
+                  <input
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by name, email, role, tech..."
+                    value={searchTerm}
+                  />
+                </div>
+                <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-0.5">
+                  {(["ALL", "EMPLOYEE", "MANAGER", "SALES"] as const).map((r) => (
+                    <button
+                      className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${roleFilter === r ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+                      key={r}
+                      onClick={() => setRoleFilter(r)}
+                      type="button"
+                    >
+                      {r === "ALL" ? "All" : r === "MANAGER" ? "Admin" : r.charAt(0) + r.slice(1).toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-slate-400">{filteredUsers.length} result{filteredUsers.length !== 1 ? "s" : ""}</span>
+              </div>
+
+              {/* Employee row list */}
+              {filteredUsers.length > 0 ? (
+                <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                  {/* Table header */}
+                  <div className="hidden grid-cols-[2fr_1.6fr_1fr_auto] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400 sm:grid">
+                    <span>Employee</span>
+                    <span>Role &amp; Status</span>
+                    <span>Contact</span>
+                    <span className="w-24 text-right">Action</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {filteredUsers.map((user) => (
+                      <EmployeeRow
+                        canEdit={canManageWorkspace}
+                        key={user.id}
+                        onEdit={() => {
+                          setSelectedUserId(user.id);
+                          setEditSection("account");
+                          setIsEditModalOpen(true);
+                        }}
+                        user={user}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[1.5rem] border border-dashed border-slate-200 py-14 text-center">
+                  <p className="text-sm font-medium text-slate-400">No employees match your search or filter.</p>
+                </div>
+              )}
+
+              {/* EDIT MODAL */}
+              {canManageWorkspace && selectedUser && isEditModalOpen ? (
+                <div
+                  aria-modal="true"
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+                  onClick={() => setIsEditModalOpen(false)}
+                  role="dialog"
+                >
+                  <div
+                    className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-[0_32px_80px_rgba(15,23,42,0.28)]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* ── Modal Header ── */}
+                    <div className={`relative shrink-0 overflow-hidden px-6 pb-5 pt-6 ${getRoleGradient(selectedUser.role)}`}>
+                      {/* Close × button */}
+                      <button
+                        aria-label="Close"
+                        className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+                        onClick={() => setIsEditModalOpen(false)}
+                        type="button"
+                      >
+                        <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                          <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                        </svg>
+                      </button>
+
+                      {/* Avatar + identity */}
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.1rem] bg-white/20 text-lg font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">
+                          {getInitials(selectedUser.fullName)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white/70">Editing Profile</p>
+                          <h4 className="mt-0.5 truncate text-xl font-semibold text-white">{selectedUser.fullName}</h4>
+                          <p className="mt-0.5 truncate text-sm text-white/70">
+                            {selectedUser.designation || selectedUser.email}
+                            {selectedUser.employeeId ? ` · ${selectedUser.employeeId}` : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Tab switcher inside header */}
+                      <div className="mt-5 flex rounded-xl bg-white/15 p-1">
+                        {(["account", "profile", "bank"] as const).map((sec) => (
+                          <button
+                            className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
+                              editSection === sec
+                                ? "bg-white text-slate-900 shadow-sm"
+                                : "text-white/80 hover:text-white"
+                            }`}
+                            key={sec}
+                            onClick={() => setEditSection(sec)}
+                            type="button"
+                          >
+                            {sec === "account" ? "Account" : sec === "profile" ? "Profile" : "Bank & ID"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ── Scrollable form body ── */}
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      {updateUserState.error ? (
+                        <div className="px-6 pt-4"><Feedback>{updateUserState.error}</Feedback></div>
+                      ) : null}
+                      {updateUserState.success ? (
+                        <div className="px-6 pt-4"><Feedback tone="success">{updateUserState.success}</Feedback></div>
+                      ) : null}
+
+                      <form action={updateUserAction} className="px-6 py-5">
+                        <input name="userId" type="hidden" value={selectedUser.id} />
+
+                        {/* Hidden passthrough fields */}
+                        {editSection !== "account" ? (
+                          <>
+                            <input name="fullName" type="hidden" value={selectedUser.fullName} />
+                            <input name="email" type="hidden" value={selectedUser.email} />
+                            <input name="phone" type="hidden" value={selectedUser.phone} />
+                            <input name="joiningDate" type="hidden" value={selectedUser.joiningDate} />
+                            <input name="role" type="hidden" value={selectedUser.role} />
+                            <input name="status" type="hidden" value={selectedUser.status} />
+                            <input name="techStack" type="hidden" value={selectedUser.techStack[0] ?? ""} />
+                          </>
+                        ) : null}
+                        {editSection !== "profile" ? (
+                          <>
+                            <input name="employeeId" type="hidden" value={selectedUser.employeeId} />
+                            <input name="department" type="hidden" value={selectedUser.department} />
+                            <input name="designation" type="hidden" value={selectedUser.designation} />
+                            <input name="dateOfBirth" type="hidden" value={selectedUser.dateOfBirth} />
+                            <input name="address" type="hidden" value={selectedUser.address} />
+                            <input name="emergencyContact" type="hidden" value={selectedUser.emergencyContact} />
+                          </>
+                        ) : null}
+                        {editSection !== "bank" ? (
+                          <>
+                            <input name="bankName" type="hidden" value={selectedUser.bankName} />
+                            <input name="bankAccountNumber" type="hidden" value={selectedUser.bankAccountNumber} />
+                            <input name="bankIfscCode" type="hidden" value={selectedUser.bankIfscCode} />
+                            <input name="panNumber" type="hidden" value={selectedUser.panNumber} />
+                          </>
+                        ) : null}
+
+                        {/* ACCOUNT */}
+                        {editSection === "account" ? (
+                          <div className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field defaultValue={selectedUser.fullName} label="Full Name" name="fullName" placeholder="Enter full name" />
+                              <Field defaultValue={selectedUser.email} label="Email Address" name="email" placeholder="Enter email" type="email" />
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field defaultValue={selectedUser.phone} label="Phone" name="phone" placeholder="Enter phone number" />
+                              <Field defaultValue={selectedUser.joiningDate} fallbackTodayForDate label="Joining Date" name="joiningDate" placeholder="Select joining date" type="date" />
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-3">
+                              <SelectField defaultValue={selectedUser.role} label="Role" labels={{ EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }} name="role" options={["EMPLOYEE", "MANAGER", "SALES"]} />
+                              <SelectField defaultValue={selectedUser.status} label="Status" name="status" options={["ACTIVE", "SUSPENDED"]} />
+                              <SelectField defaultValue={selectedUser.techStack[0] ?? ""} includePlaceholder label="Tech Focus" name="techStack" options={salesTechnologyOptions} placeholder="No tech focus" />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* PROFILE */}
+                        {editSection === "profile" ? (
+                          <div className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-3">
+                              <Field defaultValue={selectedUser.employeeId} label="Employee ID" name="employeeId" placeholder="EMP-001" required={false} />
+                              <Field defaultValue={selectedUser.department} label="Department" name="department" placeholder="Engineering" required={false} />
+                              <Field defaultValue={selectedUser.designation} label="Designation" name="designation" placeholder="Software Engineer" required={false} />
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field defaultValue={selectedUser.dateOfBirth} label="Date of Birth" name="dateOfBirth" placeholder="Select date" required={false} type="date" />
+                              <Field defaultValue={selectedUser.emergencyContact} label="Emergency Contact" name="emergencyContact" placeholder="Name & phone" required={false} />
+                            </div>
+                            <Field defaultValue={selectedUser.address} label="Address" name="address" placeholder="Full residential address" required={false} />
+                          </div>
+                        ) : null}
+
+                        {/* BANK */}
+                        {editSection === "bank" ? (
+                          <div className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field defaultValue={selectedUser.bankName} label="Bank Name" name="bankName" placeholder="e.g. HDFC Bank" required={false} />
+                              <Field defaultValue={selectedUser.bankAccountNumber} label="Account Number" name="bankAccountNumber" placeholder="Account number" required={false} />
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field defaultValue={selectedUser.bankIfscCode} label="IFSC Code" name="bankIfscCode" placeholder="HDFC0001234" required={false} />
+                              <Field defaultValue={selectedUser.panNumber} label="PAN Number" name="panNumber" placeholder="ABCDE1234F" required={false} />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* Save */}
+                        <Button className="mt-6 w-full" disabled={updateUserPending} type="submit">
+                          {updateUserPending ? "Saving Changes…" : "Save Changes"}
+                        </Button>
+                      </form>
+                    </div>
+
+                    {/* ── Footer — Delete ── */}
+                    <div className="shrink-0 border-t border-slate-100 bg-rose-50/40 px-6 py-3">
+                      <form action={deleteManagedUser} className="flex items-center justify-between gap-3">
+                        <input name="userId" type="hidden" value={selectedUser.id} />
+                        <div className="flex items-center gap-2">
+                          <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="shrink-0 text-rose-400">
+                            <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"/>
+                          </svg>
+                          <p className="text-xs text-rose-400">This will permanently delete the account.</p>
+                        </div>
+                        <FormActionButton
+                          className="w-auto shrink-0 border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-none hover:border-rose-300 hover:bg-rose-600 hover:text-white"
+                          pendingLabel="Deleting…"
+                          type="submit"
+                          variant="primary"
+                        >
+                          Delete
+                        </FormActionButton>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Tech coverage summary (read-only view) */}
+              {readOnly && techSummary.length > 0 ? (
+                <div className="mt-2 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Tech Coverage</p>
+                  <div className="flex flex-wrap gap-2">
+                    {techSummary.map((item) => (
+                      <span className="rounded-full border border-blue-100 bg-white px-3 py-1 text-sm font-semibold text-blue-700" key={item.label}>
+                        {item.label} <span className="text-slate-400">({item.count})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+        </section>
       ) : null}
 
       {shouldShowSalesTracker ? (
@@ -498,446 +602,104 @@ export function EmployeesManagementPanel({
         />
       ) : null}
 
-      {false ? (
-        <PanelSection
-          description={
-            salesOnly
-              ? "Aapke sales login ke leads, follow-ups, deals, payments aur target progress yahan visible hain."
-              : "Sales workspace me lead intake, follow-up planning, deal conversion, payment collection aur target tracking ko ek jagah organize kiya gaya hai."
-          }
-          eyebrow={salesOnly ? "My Pipeline" : "Sales Pipeline"}
-          title={salesOnly ? "My Sales Workspace" : "Sales Workspace"}
-        >
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {(salesSummaryCards.length
-            ? salesSummaryCards
-            : [
-                { label: "Tracked Clients", value: String(salesLeadRows.length), detail: "Sales lead register me current rows." },
-                { label: "Meetings Today", value: String(todayMeetingCount), detail: "Today scheduled sales meetings." },
-                { label: "Client Budget", value: formatCurrency(totalTrackedBudget), detail: "Captured client budget across records." },
-                { label: "Quoted Value", value: formatCurrency(totalPitchedValue), detail: "Total value already pitched." },
-              ]
-          ).map((card) => (
-            <OverviewCard detail={card.detail} key={card.label} label={card.label} value={card.value} />
-          ))}
-        </div>
-
-        {canManageWorkspace ? (
-            <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-            <section className="rounded-[1.7rem] border border-slate-100 bg-slate-50 p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-500">New Client Entry</p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Add Sales Record</h3>
-                </div>
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-blue-700">
-                  Desktop Ready
-                </span>
-              </div>
-
-              <form action={createSalesLeadAction} className="mt-6 space-y-4">
-                {salesLeadState.error ? <Feedback>{salesLeadState.error}</Feedback> : null}
-                {salesLeadState.success ? <Feedback tone="success">{salesLeadState.success}</Feedback> : null}
-
-                <SelectField
-                  defaultValue={salesLeadState.values?.salesUserId ?? ""}
-                  includePlaceholder
-                  label="Sales Employee"
-                  labels={salesLabelById}
-                  name="salesUserId"
-                  options={salesOptions.map((salesUser) => salesUser.id)}
-                  placeholder={salesOptions.length ? "Select sales employee" : "No sales employee available"}
-                  required
-                />
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field defaultValue={salesLeadState.values?.companyName} label="Company Name" name="companyName" placeholder="Enter company name" required={false} />
-                  <Field defaultValue={salesLeadState.values?.clientName} label="Client Name" name="clientName" placeholder="Enter client name" />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field defaultValue={salesLeadState.values?.clientPhone} label="Client Mobile" name="clientPhone" placeholder="Enter client mobile number" required={false} />
-                  <Field
-                    autoComplete="off"
-                    defaultValue={salesLeadState.values?.clientEmail}
-                    label="Client Email"
-                    name="clientEmail"
-                    placeholder="Enter client email"
-                    required={false}
-                    type="email"
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <SelectField
-                    defaultValue={salesLeadState.values?.source ?? salesLeadSourceOptions[0] ?? ""}
-                    label="Lead Source"
-                    name="source"
-                    options={salesLeadSourceOptions}
-                    required
-                  />
-                  <SelectField
-                    defaultValue={salesLeadState.values?.status ?? "NEW"}
-                    label="Lead Status"
-                    name="status"
-                    options={salesLeadStatusOptions}
-                    required
-                  />
-                  <SelectField
-                    defaultValue={salesLeadState.values?.priority ?? "WARM"}
-                    label="Priority"
-                    name="priority"
-                    options={salesLeadPriorityOptions}
-                    required
-                  />
-                </div>
-
-                <MultiSelectField
-                  defaultValue={salesLeadState.values?.technologies ?? []}
-                  helperText="Ctrl/Cmd daba ke multiple technologies select karo."
-                  label="Tech Stack"
-                  name="technologies"
-                  options={salesTechnologyOptions}
-                />
-
-                <Field defaultValue={salesLeadState.values?.meetingLink} label="Meeting Link" name="meetingLink" placeholder="https://meet.google.com/..." required={false} />
-
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <Field
-                    defaultValue={salesLeadState.values?.meetingDate}
-                    fallbackTodayForDate
-                    label="Meeting Date"
-                    name="meetingDate"
-                    placeholder="Select meeting date"
-                    required={false}
-                    type="date"
-                  />
-                  <Field defaultValue={salesLeadState.values?.meetingTime} label="Meeting Time" name="meetingTime" placeholder="10:30 AM" required={false} type="time" />
-                  <Field
-                    defaultValue={salesLeadState.values?.nextFollowUpDate}
-                    fallbackTodayForDate
-                    label="Next Follow-up"
-                    name="nextFollowUpDate"
-                    placeholder="Select follow-up date"
-                    required={false}
-                    type="date"
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field
-                    defaultValue={salesLeadState.values?.expectedCloseDate}
-                    label="Expected Close"
-                    name="expectedCloseDate"
-                    placeholder="Select expected close date"
-                    required={false}
-                    type="date"
-                  />
-                  <Field
-                    defaultValue={salesLeadState.values?.deliveryDate}
-                    label="Delivery Date"
-                    name="deliveryDate"
-                    placeholder="Select delivery date"
-                    required={false}
-                    type="date"
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field defaultValue={salesLeadState.values?.budget} label="Client Budget" name="budget" placeholder="Enter client budget" required={false} type="number" />
-                  <Field
-                    defaultValue={salesLeadState.values?.pitchedPrice}
-                    label="Pitched Price"
-                    name="pitchedPrice"
-                    placeholder="Enter quoted price"
-                    required={false}
-                    type="number"
-                  />
-                </div>
-
-                <TextAreaField
-                  defaultValue={salesLeadState.values?.notes}
-                  label="Sales Notes"
-                  name="notes"
-                  placeholder="Call notes, objections, proposal details, next action..."
-                />
-
-                <Button className="mt-2 min-w-44 sm:w-auto" disabled={salesLeadPending || salesOptions.length === 0} type="submit">
-                  {salesLeadPending ? "Saving..." : "Save Sales Record"}
-                </Button>
-              </form>
-            </section>
-
-            <section className="rounded-[1.7rem] border border-slate-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.88),rgba(255,255,255,0.96))] p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <MetricCard
-                  label="Sales Team"
-                  value={String(salesOptions.length)}
-                  tone="blue"
-                  detail="Active sales employees available for client handling."
-                />
-                <MetricCard
-                  label="Meetings Today"
-                  value={String(todayMeetingCount)}
-                  tone="amber"
-                  detail="Sales meetings scheduled for the current day."
-                />
-                <MetricCard
-                  label="Pending Collection"
-                  value={formatCurrency(pendingCollectionValue)}
-                  tone="emerald"
-                  detail="Outstanding amount still waiting to be collected."
-                />
-                <MetricCard
-                  label="Overdue Follow-ups"
-                  value={String(overdueFollowUps)}
-                  tone="violet"
-                  detail="Pending follow-ups already due before today."
-                />
-              </div>
-
-              <div className="mt-5 rounded-[1.5rem] border border-white/80 bg-white/80 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Pipeline Note</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-950">Lead, follow-up, deal aur collection ko ek hi workflow me rakho.</p>
-                  </div>
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {salesLeadRows.length ? `${salesLeadRows.length} lead(s)` : "No leads yet"}
-                  </span>
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Open Deals</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-950">{openDealCount}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">Proposal aur negotiation phase me chal rahe commercial opportunities.</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Quoted Value</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(totalPitchedValue)}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">Sales team ne ab tak leads par kitni commercial value quote ki hai.</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        ) : null}
-
-        <div className="mt-6">
-          <DashboardTable
-            columns={[
-              { label: "Sales Rep", className: "min-w-[180px]" },
-              { label: "Client", className: "min-w-[220px]" },
-              { label: "Source / Status", className: "min-w-[220px]" },
-              { label: "Follow-up", className: "min-w-[230px]" },
-              { label: "Commercial", className: "min-w-[220px]" },
-            ]}
-            emptyMessage="Sales lead records will appear here after the first pipeline entry is created."
-            hasRows={salesLeadRows.length > 0}
-            hideScrollbar
-          >
-            {salesLeadRows.map((row) => (
-              <tr key={row.id}>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{row.salesUserName}</p>
-                  <p className="mt-1 text-xs text-slate-500">{row.salesUserEmail || "Sales email not added"}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{row.companyName || row.clientName}</p>
-                  <p className="mt-1 text-sm text-slate-600">{row.companyName ? row.clientName : row.clientEmail || "Client email not added"}</p>
-                  <div className="mt-2 space-y-1 text-xs text-slate-500">
-                    <p>{row.clientPhone || "Phone not added"}</p>
-                    {row.technologies.length ? <p>{row.technologies.join(", ")}</p> : <p>Technology scope not selected</p>}
-                  </div>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <div className="flex flex-wrap gap-2">
-                    <Pill label={row.source} tone="blue" />
-                    <Pill label={row.status.replaceAll("_", " ")} tone={row.status === "WON" ? "emerald" : row.status === "LOST" ? "rose" : "amber"} />
-                    <Pill label={row.priority} tone={row.priority === "HOT" ? "rose" : row.priority === "COLD" ? "slate" : "violet"} />
-                  </div>
-                  <p className="mt-3 text-xs text-slate-500">Created {row.createdAt}</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">{row.notes || "No sales note added yet."}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <div className="space-y-2">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        Meeting {row.meetingDate || "pending"} {row.meetingTime ? `• ${row.meetingTime}` : ""}
-                      </p>
-                      {row.meetingLink ? (
-                        <a className="mt-2 inline-flex text-sm font-semibold text-blue-700 underline-offset-4 hover:underline" href={row.meetingLink} rel="noreferrer" target="_blank">
-                          Open meeting link
-                        </a>
-                      ) : (
-                        <p className="mt-2 text-sm text-slate-500">Meeting link not added</p>
-                      )}
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Next Follow-up</p>
-                      <p className="mt-2 text-sm font-medium text-slate-900">{row.nextFollowUpDate || "Not scheduled"}</p>
-                      <p className="mt-1 text-xs text-slate-500">Expected close {row.expectedCloseDate || "not fixed"}</p>
-                    </div>
-                  </div>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{formatCurrency(row.budget)}</p>
-                  <p className="mt-1 text-xs text-slate-500">Client budget</p>
-                  <p className="mt-4 font-semibold text-slate-950">{formatCurrency(row.pitchedPrice)}</p>
-                  <p className="mt-1 text-xs text-slate-500">Quoted by team</p>
-                  <p className="mt-4 text-sm font-medium text-slate-900">{row.deliveryDate || "Delivery not fixed"}</p>
-                  <p className="mt-1 text-xs text-slate-500">Planned handover</p>
-                </DashboardTableCell>
-              </tr>
-            ))}
-          </DashboardTable>
-        </div>
-
-        <div className="mt-6 grid gap-6 xl:grid-cols-2">
-          <PipelineTableSection
-            columns={[
-              { label: "Client", className: "min-w-[180px]" },
-              { label: "Follow-up", className: "min-w-[160px]" },
-              { label: "Status", className: "min-w-[140px]" },
-            ]}
-            description="Today and upcoming contact commitments."
-            emptyMessage="No follow-up queue is available yet."
-            eyebrow="Follow-up Queue"
-            hasRows={salesWorkspace.followUps.length > 0}
-            title="Follow-ups"
-          >
-            {salesWorkspace.followUps.map((row) => (
-              <tr key={row.id}>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{row.clientName}</p>
-                  <p className="mt-1 text-xs text-slate-500">{row.salesUserName}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-medium text-slate-900">{row.followUpDate}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {row.followUpTime || "Time not fixed"} • {row.channel}
-                  </p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <Pill label={row.status} tone={row.status === "COMPLETED" ? "emerald" : row.status === "MISSED" ? "rose" : "amber"} />
-                  <p className="mt-2 text-xs leading-5 text-slate-500">{row.outcome || "Outcome note pending"}</p>
-                </DashboardTableCell>
-              </tr>
-            ))}
-          </PipelineTableSection>
-
-          <PipelineTableSection
-            columns={[
-              { label: "Deal", className: "min-w-[200px]" },
-              { label: "Stage", className: "min-w-[140px]" },
-              { label: "Value", className: "min-w-[160px]" },
-            ]}
-            description="Proposal se closure tak active commercial opportunities."
-            emptyMessage="No deal records are available yet."
-            eyebrow="Deal Tracker"
-            hasRows={salesWorkspace.deals.length > 0}
-            title="Deals"
-          >
-            {salesWorkspace.deals.map((row) => (
-              <tr key={row.id}>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{row.title}</p>
-                  <p className="mt-1 text-xs text-slate-500">{row.salesUserName}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <Pill label={row.stage.replaceAll("_", " ")} tone={row.status === "WON" ? "emerald" : row.status === "LOST" ? "rose" : "blue"} />
-                  <p className="mt-2 text-xs text-slate-500">Status {row.status.replaceAll("_", " ")}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{formatCurrency(row.amount)}</p>
-                  <p className="mt-1 text-xs text-slate-500">{row.probability}% probability</p>
-                  <p className="mt-2 text-xs text-slate-500">Close {row.expectedCloseDate || "not fixed"}</p>
-                </DashboardTableCell>
-              </tr>
-            ))}
-          </PipelineTableSection>
-        </div>
-
-        <div className="mt-6 grid gap-6 xl:grid-cols-2">
-          <PipelineTableSection
-            columns={[
-              { label: "Invoice", className: "min-w-[160px]" },
-              { label: "Due", className: "min-w-[150px]" },
-              { label: "Collection", className: "min-w-[180px]" },
-            ]}
-            description="Pending, partial aur overdue payment visibility."
-            emptyMessage="No payment tracker records are available yet."
-            eyebrow="Collections"
-            hasRows={salesWorkspace.payments.length > 0}
-            title="Payments"
-          >
-            {salesWorkspace.payments.map((row) => (
-              <tr key={row.id}>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{row.invoiceNumber || "Invoice pending"}</p>
-                  <p className="mt-1 text-xs text-slate-500">{row.salesUserName}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-medium text-slate-900">{row.dueDate || "No due date"}</p>
-                  <p className="mt-1 text-xs text-slate-500">Received {row.receivedDate || "not yet"}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{formatCurrency(row.amount)}</p>
-                  <p className="mt-1 text-xs text-slate-500">Received {formatCurrency(row.receivedAmount)}</p>
-                  <div className="mt-2">
-                    <Pill label={row.status} tone={row.status === "PAID" ? "emerald" : row.status === "OVERDUE" ? "rose" : "amber"} />
-                  </div>
-                </DashboardTableCell>
-              </tr>
-            ))}
-          </PipelineTableSection>
-
-          <PipelineTableSection
-            columns={[
-              { label: "Sales Rep", className: "min-w-[180px]" },
-              { label: "Month", className: "min-w-[140px]" },
-              { label: "Progress", className: "min-w-[200px]" },
-            ]}
-            description="Monthly target, achieved amount aur incentive snapshot."
-            emptyMessage="No sales targets have been created yet."
-            eyebrow="Targets"
-            hasRows={salesWorkspace.targets.length > 0}
-            title="Target Tracker"
-          >
-            {salesWorkspace.targets.map((row) => (
-              <tr key={row.id}>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{row.salesUserName}</p>
-                  <p className="mt-1 text-xs text-slate-500">Incentive {formatCurrency(row.incentiveAmount)}</p>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-medium text-slate-900">{row.monthKey}</p>
-                  <div className="mt-2">
-                    <Pill label={row.status} tone={row.status === "ACHIEVED" ? "emerald" : row.status === "MISSED" ? "rose" : "blue"} />
-                  </div>
-                </DashboardTableCell>
-                <DashboardTableCell>
-                  <p className="font-semibold text-slate-950">{row.achievementRate}%</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {formatCurrency(row.achievedAmount)} / {formatCurrency(row.targetAmount)}
-                  </p>
-                </DashboardTableCell>
-              </tr>
-            ))}
-          </PipelineTableSection>
-        </div>
-      </PanelSection>
-        ) : null}
 
     </div>
   );
 }
 
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
+function getInitials(name: string) {
+  return name.trim().split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+}
+
+function getRoleGradient(role: string) {
+  switch (role) {
+    case "SUPER_ADMIN": return "bg-[linear-gradient(135deg,#7c3aed,#4f46e5)]";
+    case "MANAGER": return "bg-[linear-gradient(135deg,#1d4ed8,#0284c7)]";
+    case "SALES": return "bg-[linear-gradient(135deg,#d97706,#dc2626)]";
+    default: return "bg-[linear-gradient(135deg,#059669,#0284c7)]";
+  }
+}
+
+function getRoleBadgeClass(role: string) {
+  switch (role) {
+    case "SUPER_ADMIN": return "border-violet-100 bg-violet-50 text-violet-700";
+    case "MANAGER": return "border-blue-100 bg-blue-50 text-blue-700";
+    case "SALES": return "border-amber-100 bg-amber-50 text-amber-700";
+    default: return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  }
+}
+
+function EmployeeRow({
+  canEdit,
+  onEdit,
+  user,
+}: {
+  canEdit: boolean;
+  onEdit: () => void;
+  user: EmployeeDirectoryEntry;
+}) {
   return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
+    <div
+      className="flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/60 sm:grid sm:grid-cols-[2fr_1.6fr_1fr_auto] sm:gap-4 sm:px-5"
+    >
+      {/* Col 1 — Avatar + Name */}
+      <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-none">
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.75rem] text-xs font-bold text-white shadow-sm ${getRoleGradient(user.role)}`}>
+          {getInitials(user.fullName)}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-900">{user.fullName}</p>
+          <p className="truncate text-xs text-slate-400">{user.designation || user.email}</p>
+        </div>
+      </div>
+
+      {/* Col 2 — Role / Status / Tech */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] ${getRoleBadgeClass(user.role)}`}>
+          {roleLabel(user.role)}
+        </span>
+        <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] ${
+          user.status === "ACTIVE" ? "border-emerald-100 bg-emerald-50 text-emerald-600" : "border-rose-100 bg-rose-50 text-rose-600"
+        }`}>
+          {user.status}
+        </span>
+        <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.1em] ${
+          user.todayStatus === "Present"
+            ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+            : user.todayStatus === "On Leave"
+              ? "border-amber-100 bg-amber-50 text-amber-700"
+              : "border-rose-100 bg-rose-50 text-rose-600"
+        }`}>
+          {user.todayStatus}
+        </span>
+        {user.techStack.slice(0, 2).map((tech) => (
+          <span className="rounded-full border border-violet-100 bg-violet-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-violet-700" key={tech}>
+            {tech}
+          </span>
+        ))}
+        {user.techStack.length > 2 ? (
+          <span className="rounded-full border border-slate-100 bg-slate-50 px-2 py-0.5 text-[0.62rem] font-semibold text-slate-400">
+            +{user.techStack.length - 2}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Col 3 — Contact */}
+      <div className="hidden min-w-0 sm:block">
+        <p className="truncate text-xs font-medium text-slate-600">{user.phone || "—"}</p>
+        {user.joiningDate ? <p className="mt-0.5 text-xs text-slate-400">Joined {user.joiningDate}</p> : null}
+      </div>
+
+      {/* Col 4 — Action */}
+      {canEdit ? (
+        <button
+          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+          onClick={onEdit}
+          type="button"
+        >
+          Edit
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -949,62 +711,6 @@ function OverviewCard({ detail, label, value }: { detail: string; label: string;
       <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
       <p className="mt-2 text-sm leading-6 text-slate-500">{detail}</p>
     </article>
-  );
-}
-
-function MetricCard({
-  detail,
-  label,
-  tone,
-  value,
-}: {
-  detail: string;
-  label: string;
-  tone: "amber" | "blue" | "emerald" | "violet";
-  value: string;
-}) {
-  const toneClassName =
-    tone === "amber"
-      ? "border-amber-100 bg-amber-50/80 text-amber-700"
-      : tone === "emerald"
-        ? "border-emerald-100 bg-emerald-50/80 text-emerald-700"
-        : tone === "violet"
-          ? "border-violet-100 bg-violet-50/80 text-violet-700"
-          : "border-blue-100 bg-blue-50/80 text-blue-700";
-
-  return (
-    <article className={`rounded-[1.5rem] border px-4 py-4 shadow-[0_14px_35px_rgba(15,23,42,0.04)] ${toneClassName}`}>
-      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em]">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
-    </article>
-  );
-}
-
-function PanelSection({
-  children,
-  description,
-  eyebrow,
-  hideHeader = false,
-  title,
-}: {
-  children: ReactNode;
-  description: string;
-  eyebrow: string;
-  hideHeader?: boolean;
-  title: string;
-}) {
-  return (
-    <section className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-      {!hideHeader ? (
-        <>
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-500">{eyebrow}</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{title}</h2>
-          {description ? <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{description}</p> : null}
-        </>
-      ) : null}
-      {children}
-    </section>
   );
 }
 
@@ -1036,7 +742,7 @@ function Field({
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <input
-        className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none ${
+        className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 ${
           type === "date" ? "[color-scheme:light]" : ""
         }`}
         autoComplete={autoComplete}
@@ -1088,7 +794,7 @@ function SelectField({
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <select
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none"
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
         defaultValue={defaultValue}
         name={name}
         onChange={(event) => onChangeValue?.(event.target.value)}
@@ -1102,126 +808,6 @@ function SelectField({
         ))}
       </select>
     </label>
-  );
-}
-
-function MultiSelectField({
-  defaultValue,
-  helperText,
-  label,
-  name,
-  optionLabels,
-  options,
-  required = true,
-}: {
-  defaultValue: string[];
-  helperText?: string;
-  label: string;
-  name: string;
-  optionLabels?: Record<string, string>;
-  options: string[];
-  required?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <select
-        className="min-h-40 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none"
-        defaultValue={defaultValue}
-        multiple
-        name={name}
-        required={required}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {optionLabels?.[option] ?? option}
-          </option>
-        ))}
-      </select>
-      {helperText ? <span className="mt-2 block text-xs text-slate-500">{helperText}</span> : null}
-    </label>
-  );
-}
-
-function TextAreaField({
-  defaultValue,
-  label,
-  name,
-  placeholder,
-}: {
-  defaultValue?: string;
-  label: string;
-  name: string;
-  placeholder: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <textarea
-        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none"
-        defaultValue={defaultValue}
-        name={name}
-        placeholder={placeholder}
-      />
-    </label>
-  );
-}
-
-function PipelineTableSection({
-  children,
-  columns,
-  description,
-  emptyMessage,
-  eyebrow,
-  hasRows,
-  title,
-}: {
-  children: ReactNode;
-  columns: Array<{ label: string; className?: string }>;
-  description: string;
-  emptyMessage: string;
-  eyebrow: string;
-  hasRows: boolean;
-  title: string;
-}) {
-  return (
-    <section className="rounded-[1.7rem] border border-slate-100 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.04)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-500">{eyebrow}</p>
-      <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{title}</h3>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-      <div className="mt-5">
-        <DashboardTable columns={columns} emptyMessage={emptyMessage} hasRows={hasRows} hideScrollbar>
-          {children}
-        </DashboardTable>
-      </div>
-    </section>
-  );
-}
-
-function Pill({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "amber" | "blue" | "emerald" | "rose" | "slate" | "violet";
-}) {
-  const className =
-    tone === "amber"
-      ? "border-amber-100 bg-amber-50 text-amber-700"
-      : tone === "emerald"
-        ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-        : tone === "rose"
-          ? "border-rose-100 bg-rose-50 text-rose-700"
-          : tone === "slate"
-            ? "border-slate-200 bg-slate-100 text-slate-700"
-            : tone === "violet"
-              ? "border-violet-100 bg-violet-50 text-violet-700"
-              : "border-blue-100 bg-blue-50 text-blue-700";
-
-  return (
-    <span className={`rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.15em] ${className}`}>
-      {label}
-    </span>
   );
 }
 
@@ -1243,30 +829,6 @@ function buildTechSummary(users: EmployeeDirectoryEntry[]) {
     .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
 }
 
-function getTodayStatusClassName(status: string) {
-  if (status === "Present") {
-    return "rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700";
-  }
-
-  if (status === "On Leave") {
-    return "rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700";
-  }
-
-  if (status === "Not Marked") {
-    return "rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-rose-700";
-  }
-
-  return "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600";
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function roleLabel(role: EmployeeDirectoryEntry["role"]) {
   switch (role) {
     case "SUPER_ADMIN":
@@ -1279,8 +841,3 @@ function roleLabel(role: EmployeeDirectoryEntry["role"]) {
       return "Sales";
   }
 }
-
-
-
-
-

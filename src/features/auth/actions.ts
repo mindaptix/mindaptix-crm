@@ -9,7 +9,25 @@ import { hashPassword, verifyPassword } from "@/features/auth/lib/password";
 import { isPublicRegistrationOpen } from "@/features/auth/lib/user-admin";
 import { getDefaultDashboardHrefForRole } from "@/features/dashboard/config";
 import { UserModel } from "@/database/mongodb/models/user";
+import { LoginAttemptModel } from "@/database/mongodb/models/workforce/login-attempt";
 import type { UserRole } from "@/features/auth/lib/rbac";
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+
+async function checkRateLimit(email: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MS);
+  const recentFails = await LoginAttemptModel.countDocuments({
+    email,
+    success: false,
+    attemptedAt: { $gte: windowStart },
+  });
+  return recentFails >= MAX_FAILED_ATTEMPTS;
+}
+
+async function recordAttempt(email: string, success: boolean, ipAddress: string) {
+  await LoginAttemptModel.create({ email, success, ipAddress, attemptedAt: new Date() }).catch(() => null);
+}
 
 export async function registerUser(_previousState: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const fullName = String(formData.get("fullName") ?? "").trim();
@@ -104,12 +122,24 @@ export async function loginUser(_previousState: AuthFormState, formData: FormDat
     };
   }
 
+  const headerStore = await headers();
+  const ipAddress = headerStore.get("x-forwarded-for") ?? "";
+
   try {
     await connectDb();
+
+    const isLocked = await checkRateLimit(email);
+    if (isLocked) {
+      return {
+        error: "Too many failed attempts. Account temporarily locked for 15 minutes.",
+        values: { email },
+      };
+    }
 
     const user = await UserModel.findOne({ email });
 
     if (!user) {
+      await recordAttempt(email, false, ipAddress);
       if (process.env.NODE_ENV !== "production") {
         console.warn("[auth] login failed user not found", { email });
       }
@@ -130,6 +160,7 @@ export async function loginUser(_previousState: AuthFormState, formData: FormDat
     const isValidPassword = await verifyPassword(password, user.passwordHash);
 
     if (!isValidPassword) {
+      await recordAttempt(email, false, ipAddress);
       if (process.env.NODE_ENV !== "production") {
         console.warn("[auth] login failed invalid password", { email });
       }
@@ -141,6 +172,7 @@ export async function loginUser(_previousState: AuthFormState, formData: FormDat
     }
 
     if (userStatus !== "ACTIVE") {
+      await recordAttempt(email, false, ipAddress);
       if (process.env.NODE_ENV !== "production") {
         console.warn("[auth] login failed inactive user", { email, status: userStatus });
       }
@@ -151,10 +183,10 @@ export async function loginUser(_previousState: AuthFormState, formData: FormDat
       };
     }
 
-    const headerStore = await headers();
+    await recordAttempt(email, true, ipAddress);
 
     await createUserSession(user, {
-      ipAddress: headerStore.get("x-forwarded-for") ?? "",
+      ipAddress,
       userAgent: headerStore.get("user-agent") ?? "",
     });
 

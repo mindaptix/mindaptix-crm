@@ -132,6 +132,16 @@ export async function updateManagedUserAccess(
     .filter(Boolean);
   const role = String(formData.get("role") ?? "");
   const status = String(formData.get("status") ?? "");
+  const employeeId = String(formData.get("employeeId") ?? "").trim();
+  const department = String(formData.get("department") ?? "").trim();
+  const designation = String(formData.get("designation") ?? "").trim();
+  const dateOfBirth = String(formData.get("dateOfBirth") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const emergencyContact = String(formData.get("emergencyContact") ?? "").trim();
+  const bankAccountNumber = String(formData.get("bankAccountNumber") ?? "").trim();
+  const bankName = String(formData.get("bankName") ?? "").trim();
+  const bankIfscCode = String(formData.get("bankIfscCode") ?? "").trim().toUpperCase();
+  const panNumber = String(formData.get("panNumber") ?? "").trim().toUpperCase();
 
   if (
     !userId ||
@@ -176,6 +186,16 @@ export async function updateManagedUserAccess(
     managerId: resolvedManagerId.value,
     status,
     techStack,
+    employeeId,
+    department,
+    designation,
+    dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+    address,
+    emergencyContact,
+    bankAccountNumber,
+    bankName,
+    bankIfscCode,
+    panNumber,
   });
 
   revalidatePath("/dashboard/employees");
@@ -184,7 +204,13 @@ export async function updateManagedUserAccess(
 
   return {
     success: "Account details updated successfully.",
-    values: { fullName, email, phone, joiningDate, managerId: resolvedManagerId.value, techStack, role: role as UserRole, status: status as UserStatus },
+    values: {
+      fullName, email, phone, joiningDate,
+      managerId: resolvedManagerId.value,
+      techStack, role: role as UserRole, status: status as UserStatus,
+      employeeId, department, designation, dateOfBirth, address, emergencyContact,
+      bankAccountNumber, bankName, bankIfscCode, panNumber,
+    },
   };
 }
 

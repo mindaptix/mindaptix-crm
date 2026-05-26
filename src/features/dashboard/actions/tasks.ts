@@ -24,7 +24,7 @@ type TaskState = {
 export async function createTask(_previousState: TaskState, formData: FormData): Promise<TaskState> {
   const session = await getCurrentSession();
 
-  if (!session || session.user.role !== "MANAGER") {
+  if (!session || (session.user.role !== "MANAGER" && session.user.role !== "SUPER_ADMIN")) {
     return { error: "Only admin can assign tasks." };
   }
 

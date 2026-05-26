@@ -13,6 +13,16 @@ export type UserManagementFormState = {
     techStack?: string[];
     role?: UserRole;
     status?: UserStatus;
+    employeeId?: string;
+    department?: string;
+    designation?: string;
+    dateOfBirth?: string;
+    address?: string;
+    emergencyContact?: string;
+    bankAccountNumber?: string;
+    bankName?: string;
+    bankIfscCode?: string;
+    panNumber?: string;
   };
 };
 

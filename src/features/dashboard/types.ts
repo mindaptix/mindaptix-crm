@@ -133,6 +133,17 @@ export type EmployeeDirectoryEntry = {
   projectIds: string[];
   documentName: string;
   documentUrl: string;
+  employeeId: string;
+  department: string;
+  designation: string;
+  dateOfBirth: string;
+  address: string;
+  emergencyContact: string;
+  bankAccountNumber: string;
+  bankName: string;
+  bankIfscCode: string;
+  panNumber: string;
+  profilePhotoUrl: string;
 };
 
 export type EmployeeProjectEntry = {
@@ -290,6 +301,11 @@ export type AttendanceRecordView = {
   checkInAt: string;
   checkOutAt: string;
   status: string;
+  workMode: string;
+  isHalfDay: boolean;
+  isLate: boolean;
+  lateByMinutes: number;
+  overtimeMinutes: number;
 };
 
 export type AttendanceMonthlyRow = {
@@ -503,4 +519,173 @@ export type SettingsPageData = {
   workStart: string;
   workEnd: string;
   leavePolicy: string;
+  workingDays: number;
+  salaryDay: number;
+  lateGraceMinutes: number;
+  holidays: HolidayEntry[];
+};
+
+// ─── Salary & Payroll ───────────────────────────────────────────────────────
+
+export type SalaryStructureEntry = {
+  id: string;
+  userId: string;
+  employeeName: string;
+  employeeEmail: string;
+  basicSalary: number;
+  hra: number;
+  transportAllowance: number;
+  medicalAllowance: number;
+  otherAllowances: number;
+  grossSalary: number;
+  tds: number;
+  providentFund: number;
+  otherDeductions: number;
+  netSalary: number;
+  effectiveFrom: string;
+  status: string;
+  note: string;
+};
+
+export type PayslipEntry = {
+  id: string;
+  userId: string;
+  employeeName: string;
+  employeeEmail: string;
+  monthKey: string;
+  basicSalary: number;
+  hra: number;
+  transportAllowance: number;
+  medicalAllowance: number;
+  otherAllowances: number;
+  grossSalary: number;
+  tds: number;
+  providentFund: number;
+  leaveDays: number;
+  leaveDeduction: number;
+  lateDays: number;
+  lateDeduction: number;
+  otherDeductions: number;
+  totalDeductions: number;
+  netSalary: number;
+  presentDays: number;
+  workingDays: number;
+  status: string;
+  paidOn: string;
+  note: string;
+};
+
+export type PayrollPageData = {
+  summaryCards: SummaryCard[];
+  salaryStructures: SalaryStructureEntry[];
+  payslips: PayslipEntry[];
+  employeeOptions: EmployeeOption[];
+  selectedMonthKey: string;
+};
+
+// ─── Leave Balance ──────────────────────────────────────────────────────────
+
+export type LeaveBalanceEntry = {
+  id: string;
+  userId: string;
+  employeeName: string;
+  employeeEmail: string;
+  year: number;
+  paidLeaveTotal: number;
+  paidLeaveUsed: number;
+  paidLeaveRemaining: number;
+  sickLeaveTotal: number;
+  sickLeaveUsed: number;
+  sickLeaveRemaining: number;
+  casualLeaveTotal: number;
+  casualLeaveUsed: number;
+  casualLeaveRemaining: number;
+  compOffEarned: number;
+  compOffUsed: number;
+  compOffRemaining: number;
+};
+
+// ─── Expenses ───────────────────────────────────────────────────────────────
+
+export type ExpenseEntry = {
+  id: string;
+  userId: string;
+  employeeName: string;
+  employeeEmail: string;
+  title: string;
+  category: string;
+  amount: number;
+  expenseDate: string;
+  description: string;
+  receiptUrl: string;
+  receiptName: string;
+  status: string;
+  reviewNote: string;
+  paidOn: string;
+  createdAt: string;
+};
+
+export type ExpensePageData = {
+  summaryCards: SummaryCard[];
+  expenses: ExpenseEntry[];
+  canReview: boolean;
+};
+
+// ─── Announcements ──────────────────────────────────────────────────────────
+
+export type AnnouncementEntry = {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  isPinned: boolean;
+  expiresAt: string;
+  createdByName: string;
+  createdAt: string;
+};
+
+export type AnnouncementsPageData = {
+  announcements: AnnouncementEntry[];
+  canManage: boolean;
+};
+
+// ─── Holidays ───────────────────────────────────────────────────────────────
+
+export type HolidayEntry = {
+  id: string;
+  name: string;
+  date: string;
+  year: number;
+  type: string;
+  description: string;
+};
+
+// ─── Employee Documents ─────────────────────────────────────────────────────
+
+export type EmployeeDocumentEntry = {
+  id: string;
+  userId: string;
+  documentType: string;
+  fileName: string;
+  fileUrl: string;
+  note: string;
+  expiryDate: string;
+  uploadedAt: string;
+};
+
+// ─── Audit Log ──────────────────────────────────────────────────────────────
+
+export type AuditLogEntry = {
+  id: string;
+  actorName: string;
+  actorRole: string;
+  action: string;
+  targetName: string;
+  detail: string;
+  createdAt: string;
+};
+
+export type AuditLogPageData = {
+  logs: AuditLogEntry[];
+  summaryCards: SummaryCard[];
 };
