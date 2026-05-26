@@ -1,6 +1,7 @@
 "use client";
 
-import React, { type ReactNode, useActionState, useCallback, useEffect, useMemo, useState, startTransition } from "react";
+import React, { type ReactNode, useActionState, useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { addTaskComment, createTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
 import { emitDashboardSync, subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
@@ -41,6 +42,7 @@ const PRIORITY_CONFIG: Record<string, { bg: string; text: string; border: string
 export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createTask, INITIAL_TASK_STATE);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
@@ -51,7 +53,10 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
   }, [router]);
 
   useEffect(() => {
-    if (state.success) emitDashboardSync("task-created");
+    if (state.success) {
+      emitDashboardSync("task-created");
+      setIsCreateOpen(false);
+    }
   }, [state.success]);
 
   // Auto-refresh when admin assigns a task (employee sees it instantly)
@@ -90,101 +95,29 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
         <StatCard gradient="linear-gradient(135deg,#ec4899,#f43f5e)" shadow="rgba(236,72,153,0.3)"  icon={<FireIcon />}  label="High Priority"  value={high_count} />
       </div>
 
-      <div className={`grid gap-5 ${canAssign ? "xl:grid-cols-[420px_minmax(0,1fr)]" : ""}`}>
-
-        {/* ── Assign task form (admin) ── */}
-        {canAssign && (
-          <div className="overflow-hidden rounded-[1.8rem]"
-            style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.08)" }}>
-            <div className="px-6 py-5"
-              style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
-              <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Assign Task</p>
-              <h2 className="mt-1 text-2xl font-bold text-slate-800">Create Task</h2>
-              <p className="mt-1 text-sm text-slate-500">Assign a task to an employee with priority and due date.</p>
+      {/* ── Task board (full width) ── */}
+      <div className="overflow-hidden rounded-[1.8rem]"
+        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.08)" }}>
+        <div className="px-6 py-5"
+          style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Task Board</p>
+              <h2 className="mt-1 text-2xl font-bold text-slate-800">
+                {canAssign ? "All Tasks" : "My Tasks"}
+              </h2>
             </div>
-            <div className="p-6">
-              <form action={formAction} className="space-y-4">
-                {state.error  && <Feedback>{state.error}</Feedback>}
-                {state.success && <Feedback tone="success">{state.success}</Feedback>}
-
-                <FormField icon={<TitleIcon />} label="Task Title" name="title" placeholder="Enter task title" defaultValue={state.values?.title} />
-                <FormTextArea label="Description" name="description" placeholder="Describe the work clearly" defaultValue={state.values?.description} />
-                <FormSelect
-                  icon={<UserIcon />}
-                  label="Assign To"
-                  name="assignedUserId"
-                  defaultValue={state.values?.assignedUserId ?? ""}
-                  includePlaceholder
-                  options={data.employeeOptions.map((e) => e.id)}
-                  labels={Object.fromEntries(data.employeeOptions.map((e) => [e.id, e.label]))}
-                />
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField icon={<CalIcon />} label="Due Date" name="dueDate" placeholder="Due date" type="date" defaultValue={state.values?.dueDate} />
-                  <FormSelect
-                    icon={<FlagIcon />}
-                    label="Priority"
-                    name="priority"
-                    defaultValue={state.values?.priority ?? "MEDIUM"}
-                    options={["LOW", "MEDIUM", "HIGH"]}
-                    labels={{ LOW: "Low", MEDIUM: "Medium", HIGH: "High" }}
-                  />
-                </div>
-
-                {/* Labels */}
-                <div>
-                  <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500">Labels</p>
-                  <div className="flex flex-wrap gap-2">
-                    {data.labelOptions.map((lbl) => (
-                      <label
-                        key={lbl}
-                        className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-[0.72rem] font-semibold transition-all"
-                        style={{ borderColor: "rgba(99,102,241,0.2)", background: "rgba(99,102,241,0.05)", color: "#4f46e5" }}
-                      >
-                        <input className="accent-indigo-500" defaultChecked={state.values?.labels?.includes(lbl)} name="labels" type="checkbox" value={lbl} />
-                        {lbl}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Attachment */}
-                <div>
-                  <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500">Attachments</p>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50/40"
-                    style={{ borderColor: "rgba(99,102,241,0.2)" }}>
-                    <svg fill="none" height="18" stroke="#6366f1" strokeWidth="2" viewBox="0 0 24 24" width="18">
-                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                    </svg>
-                    <span className="text-sm text-slate-500">Click to attach files</span>
-                    <input className="hidden" multiple name="attachments" type="file" />
-                  </label>
-                </div>
-
+            <div className="flex items-center gap-3">
+              {canAssign && (
                 <button
-                  className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-60"
-                  style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 8px 24px rgba(99,102,241,0.35)" }}
-                  disabled={pending}
-                  type="submit"
+                  className="rounded-xl px-4 py-2.5 text-sm font-bold text-white transition-all hover:brightness-110 active:scale-[0.97]"
+                  style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 6px 18px rgba(99,102,241,0.35)" }}
+                  onClick={() => setIsCreateOpen(true)}
+                  type="button"
                 >
-                  {pending ? "Assigning…" : "✓ Assign Task"}
+                  + Create Task
                 </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ── Task board ── */}
-        <div className="overflow-hidden rounded-[1.8rem]"
-          style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.08)" }}>
-          <div className="px-6 py-5"
-            style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Task Board</p>
-                <h2 className="mt-1 text-2xl font-bold text-slate-800">
-                  {canAssign ? "All Tasks" : "My Tasks"}
-                </h2>
-              </div>
+              )}
               <div className="flex items-center gap-2 rounded-full px-3 py-1.5"
                 style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}>
                 <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />
@@ -192,6 +125,7 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
               </div>
             </div>
           </div>
+        </div>
 
           {/* Filters */}
           <div className="flex flex-wrap gap-3 border-b border-slate-100 px-6 py-4">
@@ -237,9 +171,171 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
               ))}
             </div>
           )}
+      </div>
+
+      {/* ── Create Task Modal ── */}
+      {isCreateOpen && canAssign ? (
+        <CreateTaskModal
+          data={data}
+          formAction={formAction}
+          onClose={() => setIsCreateOpen(false)}
+          pending={pending}
+          state={state as CreateTaskState}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* ─── Create Task Modal ─── */
+type CreateTaskState = {
+  error?: string;
+  success?: string;
+  values?: {
+    title?: string;
+    description?: string;
+    assignedUserId?: string;
+    dueDate?: string;
+    priority?: TaskPriority;
+    labels?: string[];
+  };
+};
+
+function CreateTaskModal({
+  data,
+  formAction,
+  onClose,
+  pending,
+  state,
+}: {
+  data: TaskPageData;
+  formAction: (fd: FormData) => void;
+  onClose: () => void;
+  pending: boolean;
+  state: CreateTaskState;
+}) {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+    >
+      <div
+        className="flex h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-[0_32px_80px_rgba(15,23,42,0.3)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="relative shrink-0 px-6 pb-5 pt-6"
+          style={{ background: "linear-gradient(135deg,#6366f1 0%,#4f46e5 100%)" }}>
+          <button
+            aria-label="Close"
+            className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+            onClick={onClose}
+            type="button"
+          >
+            <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+              <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-4">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[1rem] bg-white/20">
+              <svg fill="none" height="22" viewBox="0 0 24 24" width="22">
+                <path d="M12 5v14M5 12h14" stroke="white" strokeLinecap="round" strokeWidth="2.2" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em] text-white/70">Assign Task</p>
+              <h4 className="mt-0.5 text-xl font-bold text-white">Create Task</h4>
+              <p className="mt-0.5 text-sm text-white/60">Assign a task to an employee with priority and due date.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable form */}
+        <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <form action={formAction} className="space-y-4 px-6 py-5" ref={formRef}>
+            {state.error && <Feedback>{state.error}</Feedback>}
+            {state.success && <Feedback tone="success">{state.success}</Feedback>}
+
+            <FormField icon={<TitleIcon />} label="Task Title" name="title" placeholder="Enter task title" defaultValue={state.values?.title} />
+            <FormTextArea label="Description" name="description" placeholder="Describe the work clearly" defaultValue={state.values?.description} />
+            <FormSelect
+              icon={<UserIcon />}
+              label="Assign To"
+              name="assignedUserId"
+              defaultValue={state.values?.assignedUserId ?? ""}
+              includePlaceholder
+              options={data.employeeOptions.map((e) => e.id)}
+              labels={Object.fromEntries(data.employeeOptions.map((e) => [e.id, e.label]))}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField icon={<CalIcon />} label="Due Date" name="dueDate" placeholder="Due date" type="date" defaultValue={state.values?.dueDate} />
+              <FormSelect
+                icon={<FlagIcon />}
+                label="Priority"
+                name="priority"
+                defaultValue={state.values?.priority ?? "MEDIUM"}
+                options={["LOW", "MEDIUM", "HIGH"]}
+                labels={{ LOW: "Low", MEDIUM: "Medium", HIGH: "High" }}
+              />
+            </div>
+
+            {/* Labels */}
+            <div>
+              <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500">Labels</p>
+              <div className="flex flex-wrap gap-2">
+                {data.labelOptions.map((lbl) => (
+                  <label
+                    key={lbl}
+                    className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-[0.72rem] font-semibold transition-all"
+                    style={{ borderColor: "rgba(99,102,241,0.2)", background: "rgba(99,102,241,0.05)", color: "#4f46e5" }}
+                  >
+                    <input className="accent-indigo-500" defaultChecked={state.values?.labels?.includes(lbl)} name="labels" type="checkbox" value={lbl} />
+                    {lbl}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Attachment */}
+            <div>
+              <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500">Attachments</p>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50/40"
+                style={{ borderColor: "rgba(99,102,241,0.2)" }}>
+                <svg fill="none" height="18" stroke="#6366f1" strokeWidth="2" viewBox="0 0 24 24" width="18">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+                <span className="text-sm text-slate-500">Click to attach files</span>
+                <input className="hidden" multiple name="attachments" type="file" />
+              </label>
+            </div>
+
+            <button
+              className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 8px 24px rgba(99,102,241,0.35)" }}
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Assigning…" : "✓ Assign Task"}
+            </button>
+          </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

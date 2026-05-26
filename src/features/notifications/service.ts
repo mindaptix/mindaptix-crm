@@ -7,6 +7,7 @@ import { NotificationModel, type NotificationType } from "@/database/mongodb/mod
 import { SettingModel } from "@/database/mongodb/models/setting";
 import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
+import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time";
 
 type CreateNotificationInput = {
   recipientUserId: string;
@@ -72,8 +73,8 @@ export async function getAdminUserIds() {
 export async function syncWorkflowNotifications(session: AuthenticatedSession) {
   await connectDb();
 
-  const today = getTodayDate();
-  const currentTime = getCurrentTimeKey();
+  const today = formatIndiaDateKey();
+  const currentTime = formatIndiaTimeKey();
   const settings = await SettingModel.findOne({ key: "company" }, { workStart: 1 }).lean();
   const workStart = settings?.workStart ?? "09:00";
 
@@ -84,12 +85,13 @@ export async function syncWorkflowNotifications(session: AuthenticatedSession) {
       TaskModel.find({ assignedUserId: session.user.id, status: { $ne: "COMPLETED" } }, { title: 1, dueDate: 1 }).lean(),
     ]);
 
-    if (!todayUpdate && currentTime >= "19:00") {
+    // Remind between 18:30 and 19:00 IST if DSR not submitted
+    if (!todayUpdate && currentTime >= "18:30" && currentTime < "19:00") {
       await createNotification({
         recipientUserId: session.user.id,
         type: "DSR_REMINDER",
-        title: "DSR pending for today",
-        message: "Submit your DSR before day close so reporting stays complete.",
+        title: "DSR pending — please submit before 7 PM",
+        message: "You haven't submitted today's DSR yet. Submit it now before the day closes.",
         actionUrl: "/dashboard/dsr",
         sourceKey: `dsr-reminder:${session.user.id}:${today}`,
       });
@@ -128,16 +130,8 @@ export async function syncWorkflowNotifications(session: AuthenticatedSession) {
   }
 }
 
-function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getCurrentTimeKey() {
-  return new Date().toISOString().slice(11, 16);
-}
-
 function formatTimeKey(value: Date | string) {
-  return new Date(value).toISOString().slice(11, 16);
+  return formatIndiaTimeKey(value);
 }
 
 function addDaysToDate(dateKey: string, days: number) {
