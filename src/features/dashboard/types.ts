@@ -581,6 +581,7 @@ export type PayrollPageData = {
   payslips: PayslipEntry[];
   employeeOptions: EmployeeOption[];
   selectedMonthKey: string;
+  availableMonthKeys: string[];
 };
 
 // ─── Leave Balance ──────────────────────────────────────────────────────────

@@ -1397,18 +1397,29 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
   };
 }
 
+function getLast3MonthKeys(): string[] {
+  const keys: string[] = [];
+  const date = new Date();
+  for (let i = 0; i < 3; i++) {
+    keys.push(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`);
+    date.setUTCMonth(date.getUTCMonth() - 1);
+  }
+  return keys; // [current, prev1, prev2]
+}
+
 export async function getPayrollPageData(session: AuthenticatedSession): Promise<PayrollPageData> {
   await connectDb();
 
   const today = getTodayDate();
   const currentMonthKey = today.slice(0, 7);
+  const last3Months = getLast3MonthKeys();
 
   if (session.user.role === "EMPLOYEE") {
     const userId = session.user.id;
     const [myUser, mySalary, myPayslips] = await Promise.all([
       UserModel.findById(userId, { fullName: 1, email: 1 }).lean(),
       SalaryModel.findOne({ userId, status: "ACTIVE" }).lean(),
-      PayslipModel.find({ userId }).sort({ monthKey: -1 }).lean(),
+      PayslipModel.find({ userId, monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
     ]);
 
     const gross = mySalary
@@ -1476,13 +1487,14 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       payslips: myPayslips.map(mapPayslip),
       employeeOptions: [],
       selectedMonthKey: currentMonthKey,
+      availableMonthKeys: last3Months,
     };
   }
 
   const [employees, salaryStructures, payslips] = await Promise.all([
     UserModel.find({ role: { $in: ["EMPLOYEE", "MANAGER"] }, status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean(),
     SalaryModel.find({ status: "ACTIVE" }).lean(),
-    PayslipModel.find({ monthKey: currentMonthKey }).lean(),
+    PayslipModel.find({ monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
   ]);
 
   const salaryMap = new Map(salaryStructures.map((s) => [s.userId, s]));
@@ -1555,6 +1567,7 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
     }),
     employeeOptions: employees.map((e) => ({ id: e._id.toString(), label: e.fullName })),
     selectedMonthKey: currentMonthKey,
+    availableMonthKeys: last3Months,
   };
 }
 

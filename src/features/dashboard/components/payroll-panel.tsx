@@ -18,11 +18,17 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-IN", { currency: "INR", maximumFractionDigits: 0, style: "currency" }).format(amount);
 }
 
+function formatMonthLabel(monthKey: string) {
+  const date = new Date(`${monthKey}-01T00:00:00.000Z`);
+  return date.toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
 export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
   const [activeTab, setActiveTab] = useState<"structures" | "payslips">("structures");
   const [selectedEmployee, setSelectedEmployee] = useState<SalaryStructureEntry | null>(null);
   const [showSetSalaryForm, setShowSetSalaryForm] = useState(false);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
+  const [selectedPayslipMonth, setSelectedPayslipMonth] = useState(data.availableMonthKeys[0] ?? data.selectedMonthKey);
   const [salaryState, salaryAction, salaryPending] = useActionState(setSalaryStructure, SALARY_INITIAL);
   const [payslipState, payslipAction, payslipPending] = useActionState(generatePayslip, SALARY_INITIAL);
   const [paidState, paidAction, paidPending] = useActionState(markPayslipPaid, SALARY_INITIAL);
@@ -80,28 +86,39 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
           />
 
           {showSetSalaryForm && canManage ? (
-            <div className="border-b border-slate-100 bg-violet-50/80 px-5 py-4 sm:px-6">
+            <div className="border-b border-slate-100 bg-violet-50/80 px-5 py-4 sm:px-6" key={selectedEmployee?.userId ?? "new"}>
               <form action={salaryAction} className="space-y-4">
                 {salaryState.error ? <Feedback>{salaryState.error}</Feedback> : null}
                 {salaryState.success ? <Feedback tone="success">{salaryState.success}</Feedback> : null}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <SelectField label="Employee" name="userId" options={data.employeeOptions} />
-                  <InputField defaultValue={selectedEmployee?.basicSalary?.toString()} label="Basic Salary (INR)" name="basicSalary" placeholder="0" type="number" />
-                  <InputField defaultValue={selectedEmployee?.hra?.toString()} label="HRA (INR)" name="hra" placeholder="0" type="number" />
-                  <InputField defaultValue={selectedEmployee?.transportAllowance?.toString()} label="Transport Allowance (INR)" name="transportAllowance" placeholder="0" type="number" />
-                  <InputField defaultValue={selectedEmployee?.medicalAllowance?.toString()} label="Medical Allowance (INR)" name="medicalAllowance" placeholder="0" type="number" />
-                  <InputField label="Other Allowances (INR)" name="otherAllowances" placeholder="0" type="number" />
-                  <InputField defaultValue={selectedEmployee?.tds?.toString()} label="TDS (INR)" name="tds" placeholder="0" type="number" />
-                  <InputField defaultValue={selectedEmployee?.providentFund?.toString()} label="Provident Fund (INR)" name="providentFund" placeholder="0" type="number" />
-                  <InputField label="Other Deductions (INR)" name="otherDeductions" placeholder="0" type="number" />
-                  <InputField defaultValue={selectedEmployee?.effectiveFrom} label="Effective From" name="effectiveFrom" placeholder="" type="date" />
+                  {selectedEmployee ? (
+                    <div>
+                      <p className="mb-1 block text-xs font-medium text-slate-700">Employee</p>
+                      <div className="flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 py-2">
+                        <span className="text-sm font-semibold text-slate-900">{selectedEmployee.employeeName}</span>
+                        <span className="text-xs text-slate-400">{selectedEmployee.employeeEmail}</span>
+                      </div>
+                      <input name="userId" type="hidden" value={selectedEmployee.userId} />
+                    </div>
+                  ) : (
+                    <SelectField label="Employee" name="userId" options={data.employeeOptions} />
+                  )}
+                  <InputField defaultValue={selectedEmployee?.basicSalary ? selectedEmployee.basicSalary.toString() : ""} label="Basic Salary (INR)" name="basicSalary" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.hra ? selectedEmployee.hra.toString() : ""} label="HRA (INR)" name="hra" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.transportAllowance ? selectedEmployee.transportAllowance.toString() : ""} label="Transport Allowance (INR)" name="transportAllowance" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.medicalAllowance ? selectedEmployee.medicalAllowance.toString() : ""} label="Medical Allowance (INR)" name="medicalAllowance" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.otherAllowances ? selectedEmployee.otherAllowances.toString() : ""} label="Other Allowances (INR)" name="otherAllowances" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.tds ? selectedEmployee.tds.toString() : ""} label="TDS (INR)" name="tds" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.providentFund ? selectedEmployee.providentFund.toString() : ""} label="Provident Fund (INR)" name="providentFund" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.otherDeductions ? selectedEmployee.otherDeductions.toString() : ""} label="Other Deductions (INR)" name="otherDeductions" placeholder="0" type="number" />
+                  <InputField defaultValue={selectedEmployee?.effectiveFrom ?? ""} label="Effective From" name="effectiveFrom" placeholder="" type="date" />
                 </div>
                 <TextAreaField label="Note (optional)" name="note" placeholder="Reason for revision" />
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button className="sm:w-auto" disabled={salaryPending} type="submit">
                     {salaryPending ? "Saving..." : "Save Salary Structure"}
                   </Button>
-                  <Button className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 sm:w-auto" onClick={() => setShowSetSalaryForm(false)} type="button">
+                  <Button className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 sm:w-auto" onClick={() => { setShowSetSalaryForm(false); setSelectedEmployee(null); }} type="button">
                     Cancel
                   </Button>
                 </div>
@@ -156,8 +173,22 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
           <PanelHeader
             action={canManage ? <Button className="sm:w-auto" onClick={() => setShowGenerateForm((value) => !value)}>Generate Payslip</Button> : null}
             eyebrow="Monthly Payroll"
-            title={`Payslips - ${data.selectedMonthKey}`}
+            title="Payslips"
           />
+
+          {/* Month tabs — last 3 months */}
+          <div className="flex gap-1 overflow-x-auto border-b border-slate-100 bg-slate-50/60 px-5 py-2.5">
+            {data.availableMonthKeys.map((mk) => (
+              <button
+                className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${selectedPayslipMonth === mk ? "bg-white text-violet-700 shadow border border-violet-100" : "text-slate-500 hover:text-slate-700"}`}
+                key={mk}
+                onClick={() => { setSelectedPayslipMonth(mk); setShowGenerateForm(false); }}
+                type="button"
+              >
+                {formatMonthLabel(mk)}
+              </button>
+            ))}
+          </div>
 
           {showGenerateForm && canManage ? (
             <div className="border-b border-slate-100 bg-violet-50/80 px-5 py-4 sm:px-6">
@@ -166,7 +197,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
                 {payslipState.success ? <Feedback tone="success">{payslipState.success}</Feedback> : null}
                 <div className="grid gap-4 sm:grid-cols-3">
                   <SelectField label="Employee" name="userId" options={data.employeeOptions} />
-                  <InputField defaultValue={data.selectedMonthKey} label="Month (YYYY-MM)" name="monthKey" placeholder="" type="month" />
+                  <InputField defaultValue={selectedPayslipMonth} label="Month (YYYY-MM)" name="monthKey" placeholder="" type="month" />
                   <InputField defaultValue="26" label="Working Days" name="workingDays" placeholder="26" type="number" />
                 </div>
                 <TextAreaField label="Note (optional)" name="note" placeholder="Additional note for this payslip" />
@@ -191,13 +222,16 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {data.payslips.length === 0 ? (
-                  <tr><td className="px-4 py-10 text-center text-slate-400" colSpan={8}>No payslips generated for {data.selectedMonthKey} yet.</td></tr>
-                ) : (
-                  data.payslips.map((slip) => (
-                    <PayslipRow canManage={canManage} key={slip.id} paidAction={paidAction} paidPending={paidPending} slip={slip} />
-                  ))
-                )}
+                {(() => {
+                  const monthPayslips = data.payslips.filter((p) => p.monthKey === selectedPayslipMonth);
+                  return monthPayslips.length === 0 ? (
+                    <tr><td className="px-4 py-10 text-center text-slate-400" colSpan={8}>No payslips generated for {formatMonthLabel(selectedPayslipMonth)} yet.</td></tr>
+                  ) : (
+                    monthPayslips.map((slip) => (
+                      <PayslipRow canManage={canManage} key={slip.id} paidAction={paidAction} paidPending={paidPending} slip={slip} />
+                    ))
+                  );
+                })()}
               </tbody>
             </table>
           </div>
