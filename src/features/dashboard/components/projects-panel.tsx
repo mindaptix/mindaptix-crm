@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createManagedProject, deleteManagedProject, updateManagedProject } from "@/features/dashboard/actions/projects";
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
@@ -30,6 +30,16 @@ type ProjectFormState = {
 
 const INITIAL_PROJECT_STATE: ProjectFormState = {};
 
+type CreateDraft = {
+  name?: string;
+  summary?: string;
+  status?: string;
+  priority?: string;
+  dueDate?: string;
+  techStack?: string[];
+  assignedUserIds?: string[];
+};
+
 const STATUS_STYLES: Record<string, { card: string; chip: string; dot: string; label: string }> = {
   PLANNING:    { card: "border-blue-200/70",   chip: "border-blue-100 bg-blue-50 text-blue-700",     dot: "bg-blue-400",    label: "Planning" },
   IN_PROGRESS: { card: "border-emerald-200/70", chip: "border-emerald-100 bg-emerald-50 text-emerald-700", dot: "bg-emerald-400 animate-pulse", label: "In Progress" },
@@ -52,6 +62,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<CreateDraft>({});
   const [lastUpdateSuccess, setLastUpdateSuccess] = useState<string | null>(null);
 
   const employeeLabels = useMemo(
@@ -80,6 +91,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
   useEffect(() => {
     if (createState.success) {
       emitDashboardSync("project-created");
+      setCreateDraft({});
       setIsCreateOpen(false);
     }
   }, [createState.success]);
@@ -277,9 +289,11 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
           createPending={createPending}
           createProjectAction={createProjectAction}
           createState={createState}
+          draft={createDraft}
           employeeLabels={employeeLabels}
           employeeOptions={data.employeeOptions}
           onClose={() => setIsCreateOpen(false)}
+          onSaveDraft={setCreateDraft}
           technologyOptions={data.technologyOptions}
         />
       ) : null}
@@ -462,26 +476,48 @@ function CreateModal({
   createPending,
   createProjectAction,
   createState,
+  draft,
   employeeLabels,
   employeeOptions,
   onClose,
+  onSaveDraft,
   technologyOptions,
 }: {
   createPending: boolean;
   createProjectAction: (fd: FormData) => void;
   createState: ProjectFormState;
+  draft: CreateDraft;
   employeeLabels: Record<string, string>;
   employeeOptions: { id: string; label: string }[];
   onClose: () => void;
+  onSaveDraft: (d: CreateDraft) => void;
   technologyOptions: string[];
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function handleClose() {
+    if (formRef.current) {
+      const fd = new FormData(formRef.current);
+      onSaveDraft({
+        name: (fd.get("name") as string) || undefined,
+        summary: (fd.get("summary") as string) || undefined,
+        status: (fd.get("status") as string) || undefined,
+        priority: (fd.get("priority") as string) || undefined,
+        dueDate: (fd.get("dueDate") as string) || undefined,
+        techStack: ((fd.get("techStackCsv") as string) || "").split(",").filter(Boolean),
+        assignedUserIds: ((fd.get("assignedUserIdsCsv") as string) || "").split(",").filter(Boolean),
+      });
+    }
+    onClose();
+  }
+
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
     window.addEventListener("keydown", onKey);
     return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
-  }, [onClose]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (typeof document === "undefined") return null;
 
@@ -489,11 +525,11 @@ function CreateModal({
     <div
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleClose}
       role="dialog"
     >
       <div
-        className="w-full max-w-4xl overflow-hidden rounded-[2rem] bg-white shadow-[0_32px_80px_rgba(15,23,42,0.3)]"
+        className="flex h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-[0_32px_80px_rgba(15,23,42,0.3)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -501,7 +537,7 @@ function CreateModal({
           <button
             aria-label="Close"
             className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
-            onClick={onClose}
+            onClick={handleClose}
             type="button"
           >
             <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
@@ -523,31 +559,31 @@ function CreateModal({
         </div>
 
         {/* Form */}
-        <div>
-          <form action={createProjectAction} className="space-y-4 px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <form action={createProjectAction} className="space-y-4 px-6 py-5" ref={formRef}>
             {createState.error ? <Feedback>{createState.error}</Feedback> : null}
             {createState.success ? <Feedback tone="success">{createState.success}</Feedback> : null}
 
-            <Field defaultValue={createState.values?.name} label="Project Name" name="name" placeholder="Enter project name" />
-            <TextAreaField defaultValue={createState.values?.summary} label="Project Summary" name="summary" placeholder="Describe the project scope and goals" />
+            <Field defaultValue={createState.values?.name ?? draft.name} label="Project Name" name="name" placeholder="Enter project name" />
+            <TextAreaField defaultValue={createState.values?.summary ?? draft.summary} label="Project Summary" name="summary" placeholder="Describe the project scope and goals" />
 
             <div className="grid gap-4 sm:grid-cols-3">
               <SelectField
-                defaultValue={createState.values?.status ?? "PLANNING"}
+                defaultValue={createState.values?.status ?? draft.status ?? "PLANNING"}
                 label="Status"
                 labels={{ PLANNING: "Planning", IN_PROGRESS: "In Progress", ON_HOLD: "On Hold", COMPLETED: "Completed" }}
                 name="status"
                 options={["PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"]}
               />
               <SelectField
-                defaultValue={createState.values?.priority ?? "MEDIUM"}
+                defaultValue={createState.values?.priority ?? draft.priority ?? "MEDIUM"}
                 label="Priority"
                 labels={{ LOW: "Low", MEDIUM: "Medium", HIGH: "High" }}
                 name="priority"
                 options={["LOW", "MEDIUM", "HIGH"]}
               />
               <Field
-                defaultValue={createState.values?.dueDate}
+                defaultValue={createState.values?.dueDate ?? draft.dueDate}
                 fallbackTodayForDate
                 label="Due Date"
                 name="dueDate"
@@ -557,8 +593,8 @@ function CreateModal({
             </div>
 
             <MultiSelect
-              defaultValue={createState.values?.techStack ?? []}
-              key={`create-tech-${(createState.values?.techStack ?? []).join(",")}`}
+              defaultValue={createState.values?.techStack ?? draft.techStack ?? []}
+              key={`create-tech-${(createState.values?.techStack ?? draft.techStack ?? []).join(",")}`}
               label="Tech Stack"
               name="techStack"
               optionLabels={Object.fromEntries(technologyOptions.map((o) => [o, o]))}
@@ -567,8 +603,8 @@ function CreateModal({
             />
 
             <MultiSelect
-              defaultValue={createState.values?.assignedUserIds ?? []}
-              key={`create-emp-${(createState.values?.assignedUserIds ?? []).join(",")}`}
+              defaultValue={createState.values?.assignedUserIds ?? draft.assignedUserIds ?? []}
+              key={`create-emp-${(createState.values?.assignedUserIds ?? draft.assignedUserIds ?? []).join(",")}`}
               label="Assign Employees"
               name="assignedUserIds"
               optionLabels={employeeLabels}
