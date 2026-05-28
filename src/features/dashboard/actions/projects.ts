@@ -46,6 +46,8 @@ export async function createManagedProject(
   const status = String(formData.get("status") ?? "PLANNING");
   const priority = String(formData.get("priority") ?? "MEDIUM");
   const dueDate = String(formData.get("dueDate") ?? "").trim();
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  const clientBudget = Number(formData.get("clientBudget") ?? 0) || 0;
   const techStack = extractMultiValue(formData, "techStack");
   const assignedUserIds = extractMultiValue(formData, "assignedUserIds");
 
@@ -92,6 +94,8 @@ export async function createManagedProject(
     techStack,
     assignedUserIds: assignedEmployeeIds,
     createdByUserId: session.user.id,
+    clientName,
+    clientBudget,
   });
 
   if (assignedEmployeeIds.length) {
@@ -138,6 +142,8 @@ export async function updateManagedProject(
   const status = String(formData.get("status") ?? "PLANNING");
   const priority = String(formData.get("priority") ?? "MEDIUM");
   const dueDate = String(formData.get("dueDate") ?? "").trim();
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  const clientBudget = Number(formData.get("clientBudget") ?? 0) || 0;
   const techStack = extractMultiValue(formData, "techStack");
   const assignedUserIds = extractMultiValue(formData, "assignedUserIds");
 
@@ -197,6 +203,8 @@ export async function updateManagedProject(
     dueDate: dueDate ? new Date(dueDate) : null,
     techStack,
     assignedUserIds: nextAssignments,
+    clientName,
+    clientBudget,
   });
 
   if (removedAssignments.length) {
@@ -246,8 +254,9 @@ export async function assignProjectToUser(formData: FormData) {
     ProjectModel.findById(projectId, { name: 1 }).lean(),
   ]);
 
-  if (!targetUser || targetUser.role !== "EMPLOYEE") {
-    throw new Error("Projects can only be assigned to employee accounts.");
+  const ASSIGNABLE_ROLES = ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"];
+  if (!targetUser || !ASSIGNABLE_ROLES.includes(targetUser.role)) {
+    throw new Error("Projects can only be assigned to employees, managers, or admins.");
   }
 
   if (!project) {
@@ -277,6 +286,74 @@ export async function assignProjectToUser(formData: FormData) {
   revalidatePath("/dashboard/dsr");
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/projects");
+}
+
+export async function markProjectClosedByEmployee(
+  _previousState: { error?: string; success?: string },
+  formData: FormData,
+): Promise<{ error?: string; success?: string }> {
+  const session = await getCurrentSession();
+
+  if (!session || session.user.role !== "EMPLOYEE") {
+    return { error: "Only employees can mark projects as closed." };
+  }
+
+  const projectId = String(formData.get("projectId") ?? "").trim();
+
+  if (!projectId) {
+    return { error: "Project selection is required." };
+  }
+
+  await connectDb();
+
+  const project = await ProjectModel.findOne(
+    { _id: projectId, assignedUserIds: session.user.id },
+    { _id: 1, name: 1, status: 1, closedByEmployeeId: 1 },
+  ).lean();
+
+  if (!project) {
+    return { error: "Project not found or you are not assigned to it." };
+  }
+
+  if (project.closedByEmployeeId) {
+    return { error: "This project has already been marked as closed." };
+  }
+
+  if (project.status === "COMPLETED") {
+    return { error: "This project is already marked as completed by admin." };
+  }
+
+  await ProjectModel.findByIdAndUpdate(projectId, {
+    status: "COMPLETED",
+    closedByEmployeeId: session.user.id,
+    closedByEmployeeAt: new Date(),
+  });
+
+  // Notify all super admins + managers so they see it in dashboard notifications
+  const leaders = await UserModel.find(
+    { role: { $in: ["SUPER_ADMIN", "MANAGER"] }, status: "ACTIVE" },
+    { _id: 1 },
+  ).lean();
+
+  const leaderIds = leaders.map((l) => l._id.toString());
+
+  if (leaderIds.length) {
+    await createNotificationsForUsers(leaderIds, {
+      actorUserId: session.user.id,
+      type: "PROJECT_ASSIGNED",
+      title: "Project marked as complete",
+      message: `${session.user.fullName} has marked "${project.name}" as complete.`,
+      actionUrl: "/dashboard/projects",
+      sourceKey: `project-closed-by-emp:${projectId}:${session.user.id}`,
+    });
+  }
+
+  revalidatePath("/dashboard/projects");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/dsr");
+  revalidatePath("/dashboard/tasks");
+
+  return { success: `"${project.name}" has been marked as closed. Admin has been notified.` };
 }
 
 export async function deleteManagedProject(formData: FormData) {
@@ -350,13 +427,16 @@ async function resolveAssignedEmployeeIds(userIds: string[]) {
   const employees = await UserModel.find({ _id: { $in: uniqueUserIds } }, { role: 1, status: 1 }).lean();
 
   if (employees.length !== uniqueUserIds.length) {
-    return { error: "One or more selected employees were not found." };
+    return { error: "One or more selected team members were not found." };
   }
 
-  const invalidEmployee = employees.find((user) => user.role !== "EMPLOYEE" || user.status !== "ACTIVE");
+  const ASSIGNABLE_ROLES = ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"];
+  const invalidEmployee = employees.find(
+    (user) => !ASSIGNABLE_ROLES.includes(user.role) || user.status !== "ACTIVE",
+  );
 
   if (invalidEmployee) {
-    return { error: "Projects can only be assigned to active employee accounts." };
+    return { error: "Projects can only be assigned to active employees, managers, and admins." };
   }
 
   return { value: uniqueUserIds };

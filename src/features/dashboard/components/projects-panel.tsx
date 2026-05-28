@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createManagedProject, deleteManagedProject, updateManagedProject } from "@/features/dashboard/actions/projects";
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
-import { FormActionButton } from "@/shared/ui/form-action-button";
 import type { ProjectsPageData } from "@/features/dashboard/types";
 import type { ProjectPriority, ProjectStatus } from "@/database/mongodb/models/project";
 
@@ -25,6 +25,8 @@ type ProjectFormState = {
     priority?: ProjectPriority;
     dueDate?: string;
     techStack?: string[];
+    clientName?: string;
+    clientBudget?: string;
   };
 };
 
@@ -38,6 +40,8 @@ type CreateDraft = {
   dueDate?: string;
   techStack?: string[];
   assignedUserIds?: string[];
+  clientName?: string;
+  clientBudget?: string;
 };
 
 const STATUS_STYLES: Record<string, { card: string; chip: string; dot: string; label: string }> = {
@@ -47,13 +51,8 @@ const STATUS_STYLES: Record<string, { card: string; chip: string; dot: string; l
   COMPLETED:   { card: "border-slate-200",      chip: "border-slate-100 bg-slate-50 text-slate-600",   dot: "bg-slate-400",   label: "Completed" },
 };
 
-const PRIORITY_CHIP: Record<string, string> = {
-  HIGH:   "border-rose-100 bg-rose-50 text-rose-700",
-  MEDIUM: "border-amber-100 bg-amber-50 text-amber-700",
-  LOW:    "border-slate-100 bg-slate-50 text-slate-500",
-};
 
-const STATUS_FILTERS = ["ALL", "PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"] as const;
+const STATUS_FILTERS = ["ALL", "PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "CLOSED_BY_EMP"] as const;
 
 export function ProjectsPanel({ data }: ProjectsPanelProps) {
   const [createState, createProjectAction, createPending] = useActionState(createManagedProject, INITIAL_PROJECT_STATE);
@@ -73,7 +72,11 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
   const filteredProjects = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.projects.filter((project) => {
-      if (statusFilter !== "ALL" && project.status !== statusFilter) return false;
+      if (statusFilter === "CLOSED_BY_EMP") {
+        if (!project.closedByEmployeeId) return false;
+      } else if (statusFilter !== "ALL" && project.status !== statusFilter) {
+        return false;
+      }
       if (!query) return true;
       return [project.name, project.summary, project.status, project.priority, project.dueDate, ...project.techStack, ...project.assignedUserNames]
         .join(" ").toLowerCase().includes(query);
@@ -84,9 +87,10 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
     ? data.projects.find((p) => p.id === selectedProjectId) ?? null
     : null;
 
-  const inProgress = data.projects.filter((p) => p.status === "IN_PROGRESS").length;
-  const completed  = data.projects.filter((p) => p.status === "COMPLETED").length;
-  const highPri    = data.projects.filter((p) => p.priority === "HIGH").length;
+  const inProgress      = data.projects.filter((p) => p.status === "IN_PROGRESS").length;
+  const completed       = data.projects.filter((p) => p.status === "COMPLETED").length;
+  const highPri         = data.projects.filter((p) => p.priority === "HIGH").length;
+  const closedByEmp     = data.projects.filter((p) => p.closedByEmployeeId).length;
 
   useEffect(() => {
     if (createState.success) {
@@ -114,7 +118,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
       <section className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#0f172a_0%,#1e3a5f_52%,#0f4c81_100%)] p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white/50">Project Management</p>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white/50">Project Portfolio</p>
             <h1 className="mt-2 text-[1.9rem] font-semibold tracking-tight text-white">Projects</h1>
             <p className="mt-1.5 text-sm text-white/60">Track project status, team assignments, and delivery timelines.</p>
           </div>
@@ -127,13 +131,38 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
           </button>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
           <StatPill label="Total" value={String(data.projects.length)} color="blue" />
           <StatPill label="In Progress" value={String(inProgress)} color="emerald" pulse />
           <StatPill label="Completed" value={String(completed)} color="slate" />
           <StatPill label="High Priority" value={String(highPri)} color="rose" />
+          <StatPill label="Closed by Employee" value={String(closedByEmp)} color="violet" />
         </div>
       </section>
+
+      {/* ── Employee-closed alert ── */}
+      {closedByEmp > 0 ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-violet-200 bg-[linear-gradient(135deg,#f5f3ff_0%,#ede9fe_100%)] px-5 py-4 shadow-sm">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100">
+            <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="#7c3aed" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-violet-900">
+              {closedByEmp} project{closedByEmp !== 1 ? "s" : ""} closed by employee{closedByEmp !== 1 ? "s" : ""}
+            </p>
+            <p className="mt-0.5 text-xs text-violet-600">Employees have self-reported these projects as completed. Review them below.</p>
+          </div>
+          <button
+            className="shrink-0 rounded-xl border border-violet-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+            onClick={() => setStatusFilter("CLOSED_BY_EMP")}
+            type="button"
+          >
+            View All
+          </button>
+        </div>
+      ) : null}
 
       {/* ── Toolbar: search + status filters ── */}
       <div className="flex flex-wrap items-center gap-3">
@@ -157,7 +186,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
               onClick={() => setStatusFilter(f)}
               type="button"
             >
-              {f === "ALL" ? "All" : STATUS_STYLES[f]?.label ?? f}
+              {f === "ALL" ? "All" : f === "CLOSED_BY_EMP" ? "Employee Closed" : STATUS_STYLES[f]?.label ?? f}
             </button>
           ))}
         </div>
@@ -166,94 +195,165 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
 
       {/* ── Project cards grid ── */}
       {filteredProjects.length === 0 ? (
-        <div className="rounded-[1.8rem] border border-dashed border-slate-200 py-16 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-2xl">📁</div>
-          <p className="text-sm font-semibold text-slate-500">No projects match your filter.</p>
-          <p className="mt-1 text-xs text-slate-400">Try clearing the search or changing the status filter.</p>
+        <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-slate-50/50 py-20 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl shadow-inner">📁</div>
+          <p className="text-base font-semibold text-slate-600">No projects match your filter</p>
+          <p className="mt-1.5 text-sm text-slate-400">Try clearing the search or selecting a different status.</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {filteredProjects.map((project) => {
             const s = STATUS_STYLES[project.status] ?? STATUS_STYLES.PLANNING;
             const overdue = project.dueDate ? project.dueDate < getTodayDate() && project.status !== "COMPLETED" : false;
+            const cardGradient =
+              project.closedByEmployeeId
+                ? "linear-gradient(135deg,#4c1d95 0%,#7c3aed 60%,#c4b5fd 100%)"
+                : project.status === "IN_PROGRESS"
+                  ? "linear-gradient(135deg,#064e3b 0%,#059669 60%,#a7f3d0 100%)"
+                  : project.status === "ON_HOLD"
+                    ? "linear-gradient(135deg,#78350f 0%,#d97706 62%,#fde68a 100%)"
+                    : project.status === "COMPLETED"
+                      ? "linear-gradient(135deg,#1e293b 0%,#475569 62%,#cbd5e1 100%)"
+                      : "linear-gradient(135deg,#1e3a8a 0%,#2563eb 62%,#bfdbfe 100%)";
+
+            const avatarGradients = [
+              "from-blue-500 to-indigo-600",
+              "from-emerald-500 to-teal-600",
+              "from-rose-500 to-pink-600",
+              "from-amber-500 to-orange-600",
+              "from-violet-500 to-purple-600",
+            ];
+
             return (
               <article
-                className={`group relative flex flex-col overflow-hidden rounded-[1.8rem] border bg-white shadow-[0_12px_32px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(15,23,42,0.1)] ${s.card}`}
+                className="group flex flex-col overflow-hidden rounded-[1.8rem] bg-white shadow-[0_8px_32px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_48px_rgba(15,23,42,0.14)]"
                 key={project.id}
+                style={{ border: "1px solid rgba(226,232,240,0.7)" }}
               >
-                {/* Top accent bar */}
-                <div className={`h-1 w-full ${project.status === "IN_PROGRESS" ? "bg-gradient-to-r from-emerald-400 to-teal-400" : project.status === "PLANNING" ? "bg-gradient-to-r from-blue-400 to-cyan-400" : project.status === "ON_HOLD" ? "bg-gradient-to-r from-amber-400 to-orange-400" : "bg-gradient-to-r from-slate-300 to-slate-400"}`} />
+                {/* ── Gradient card header ── */}
+                <div
+                  className="relative overflow-hidden px-5 pb-4 pt-5"
+                  style={{ background: cardGradient }}
+                >
+                  {/* Decorative circle */}
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
+                  <div className="pointer-events-none absolute -bottom-4 right-8 h-14 w-14 rounded-full bg-white/8" />
 
-                <div className="flex flex-1 flex-col p-5">
-                  {/* Status + Priority row */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wider ${s.chip}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                  {/* Status + Priority + Closed badge */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/15 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+                      <span className={`h-1.5 w-1.5 rounded-full bg-white ${project.status === "IN_PROGRESS" ? "animate-pulse" : ""}`} />
                       {s.label}
                     </span>
-                    <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wider ${PRIORITY_CHIP[project.priority] ?? PRIORITY_CHIP.LOW}`}>
+                    <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white/90 backdrop-blur-sm">
                       {project.priority}
                     </span>
+                    {project.closedByEmployeeId ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white">
+                        ✓ Closed by Employee
+                      </span>
+                    ) : null}
                     {overdue ? (
-                      <span className="rounded-full border border-rose-100 bg-rose-50 px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wider text-rose-600">
-                        Overdue
+                      <span className="rounded-full border border-rose-300/40 bg-rose-500/30 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white">
+                        ⚠ Overdue
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Project name + summary */}
-                  <h3 className="mt-3 text-base font-semibold text-slate-950">{project.name}</h3>
-                  <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-slate-500">{project.summary || "No description added."}</p>
+                  {/* Project name */}
+                  <h3 className="mt-3 text-[1.05rem] font-bold leading-snug text-white drop-shadow-sm">
+                    {project.name}
+                  </h3>
+
+                  {/* Team avatar row in header */}
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex -space-x-2">
+                      {project.assignedUserNames.length === 0 ? (
+                        <span className="text-[0.65rem] font-semibold text-white/60">No team assigned</span>
+                      ) : (
+                        <>
+                          {project.assignedUserNames.slice(0, 5).map((name, i) => (
+                            <div
+                              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/30 bg-gradient-to-br ${avatarGradients[i % avatarGradients.length]} text-[0.55rem] font-bold text-white shadow-md`}
+                              key={`${project.id}-av-${i}`}
+                              title={name}
+                            >
+                              {name.trim().charAt(0).toUpperCase()}
+                            </div>
+                          ))}
+                          {project.assignedUserNames.length > 5 ? (
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-[0.55rem] font-bold text-white">
+                              +{project.assignedUserNames.length - 5}
+                            </div>
+                          ) : null}
+                          <span className="ml-2 self-center text-[0.62rem] font-semibold text-white/70">
+                            {project.assignedUserNames.length} member{project.assignedUserNames.length !== 1 ? "s" : ""}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Card body ── */}
+                <div className="flex flex-1 flex-col px-5 py-4">
+                  {/* Summary */}
+                  <p className="line-clamp-2 text-[0.82rem] leading-5 text-slate-500">
+                    {project.summary || "No description added."}
+                  </p>
 
                   {/* Tech stack */}
                   {project.techStack.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {project.techStack.slice(0, 4).map((tech) => (
-                        <span className="rounded-full border border-violet-100 bg-violet-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-violet-700" key={tech}>
+                        <span
+                          className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider text-slate-600"
+                          key={tech}
+                        >
                           {tech}
                         </span>
                       ))}
                       {project.techStack.length > 4 ? (
-                        <span className="rounded-full border border-slate-100 bg-slate-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-slate-400">
-                          +{project.techStack.length - 4}
+                        <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-0.5 text-[0.6rem] font-semibold text-slate-400">
+                          +{project.techStack.length - 4} more
                         </span>
                       ) : null}
                     </div>
                   ) : null}
 
-                  {/* Footer: avatars + due date + edit */}
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                    <div className="flex items-center gap-2">
-                      {/* Avatar stack */}
-                      <div className="flex -space-x-1.5">
-                        {project.assignedUserNames.slice(0, 4).map((name, i) => (
-                          <div
-                            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-blue-500 to-slate-700 text-[0.58rem] font-bold text-white shadow-sm"
-                            key={`${project.id}-av-${i}`}
-                            title={name}
-                          >
-                            {name.trim().charAt(0).toUpperCase()}
-                          </div>
-                        ))}
-                        {project.assignedUserNames.length > 4 ? (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[0.58rem] font-bold text-slate-500">
-                            +{project.assignedUserNames.length - 4}
-                          </div>
-                        ) : null}
-                        {project.assignedUserNames.length === 0 ? (
-                          <span className="text-xs text-slate-400">No team</span>
-                        ) : null}
-                      </div>
+                  {/* Footer */}
+                  <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4 mt-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                      {project.closedByEmployeeId && project.closedByEmployeeAt ? (
+                        <span className="flex items-center gap-1 text-violet-600">
+                          <svg fill="none" height="12" viewBox="0 0 24 24" width="12">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                          </svg>
+                          Closed {project.closedByEmployeeAt}
+                        </span>
+                      ) : project.dueDate ? (
+                        <span className={`flex items-center gap-1 ${overdue ? "text-rose-500" : "text-slate-400"}`}>
+                          <svg fill="none" height="12" viewBox="0 0 24 24" width="12">
+                            <rect height="18" rx="2" width="18" x="3" y="4" stroke="currentColor" strokeWidth="1.8" />
+                            <line stroke="currentColor" strokeWidth="1.8" x1="3" x2="21" y1="10" y2="10" />
+                          </svg>
+                          {overdue ? "⚠ Overdue · " : "Due "}
+                          {project.dueDate}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">No due date</span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {project.dueDate ? (
-                        <span className={`text-xs font-semibold ${overdue ? "text-rose-500" : "text-slate-400"}`}>
-                          {overdue ? "⚠ " : ""}Due {project.dueDate}
-                        </span>
-                      ) : null}
+                      <Link
+                        className="shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100"
+                        href={`/dashboard/projects/${project.id}`}
+                      >
+                        View Details
+                      </Link>
                       <button
-                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                        className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                         onClick={() => setSelectedProjectId(project.id)}
                         type="button"
                       >
@@ -315,7 +415,7 @@ function EditModal({
 }: {
   deleteManagedProject: (fd: FormData) => void;
   employeeLabels: Record<string, string>;
-  employeeOptions: { id: string; label: string }[];
+  employeeOptions: { id: string; label: string; role?: string }[];
   onClose: () => void;
   project: ProjectsPageData["projects"][number];
   technologyOptions: string[];
@@ -323,6 +423,7 @@ function EditModal({
   updateProjectAction: (fd: FormData) => void;
   updateState: ProjectFormState;
 }) {
+  const [confirmDel, setConfirmDel] = useState(false);
   const s = STATUS_STYLES[project.status] ?? STATUS_STYLES.PLANNING;
   const gradientClass =
     project.status === "IN_PROGRESS" ? "bg-[linear-gradient(135deg,#064e3b_0%,#059669_60%,#d1fae5_100%)]"
@@ -353,16 +454,55 @@ function EditModal({
       >
         {/* Gradient header */}
         <div className={`relative shrink-0 overflow-hidden px-6 pb-5 pt-6 ${gradientClass}`}>
-          <button
-            aria-label="Close"
-            className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
-            onClick={onClose}
-            type="button"
-          >
-            <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
-              <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-            </svg>
-          </button>
+          {/* Top-right action buttons: Delete + Close */}
+          <div className="absolute right-4 top-4 flex items-center gap-2">
+            {/* Delete icon button */}
+            {confirmDel ? (
+              <div className="flex items-center gap-1.5 rounded-full border border-white/30 bg-black/30 px-3 py-1.5 backdrop-blur-sm">
+                <span className="text-[0.65rem] font-semibold text-white/90">Delete project?</span>
+                <form action={deleteAction}>
+                  <input name="projectId" type="hidden" value={project.id} />
+                  <button
+                    className="rounded-full bg-rose-500 px-2.5 py-0.5 text-[0.6rem] font-bold text-white hover:bg-rose-600 transition"
+                    type="submit"
+                  >
+                    Yes
+                  </button>
+                </form>
+                <button
+                  className="rounded-full bg-white/20 px-2.5 py-0.5 text-[0.6rem] font-bold text-white hover:bg-white/30 transition"
+                  onClick={() => setConfirmDel(false)}
+                  type="button"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                aria-label="Delete project"
+                className="grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-rose-500/70"
+                onClick={() => setConfirmDel(true)}
+                title="Delete project"
+                type="button"
+              >
+                <svg fill="none" height="15" viewBox="0 0 24 24" width="15">
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                  <path d="M10 11v6M14 11v6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                </svg>
+              </button>
+            )}
+            {/* Close button */}
+            <button
+              aria-label="Close"
+              className="grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+              onClick={onClose}
+              type="button"
+            >
+              <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+              </svg>
+            </button>
+          </div>
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.1rem] bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">
               <svg fill="none" height="24" viewBox="0 0 24 24" width="24">
@@ -394,6 +534,11 @@ function EditModal({
             <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
               <Field defaultValue={project.name} label="Project Name" name="name" placeholder="Enter project name" />
               <Field defaultValue={project.dueDate} fallbackTodayForDate label="Due Date" name="dueDate" placeholder="" type="date" />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field defaultValue={project.clientName} label="Client / Company Name" name="clientName" placeholder="e.g. Acme Corp" required={false} />
+              <Field defaultValue={String(project.clientBudget > 0 ? project.clientBudget : "")} label="Project Budget (₹)" name="clientBudget" placeholder="e.g. 150000" type="number" required={false} />
             </div>
 
             <TextAreaField defaultValue={project.summary} label="Project Summary" name="summary" placeholder="Describe the project scope and goals" />
@@ -428,9 +573,10 @@ function EditModal({
             <MultiSelect
               defaultValue={project.assignedUserIds}
               key={`edit-emp-${project.id}`}
-              label="Assigned Employees"
+              label="Assigned Team Members"
               name="assignedUserIds"
               optionLabels={employeeLabels}
+              optionRoles={Object.fromEntries(employeeOptions.map((e) => [e.id, e.role ?? "EMPLOYEE"]))}
               options={employeeOptions.map((e) => e.id)}
               placeholder="Assign team members"
             />
@@ -445,26 +591,6 @@ function EditModal({
           </form>
         </div>
 
-        {/* Delete footer */}
-        <div className="shrink-0 border-t border-slate-100 bg-rose-50/40 px-6 py-3">
-          <form action={deleteAction} className="flex items-center justify-between gap-3">
-            <input name="projectId" type="hidden" value={project.id} />
-            <div className="flex items-center gap-2">
-              <svg className="shrink-0 text-rose-400" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-              </svg>
-              <p className="text-xs text-rose-400">This will permanently delete the project and all its data.</p>
-            </div>
-            <FormActionButton
-              className="w-auto shrink-0 border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-none hover:border-rose-300 hover:bg-rose-600 hover:text-white"
-              pendingLabel="Deleting…"
-              type="submit"
-              variant="primary"
-            >
-              Delete
-            </FormActionButton>
-          </form>
-        </div>
       </div>
     </div>,
     document.body,
@@ -488,7 +614,7 @@ function CreateModal({
   createState: ProjectFormState;
   draft: CreateDraft;
   employeeLabels: Record<string, string>;
-  employeeOptions: { id: string; label: string }[];
+  employeeOptions: { id: string; label: string; role?: string }[];
   onClose: () => void;
   onSaveDraft: (d: CreateDraft) => void;
   technologyOptions: string[];
@@ -565,6 +691,12 @@ function CreateModal({
             {createState.success ? <Feedback tone="success">{createState.success}</Feedback> : null}
 
             <Field defaultValue={createState.values?.name ?? draft.name} label="Project Name" name="name" placeholder="Enter project name" />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field defaultValue={createState.values?.clientName ?? draft.clientName} label="Client / Company Name" name="clientName" placeholder="e.g. Acme Corp" required={false} />
+              <Field defaultValue={createState.values?.clientBudget ?? draft.clientBudget} label="Project Budget (₹)" name="clientBudget" placeholder="e.g. 150000" type="number" required={false} />
+            </div>
+
             <TextAreaField defaultValue={createState.values?.summary ?? draft.summary} label="Project Summary" name="summary" placeholder="Describe the project scope and goals" />
 
             <div className="grid gap-4 sm:grid-cols-3">
@@ -605,9 +737,10 @@ function CreateModal({
             <MultiSelect
               defaultValue={createState.values?.assignedUserIds ?? draft.assignedUserIds ?? []}
               key={`create-emp-${(createState.values?.assignedUserIds ?? draft.assignedUserIds ?? []).join(",")}`}
-              label="Assign Employees"
+              label="Assign Team Members"
               name="assignedUserIds"
               optionLabels={employeeLabels}
+              optionRoles={Object.fromEntries(employeeOptions.map((e) => [e.id, e.role ?? "EMPLOYEE"]))}
               options={employeeOptions.map((e) => e.id)}
               placeholder="Assign team members"
             />
@@ -629,9 +762,9 @@ function CreateModal({
 
 /* ─── Sub-components ─── */
 
-function StatPill({ color, label, pulse = false, value }: { color: "blue" | "emerald" | "slate" | "rose"; label: string; pulse?: boolean; value: string }) {
-  const bg = { blue: "bg-white/10", emerald: "bg-emerald-500/20", slate: "bg-white/8", rose: "bg-rose-500/20" }[color];
-  const dot = { blue: "bg-blue-300", emerald: "bg-emerald-300", slate: "bg-slate-400", rose: "bg-rose-300" }[color];
+function StatPill({ color, label, pulse = false, value }: { color: "blue" | "emerald" | "slate" | "rose" | "violet"; label: string; pulse?: boolean; value: string }) {
+  const bg = { blue: "bg-white/10", emerald: "bg-emerald-500/20", slate: "bg-white/8", rose: "bg-rose-500/20", violet: "bg-violet-500/20" }[color];
+  const dot = { blue: "bg-blue-300", emerald: "bg-emerald-300", slate: "bg-slate-400", rose: "bg-rose-300", violet: "bg-violet-300" }[color];
   return (
     <div className={`rounded-2xl border border-white/10 px-4 py-3 ${bg}`}>
       <div className="flex items-center gap-2">
@@ -649,10 +782,11 @@ type FieldProps = {
   label: string;
   name: string;
   placeholder: string;
+  required?: boolean;
   type?: string;
 };
 
-function Field({ defaultValue, fallbackTodayForDate = false, label, name, placeholder, type = "text" }: FieldProps) {
+function Field({ defaultValue, fallbackTodayForDate = false, label, name, placeholder, required = true, type = "text" }: FieldProps) {
   const val = type === "date" && fallbackTodayForDate ? (defaultValue || getTodayDate()) : defaultValue;
   return (
     <label className="block">
@@ -662,7 +796,7 @@ function Field({ defaultValue, fallbackTodayForDate = false, label, name, placeh
         defaultValue={val}
         name={name}
         placeholder={placeholder}
-        required
+        required={required}
         type={type}
       />
     </label>
@@ -713,11 +847,19 @@ function SelectField({
   );
 }
 
+// Role badge config for the multi-select dropdown
+const ROLE_BADGE: Record<string, { label: string; bg: string; text: string }> = {
+  SUPER_ADMIN: { label: "Super Admin", bg: "#fdf4ff", text: "#7c3aed" },
+  MANAGER:     { label: "Admin",       bg: "#eff6ff", text: "#1d4ed8" },
+  EMPLOYEE:    { label: "Employee",    bg: "#f0fdf4", text: "#166534" },
+};
+
 function MultiSelect({
   defaultValue,
   label,
   name,
   optionLabels,
+  optionRoles,
   options,
   placeholder,
 }: {
@@ -725,21 +867,42 @@ function MultiSelect({
   label: string;
   name: string;
   optionLabels?: Record<string, string>;
+  optionRoles?: Record<string, string>; // id → role string
   options: string[];
   placeholder: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>(defaultValue);
+  const [search, setSearch] = useState("");
 
   function toggle(val: string) {
     setSelected((prev) => prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]);
   }
+
+  // Group options by role when optionRoles is provided
+  const hasRoles = Boolean(optionRoles && Object.keys(optionRoles).length > 0);
+  const roleOrder = ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"];
+
+  const filteredOptions = search.trim()
+    ? options.filter((opt) => (optionLabels?.[opt] ?? opt).toLowerCase().includes(search.trim().toLowerCase()))
+    : options;
+
+  // Build grouped structure
+  const grouped: Array<{ roleKey: string; items: string[] }> = hasRoles
+    ? roleOrder
+        .map((roleKey) => ({
+          roleKey,
+          items: filteredOptions.filter((opt) => (optionRoles?.[opt] ?? "EMPLOYEE") === roleKey),
+        }))
+        .filter((g) => g.items.length > 0)
+    : [{ roleKey: "", items: filteredOptions }];
 
   return (
     <div>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <input name={`${name}Csv`} type="hidden" value={selected.join(",")} />
       <div className="relative">
+        {/* Trigger button */}
         <button
           className="flex min-h-[2.9rem] w-full flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-slate-900 outline-none transition focus:border-blue-300 hover:border-blue-300"
           onClick={() => setIsOpen((v) => !v)}
@@ -747,11 +910,27 @@ function MultiSelect({
         >
           <div className="flex flex-1 flex-wrap gap-1.5">
             {selected.length ? (
-              selected.map((v) => (
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-blue-700" key={v}>
-                  {optionLabels?.[v] ?? v}
-                </span>
-              ))
+              selected.map((v) => {
+                const role = optionRoles?.[v];
+                const rb = role ? ROLE_BADGE[role] : undefined;
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-blue-700"
+                    key={v}
+                  >
+                    {/* Short name only (before the email paren) */}
+                    {(optionLabels?.[v] ?? v).split(" (")[0]}
+                    {rb ? (
+                      <span
+                        className="rounded-full px-1.5 py-px text-[0.52rem] font-bold"
+                        style={{ background: rb.bg, color: rb.text }}
+                      >
+                        {rb.label}
+                      </span>
+                    ) : null}
+                  </span>
+                );
+              })
             ) : (
               <span className="text-sm text-slate-400">{placeholder}</span>
             )}
@@ -761,28 +940,109 @@ function MultiSelect({
           </svg>
         </button>
 
-        <div className={`absolute z-20 mt-1.5 max-h-52 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_20px_50px_rgba(15,23,42,0.14)] transition-all ${isOpen ? "visible opacity-100" : "invisible pointer-events-none opacity-0"}`}>
-          {options.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-slate-400">No options available.</p>
-          ) : (
-            options.map((opt) => {
-              const checked = selected.includes(opt);
-              return (
-                <label
-                  className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-sm transition ${checked ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-50"}`}
-                  key={opt}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <input checked={checked} className="h-4 w-4 rounded border-slate-300 text-blue-600" name={name} onChange={() => toggle(opt)} type="checkbox" value={opt} />
-                    <span className="font-medium">{optionLabels?.[opt] ?? opt}</span>
-                  </div>
-                  {checked ? (
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-blue-600">✓</span>
+        {/* Dropdown */}
+        <div
+          className={`absolute z-20 mt-1.5 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.14)] transition-all ${
+            isOpen ? "visible opacity-100" : "invisible pointer-events-none opacity-0"
+          }`}
+        >
+          {/* Search box */}
+          <div className="border-b border-slate-100 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
+              <svg className="shrink-0 text-slate-400" fill="none" height="13" viewBox="0 0 24 24" width="13">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                <path d="m16.5 16.5 4 4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+              </svg>
+              <input
+                className="flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or email…"
+                value={search}
+              />
+            </div>
+          </div>
+
+          <div className="max-h-56 overflow-y-auto p-1.5">
+            {filteredOptions.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-slate-400">No matches found.</p>
+            ) : (
+              grouped.map(({ roleKey, items }) => (
+                <div key={roleKey || "all"}>
+                  {/* Role group header */}
+                  {roleKey && ROLE_BADGE[roleKey] ? (
+                    <div className="mb-0.5 mt-1.5 flex items-center gap-2 px-3">
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-wide"
+                        style={{ background: ROLE_BADGE[roleKey].bg, color: ROLE_BADGE[roleKey].text }}
+                      >
+                        {ROLE_BADGE[roleKey].label}
+                      </span>
+                      <span className="h-px flex-1 bg-slate-100" />
+                    </div>
                   ) : null}
-                </label>
-              );
-            })
-          )}
+
+                  {items.map((opt) => {
+                    const checked = selected.includes(opt);
+                    const role = optionRoles?.[opt];
+                    const rb = role ? ROLE_BADGE[role] : undefined;
+                    const fullLabel = optionLabels?.[opt] ?? opt;
+                    // Split "Name (email)" into parts
+                    const parenIdx = fullLabel.indexOf(" (");
+                    const namePart = parenIdx > -1 ? fullLabel.slice(0, parenIdx) : fullLabel;
+                    const emailPart = parenIdx > -1 ? fullLabel.slice(parenIdx + 2, -1) : "";
+
+                    return (
+                      <label
+                        className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 transition ${
+                          checked ? "bg-blue-50" : "hover:bg-slate-50"
+                        }`}
+                        key={opt}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Custom checkbox */}
+                          <div
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border transition ${
+                              checked ? "border-blue-500 bg-blue-500" : "border-slate-300 bg-white"
+                            }`}
+                            onClick={() => toggle(opt)}
+                          >
+                            {checked ? (
+                              <svg fill="none" height="10" viewBox="0 0 12 10" width="10">
+                                <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                              </svg>
+                            ) : null}
+                          </div>
+                          <input checked={checked} className="sr-only" name={name} onChange={() => toggle(opt)} type="checkbox" value={opt} />
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-sm font-semibold truncate ${checked ? "text-blue-800" : "text-slate-800"}`}>
+                                {namePart}
+                              </span>
+                              {rb ? (
+                                <span
+                                  className="shrink-0 rounded-full px-1.5 py-px text-[0.52rem] font-bold"
+                                  style={{ background: rb.bg, color: rb.text }}
+                                >
+                                  {rb.label}
+                                </span>
+                              ) : null}
+                            </div>
+                            {emailPart ? (
+                              <p className={`text-[0.65rem] truncate ${checked ? "text-blue-500" : "text-slate-400"}`}>{emailPart}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                        {checked ? (
+                          <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[0.6rem] font-bold text-blue-600">✓</span>
+                        ) : null}
+                      </label>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
       {selected.length > 0 ? (

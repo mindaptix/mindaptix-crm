@@ -254,6 +254,17 @@ export function LoginScreen({ registered = false, signupClosed = false }: LoginS
               )}
             </div>
 
+            {/* Forgot password link */}
+            <div className="flex justify-end">
+              <Link
+                className="text-[12px] font-semibold transition hover:opacity-70"
+                style={{ color: "#0a7c6e" }}
+                href="/forgot-password"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+
             {/* Submit */}
             <button
               className="group relative mt-1 w-full overflow-hidden rounded-xl py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-lg transition-all duration-300 hover:shadow-xl active:scale-[0.98] disabled:opacity-60"

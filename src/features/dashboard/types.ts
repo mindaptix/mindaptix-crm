@@ -157,6 +157,10 @@ export type EmployeeProjectEntry = {
   assignedUserIds: string[];
   assignedUserNames: string[];
   createdByUserId: string;
+  closedByEmployeeId: string;
+  closedByEmployeeAt: string;
+  clientName: string;
+  clientBudget: number;
 };
 
 export type SalesLeadEntry = {
@@ -381,6 +385,7 @@ export type TaskEntry = {
 export type EmployeeOption = {
   id: string;
   label: string;
+  role?: string; // EMPLOYEE | MANAGER | SUPER_ADMIN — used to show role badge in dropdowns
 };
 
 export type TaskPageData = {
@@ -661,6 +666,169 @@ export type HolidayEntry = {
   description: string;
 };
 
+// ─── Employee Detail Page ────────────────────────────────────────────────────
+
+export type EmployeeDetailDsrEntry = {
+  id: string;
+  workDate: string;
+  summary: string;
+  accomplishments: string;
+  blockers: string;
+  nextPlan: string;
+};
+
+export type EmployeeDetailPaymentEntry = {
+  id: string;
+  clientName: string;
+  invoiceNumber: string;
+  totalAmount: number;
+  receivedAmount: number;
+  balanceDue: number;
+  dueDate: string;
+  status: string;
+};
+
+export type EmployeeDetailProjectEntry = {
+  id: string;
+  name: string;
+  summary: string;
+  status: string;
+  priority: string;
+  dueDate: string;
+  techStack: string[];
+  assignedUserNames: string[];
+  createdByUserId: string;
+  dsrEntries: EmployeeDetailDsrEntry[];
+  payments: EmployeeDetailPaymentEntry[];
+};
+
+export type EmployeeDetailAttendance = {
+  monthLabel: string;
+  daysPresent: number;
+  daysCompleted: number;
+  daysOnLeave: number;
+  lateCount: number;
+  totalWorkingDays: number;
+};
+
+export type EmployeeDetailLeaveEntry = {
+  id: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  requestedDays: number;
+  reason: string;
+  status: string;
+};
+
+export type EmployeeDetailPayslip = {
+  id: string;
+  monthKey: string;
+  netSalary: number;
+  grossSalary: number;
+  totalDeductions: number;
+  presentDays: number;
+  workingDays: number;
+  status: string;
+  paidOn: string;
+};
+
+export type EmployeeDetailSalary = {
+  basicSalary: number;
+  hra: number;
+  transportAllowance: number;
+  medicalAllowance: number;
+  otherAllowances: number;
+  grossSalary: number;
+  tds: number;
+  providentFund: number;
+  otherDeductions: number;
+  netSalary: number;
+  effectiveFrom: string;
+  status: string;
+};
+
+export type EmployeeDetailData = {
+  employee: EmployeeDirectoryEntry;
+  salary: EmployeeDetailSalary | null;
+  projects: EmployeeDetailProjectEntry[];
+  currentMonthAttendance: EmployeeDetailAttendance;
+  leaveHistory: EmployeeDetailLeaveEntry[];
+  leaveBalance: {
+    paidLeaveTotal: number;
+    paidLeaveUsed: number;
+    paidLeaveRemaining: number;
+    sickLeaveTotal: number;
+    sickLeaveUsed: number;
+    sickLeaveRemaining: number;
+    casualLeaveTotal: number;
+    casualLeaveUsed: number;
+    casualLeaveRemaining: number;
+  } | null;
+  recentPayslips: EmployeeDetailPayslip[];
+  canViewSensitive: boolean;
+};
+
+// ─── Project Detail Page ─────────────────────────────────────────────────────
+
+export type ProjectDetailDsrEntry = {
+  id: string;
+  workDate: string;
+  summary: string;
+  accomplishments: string;
+  blockers: string;
+  nextPlan: string;
+};
+
+export type ProjectDetailEmployeeEntry = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: string;
+  designation: string;
+  department: string;
+  employeeId: string;
+  todayStatus: string;
+  dsrEntries: ProjectDetailDsrEntry[];
+};
+
+export type ProjectDetailPaymentEntry = {
+  id: string;
+  clientName: string;
+  invoiceNumber: string;
+  totalAmount: number;
+  receivedAmount: number;
+  balanceDue: number;
+  dueDate: string;
+  receivedDate: string;
+  status: string;
+  note: string;
+  createdByName: string;
+};
+
+export type ProjectDetailData = {
+  id: string;
+  name: string;
+  summary: string;
+  status: string;
+  priority: string;
+  dueDate: string;
+  techStack: string[];
+  createdByUserId: string;
+  createdByName: string;
+  closedByEmployeeId: string;
+  closedByEmployeeAt: string;
+  clientName: string;
+  clientBudget: number;
+  assignedEmployees: ProjectDetailEmployeeEntry[];
+  payments: ProjectDetailPaymentEntry[];
+  totalPayment: number;
+  totalReceived: number;
+  totalBalance: number;
+  dsrTotalCount: number;
+};
+
 // ─── Employee Documents ─────────────────────────────────────────────────────
 
 export type EmployeeDocumentEntry = {
@@ -689,4 +857,36 @@ export type AuditLogEntry = {
 export type AuditLogPageData = {
   logs: AuditLogEntry[];
   summaryCards: SummaryCard[];
+};
+
+// ─── Client Payments ────────────────────────────────────────────────────────
+
+export type ClientPaymentEntry = {
+  id: string;
+  clientName: string;
+  projectName: string;
+  invoiceNumber: string;
+  totalAmount: number;
+  receivedAmount: number;
+  balanceDue: number;
+  dueDate: string;
+  receivedDate: string;
+  status: string; // PENDING | PARTIAL | PAID | OVERDUE
+  note: string;
+  createdByUserId: string;
+  createdByName: string;
+  createdAt: string;
+};
+
+export type PaymentsPageData = {
+  payments: ClientPaymentEntry[];
+  canManage: boolean;
+  totalCollected: number;
+  totalPending: number;
+  totalOverdue: number;
+  totalBalance: number;
+  overdueCount: number;
+  paidCount: number;
+  partialCount: number;
+  pendingCount: number;
 };

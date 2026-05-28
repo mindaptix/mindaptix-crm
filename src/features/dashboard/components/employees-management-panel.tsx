@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import React from "react";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createManagedUser, deleteManagedUser, updateManagedUserAccess } from "@/features/dashboard/actions/users";
 import { SalesWorkspacePanel } from "@/features/dashboard/components/sales-workspace-panel";
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
@@ -17,6 +18,95 @@ import type {
   SummaryCard,
 } from "@/features/dashboard/types";
 
+// ── Tech categories for the picker ─────────────────────────────────────────
+const TECH_CATEGORIES: Record<string, string[]> = {
+  "📣 Digital Marketing": [
+    "SEO", "Google Ads", "Meta Ads", "Email Marketing", "Content Marketing",
+    "Social Media Marketing", "Influencer Marketing", "SMS Marketing",
+    "WhatsApp Marketing", "YouTube Ads", "LinkedIn Ads", "Twitter / X Ads",
+    "Affiliate Marketing", "Performance Marketing", "CRO", "Google Analytics",
+    "Content", "Automation",
+  ],
+  "🌐 Website & CMS": [
+    "WordPress", "Shopify", "Wix", "Webflow", "Elementor", "WooCommerce",
+    "Magento", "BigCommerce", "Squarespace", "Drupal", "Joomla", "Custom Website",
+  ],
+  "🤖 AI & Automation": [
+    "Claude AI", "ChatGPT", "OpenAI API", "Gemini AI", "LangChain",
+    "AI Integration", "Hugging Face", "Stable Diffusion", "Midjourney",
+    "AI Chatbot", "Machine Learning", "Zapier", "Make", "n8n", "Custom CRM",
+  ],
+  "⚛️ Frontend": [
+    "React", "Next.js", "Vue.js", "Angular", "TypeScript", "JavaScript",
+    "HTML / CSS", "Tailwind CSS", "Redux", "GraphQL",
+  ],
+  "🔧 Backend & DB": [
+    "Node.js", "Python", "Django", "FastAPI", "PHP", "Laravel",
+    "Java", "Spring Boot", "Go", "Rust", "MongoDB", "PostgreSQL",
+    "MySQL", "Redis", "MERN",
+  ],
+  "📱 Mobile": [
+    "Flutter", "React Native", "Swift", "Kotlin", "iOS", "Android",
+  ],
+  "🎨 Design": [
+    "UI/UX Design", "Figma", "Adobe XD", "Photoshop", "Illustrator",
+  ],
+  "☁️ Cloud & DevOps": [
+    "AWS", "Azure", "Google Cloud", "Docker", "Kubernetes", "DevOps", "CI/CD",
+  ],
+};
+
+// ── Form-draft helpers for create-employee persistence ─────────────────────
+const DRAFT_KEY = "mindaptix_create_employee_draft";
+
+type CreateDraft = {
+  fullName: string;
+  email: string;
+  phone: string;
+  joiningDate: string;
+  role: string;
+  status: string;
+  techStack: string[];
+  // profile
+  employeeId: string;
+  department: string;
+  designation: string;
+  dateOfBirth: string;
+  address: string;
+  emergencyContact: string;
+  // bank
+  bankName: string;
+  bankAccountNumber: string;
+  bankIfscCode: string;
+  panNumber: string;
+};
+
+const DEFAULT_DRAFT: CreateDraft = {
+  fullName: "", email: "", phone: "", joiningDate: getTodayDate(),
+  role: "EMPLOYEE", status: "ACTIVE", techStack: [],
+  employeeId: "", department: "", designation: "", dateOfBirth: "",
+  address: "", emergencyContact: "",
+  bankName: "", bankAccountNumber: "", bankIfscCode: "", panNumber: "",
+};
+
+function loadDraft(): CreateDraft {
+  try {
+    if (typeof window === "undefined") return DEFAULT_DRAFT;
+    const saved = sessionStorage.getItem(DRAFT_KEY);
+    if (saved) return { ...DEFAULT_DRAFT, ...JSON.parse(saved) };
+  } catch { /* ignore */ }
+  return DEFAULT_DRAFT;
+}
+
+function persistDraft(draft: CreateDraft) {
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
+}
+
+function clearDraftStorage() {
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
+
+// ── Panel props ─────────────────────────────────────────────────────────────
 type EmployeesManagementPanelProps = {
   readOnly?: boolean;
   salesLeadPriorityOptions: string[];
@@ -30,6 +120,7 @@ type EmployeesManagementPanelProps = {
   summaryCards: SummaryCard[];
   users: EmployeeDirectoryEntry[];
 };
+
 export function EmployeesManagementPanel({
   readOnly = false,
   salesLeadPriorityOptions,
@@ -52,8 +143,30 @@ export function EmployeesManagementPanel({
   const [createSection, setCreateSection] = useState<"account" | "profile" | "bank">("account");
   const [editSection, setEditSection] = useState<"account" | "profile" | "bank">("account");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [lastUpdateSuccess, setLastUpdateSuccess] = useState<string | null>(null);
   const techSummary = buildTechSummary(users);
+
+  // ── Create-form draft state (persists across tab switches + page nav) ──
+  const [createDraft, setCreateDraft] = useState<CreateDraft>(loadDraft);
+  const [createFormKey, setCreateFormKey] = useState(0);  // bump to hard-reset form
+
+  const updateDraft = useCallback((updates: Partial<CreateDraft>) => {
+    setCreateDraft(prev => {
+      const next = { ...prev, ...updates };
+      persistDraft(next);
+      return next;
+    });
+  }, []);
+
+  const resetCreateDraft = useCallback(() => {
+    clearDraftStorage();
+    setCreateDraft(DEFAULT_DRAFT);
+    setCreateFormKey(k => k + 1);
+  }, []);
+
+  // ── Edit modal: track tech stack separately so it survives tab switches ──
+  const [editTechStack, setEditTechStack] = useState<string[]>([]);
 
   const filteredUsers = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -79,11 +192,19 @@ export function EmployeesManagementPanel({
   const shouldShowDirectory = !salesOnly;
   const shouldShowSalesTracker = salesOnly || salesOptions.length > 0 || salesLeadRows.length > 0;
 
+  // When edit modal opens, seed editTechStack from selected user
+  useEffect(() => {
+    if (isEditModalOpen && selectedUser) {
+      setEditTechStack([...selectedUser.techStack]);
+    }
+  }, [isEditModalOpen, selectedUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (userState.success) {
       emitDashboardSync("user-created");
+      resetCreateDraft();
     }
-  }, [userState.success]);
+  }, [userState.success, resetCreateDraft]);
 
   useEffect(() => {
     if (updateUserState.success) {
@@ -99,6 +220,7 @@ export function EmployeesManagementPanel({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsEditModalOpen(false);
+        setConfirmDelete(false);
       }
     };
 
@@ -183,9 +305,9 @@ export function EmployeesManagementPanel({
             ) : null}
           </div>
 
-          {/* CREATE EMPLOYEE TAB — same modal style as Edit */}
-          {canManageWorkspace && activeTab === "create" ? (
-            <div className="mt-6 overflow-hidden rounded-[2rem] bg-white shadow-[0_16px_48px_rgba(15,23,42,0.12)]">
+          {/* CREATE EMPLOYEE TAB — always in DOM when canManageWorkspace, hidden via CSS */}
+          {canManageWorkspace ? (
+            <div className={`mt-6 overflow-hidden rounded-[2rem] bg-white shadow-[0_16px_48px_rgba(15,23,42,0.12)] ${activeTab !== "create" ? "hidden" : ""}`}>
 
               {/* Gradient header */}
               <div className="bg-[linear-gradient(135deg,#1d4ed8_0%,#0f172a_100%)] px-6 pb-5 pt-6">
@@ -219,8 +341,8 @@ export function EmployeesManagementPanel({
                 </div>
               </div>
 
-              {/* Form body */}
-              <form action={createUserAction} autoComplete="off" className="px-6 py-5">
+              {/* Form body — key resets the form on success */}
+              <form action={createUserAction} autoComplete="off" className="px-6 py-5" key={createFormKey}>
                 <input autoComplete="username" className="hidden" name="fakeUsername" tabIndex={-1} type="text" />
                 <input autoComplete="new-password" className="hidden" name="fakePassword" tabIndex={-1} type="password" />
 
@@ -234,43 +356,104 @@ export function EmployeesManagementPanel({
                   </div>
                 ) : null}
 
-                {/* Hidden passthrough fields for inactive tabs */}
+                {/* Hidden passthrough for inactive tabs */}
                 {createSection !== "profile" ? (
                   <>
-                    <input name="employeeId" type="hidden" value="" />
-                    <input name="department" type="hidden" value="" />
-                    <input name="designation" type="hidden" value="" />
-                    <input name="dateOfBirth" type="hidden" value="" />
-                    <input name="address" type="hidden" value="" />
-                    <input name="emergencyContact" type="hidden" value="" />
+                    <input name="employeeId" type="hidden" value={createDraft.employeeId} />
+                    <input name="department" type="hidden" value={createDraft.department} />
+                    <input name="designation" type="hidden" value={createDraft.designation} />
+                    <input name="dateOfBirth" type="hidden" value={createDraft.dateOfBirth} />
+                    <input name="address" type="hidden" value={createDraft.address} />
+                    <input name="emergencyContact" type="hidden" value={createDraft.emergencyContact} />
                   </>
                 ) : null}
                 {createSection !== "bank" ? (
                   <>
-                    <input name="bankName" type="hidden" value="" />
-                    <input name="bankAccountNumber" type="hidden" value="" />
-                    <input name="bankIfscCode" type="hidden" value="" />
-                    <input name="panNumber" type="hidden" value="" />
+                    <input name="bankName" type="hidden" value={createDraft.bankName} />
+                    <input name="bankAccountNumber" type="hidden" value={createDraft.bankAccountNumber} />
+                    <input name="bankIfscCode" type="hidden" value={createDraft.bankIfscCode} />
+                    <input name="panNumber" type="hidden" value={createDraft.panNumber} />
                   </>
+                ) : null}
+                {/* Tech stack is always tracked in draft, hidden inputs when not on account tab */}
+                {createSection !== "account" ? (
+                  createDraft.techStack.map(tech => (
+                    <input key={tech} name="techStack" type="hidden" value={tech} />
+                  ))
                 ) : null}
 
                 {/* ACCOUNT tab */}
                 {createSection === "account" ? (
                   <div className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field defaultValue={userState.values?.fullName} label="Full Name" name="fullName" placeholder="Enter full name" />
-                      <Field autoComplete="off" defaultValue={userState.values?.email} label="Email Address" name="email" placeholder="Enter email" type="email" />
+                      <ControlledField
+                        label="Full Name"
+                        name="fullName"
+                        placeholder="Enter full name"
+                        value={createDraft.fullName}
+                        onChangeValue={(v) => updateDraft({ fullName: v })}
+                      />
+                      <ControlledField
+                        autoComplete="off"
+                        label="Email Address"
+                        name="email"
+                        placeholder="Enter email"
+                        type="email"
+                        value={createDraft.email}
+                        onChangeValue={(v) => updateDraft({ email: v })}
+                      />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field defaultValue={userState.values?.phone} label="Phone" name="phone" placeholder="Enter phone number" />
-                      <Field defaultValue={userState.values?.joiningDate} fallbackTodayForDate label="Joining Date" name="joiningDate" placeholder="Select joining date" type="date" />
+                      <ControlledField
+                        label="Phone"
+                        name="phone"
+                        placeholder="Enter phone number"
+                        value={createDraft.phone}
+                        onChangeValue={(v) => updateDraft({ phone: v })}
+                      />
+                      <ControlledField
+                        label="Joining Date"
+                        name="joiningDate"
+                        placeholder="Select joining date"
+                        type="date"
+                        value={createDraft.joiningDate}
+                        onChangeValue={(v) => updateDraft({ joiningDate: v })}
+                      />
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <SelectField defaultValue={userState.values?.role ?? "EMPLOYEE"} label="Role" labels={{ EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }} name="role" options={["EMPLOYEE", "MANAGER", "SALES"]} />
-                      <SelectField defaultValue={userState.values?.status ?? "ACTIVE"} label="Status" name="status" options={["ACTIVE", "SUSPENDED"]} />
-                      <SelectField defaultValue={userState.values?.techStack?.[0] ?? ""} includePlaceholder label="Tech Focus" name="techStack" options={salesTechnologyOptions} placeholder="No tech focus" />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <ControlledSelectField
+                        label="Role"
+                        name="role"
+                        options={["EMPLOYEE", "MANAGER", "SALES"]}
+                        labels={{ EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }}
+                        value={createDraft.role}
+                        onChangeValue={(v) => updateDraft({ role: v })}
+                      />
+                      <ControlledSelectField
+                        label="Status"
+                        name="status"
+                        options={["ACTIVE", "SUSPENDED"]}
+                        value={createDraft.status}
+                        onChangeValue={(v) => updateDraft({ status: v })}
+                      />
                     </div>
-                    <Field autoComplete="new-password" label="Temporary Password" name="password" placeholder="Min 8 chars, upper, lower, number, symbol" type="password" />
+                    {/* Multi-select Tech Stack Picker */}
+                    <TechStackPicker
+                      label="Tech Focus / Skills"
+                      options={salesTechnologyOptions}
+                      value={createDraft.techStack}
+                      onChangeValue={(techs) => updateDraft({ techStack: techs })}
+                    />
+                    <ControlledField
+                      autoComplete="new-password"
+                      label="Temporary Password"
+                      name="password"
+                      placeholder="Min 8 chars, upper, lower, number, symbol"
+                      type="password"
+                      value=""
+                      onChangeValue={() => {}}
+                      uncontrolled
+                    />
                     <FileField label="Onboarding Document (optional)" name="document" />
                   </div>
                 ) : null}
@@ -279,15 +462,58 @@ export function EmployeesManagementPanel({
                 {createSection === "profile" ? (
                   <div className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-3">
-                      <Field label="Employee ID" name="employeeId" placeholder="EMP-001" required={false} />
-                      <Field label="Department" name="department" placeholder="e.g. Engineering" required={false} />
-                      <Field label="Designation" name="designation" placeholder="e.g. Software Engineer" required={false} />
+                      <ControlledField
+                        label="Employee ID"
+                        name="employeeId"
+                        placeholder="EMP-001"
+                        value={createDraft.employeeId}
+                        onChangeValue={(v) => updateDraft({ employeeId: v })}
+                        required={false}
+                      />
+                      <ControlledField
+                        label="Department"
+                        name="department"
+                        placeholder="e.g. Engineering"
+                        value={createDraft.department}
+                        onChangeValue={(v) => updateDraft({ department: v })}
+                        required={false}
+                      />
+                      <ControlledField
+                        label="Designation"
+                        name="designation"
+                        placeholder="e.g. Software Engineer"
+                        value={createDraft.designation}
+                        onChangeValue={(v) => updateDraft({ designation: v })}
+                        required={false}
+                      />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Date of Birth" name="dateOfBirth" placeholder="Select date" required={false} type="date" />
-                      <Field label="Emergency Contact" name="emergencyContact" placeholder="Name & phone" required={false} />
+                      <ControlledField
+                        label="Date of Birth"
+                        name="dateOfBirth"
+                        placeholder="Select date"
+                        type="date"
+                        value={createDraft.dateOfBirth}
+                        onChangeValue={(v) => updateDraft({ dateOfBirth: v })}
+                        required={false}
+                      />
+                      <ControlledField
+                        label="Emergency Contact"
+                        name="emergencyContact"
+                        placeholder="Name & phone"
+                        value={createDraft.emergencyContact}
+                        onChangeValue={(v) => updateDraft({ emergencyContact: v })}
+                        required={false}
+                      />
                     </div>
-                    <Field label="Address" name="address" placeholder="Full residential address" required={false} />
+                    <ControlledField
+                      label="Address"
+                      name="address"
+                      placeholder="Full residential address"
+                      value={createDraft.address}
+                      onChangeValue={(v) => updateDraft({ address: v })}
+                      required={false}
+                    />
                   </div>
                 ) : null}
 
@@ -295,12 +521,40 @@ export function EmployeesManagementPanel({
                 {createSection === "bank" ? (
                   <div className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Bank Name" name="bankName" placeholder="e.g. HDFC Bank" required={false} />
-                      <Field label="Account Number" name="bankAccountNumber" placeholder="Account number" required={false} />
+                      <ControlledField
+                        label="Bank Name"
+                        name="bankName"
+                        placeholder="e.g. HDFC Bank"
+                        value={createDraft.bankName}
+                        onChangeValue={(v) => updateDraft({ bankName: v })}
+                        required={false}
+                      />
+                      <ControlledField
+                        label="Account Number"
+                        name="bankAccountNumber"
+                        placeholder="Account number"
+                        value={createDraft.bankAccountNumber}
+                        onChangeValue={(v) => updateDraft({ bankAccountNumber: v })}
+                        required={false}
+                      />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="IFSC Code" name="bankIfscCode" placeholder="HDFC0001234" required={false} />
-                      <Field label="PAN Number" name="panNumber" placeholder="ABCDE1234F" required={false} />
+                      <ControlledField
+                        label="IFSC Code"
+                        name="bankIfscCode"
+                        placeholder="HDFC0001234"
+                        value={createDraft.bankIfscCode}
+                        onChangeValue={(v) => updateDraft({ bankIfscCode: v })}
+                        required={false}
+                      />
+                      <ControlledField
+                        label="PAN Number"
+                        name="panNumber"
+                        placeholder="ABCDE1234F"
+                        value={createDraft.panNumber}
+                        onChangeValue={(v) => updateDraft({ panNumber: v })}
+                        required={false}
+                      />
                     </div>
                   </div>
                 ) : null}
@@ -311,13 +565,20 @@ export function EmployeesManagementPanel({
               </form>
 
               {/* Footer cancel */}
-              <div className="border-t border-slate-100 px-6 py-4 text-right">
+              <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between">
                 <button
                   className="text-sm font-medium text-slate-400 transition hover:text-slate-700"
                   onClick={() => { setActiveTab("directory"); setCreateSection("account"); }}
                   type="button"
                 >
-                  Cancel — go back to directory
+                  ← Back to directory
+                </button>
+                <button
+                  className="text-xs font-medium text-rose-300 transition hover:text-rose-600"
+                  onClick={() => { resetCreateDraft(); setCreateSection("account"); }}
+                  type="button"
+                >
+                  Clear form
                 </button>
               </div>
             </div>
@@ -400,17 +661,55 @@ export function EmployeesManagementPanel({
                   >
                     {/* ── Modal Header ── */}
                     <div className={`relative shrink-0 overflow-hidden px-6 pb-5 pt-6 ${getRoleGradient(selectedUser.role)}`}>
-                      {/* Close × button */}
-                      <button
-                        aria-label="Close"
-                        className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
-                        onClick={() => setIsEditModalOpen(false)}
-                        type="button"
-                      >
-                        <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
-                          <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-                        </svg>
-                      </button>
+                      {/* Top-right: Delete + Close buttons */}
+                      <div className="absolute right-4 top-4 flex items-center gap-2">
+                        {/* Delete with inline confirmation */}
+                        {confirmDelete ? (
+                          <div className="flex items-center gap-1.5 rounded-full border border-white/30 bg-black/30 px-3 py-1.5 backdrop-blur-sm">
+                            <span className="text-[0.62rem] font-semibold text-white/90">Delete account?</span>
+                            <form action={deleteManagedUser}>
+                              <input name="userId" type="hidden" value={selectedUser.id} />
+                              <button
+                                className="rounded-full bg-rose-500 px-2.5 py-0.5 text-[0.6rem] font-bold text-white transition hover:bg-rose-600"
+                                type="submit"
+                              >
+                                Yes
+                              </button>
+                            </form>
+                            <button
+                              className="rounded-full bg-white/20 px-2.5 py-0.5 text-[0.6rem] font-bold text-white transition hover:bg-white/30"
+                              onClick={() => setConfirmDelete(false)}
+                              type="button"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            aria-label="Delete account"
+                            className="grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-rose-500/70"
+                            onClick={() => setConfirmDelete(true)}
+                            title="Delete account"
+                            type="button"
+                          >
+                            <svg fill="none" height="15" viewBox="0 0 24 24" width="15">
+                              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                              <path d="M10 11v6M14 11v6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                            </svg>
+                          </button>
+                        )}
+                        {/* Close × */}
+                        <button
+                          aria-label="Close"
+                          className="grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+                          onClick={() => { setIsEditModalOpen(false); setConfirmDelete(false); }}
+                          type="button"
+                        >
+                          <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                            <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                          </svg>
+                        </button>
+                      </div>
 
                       {/* Avatar + identity */}
                       <div className="flex items-center gap-4">
@@ -467,7 +766,10 @@ export function EmployeesManagementPanel({
                             <input name="joiningDate" type="hidden" value={selectedUser.joiningDate} />
                             <input name="role" type="hidden" value={selectedUser.role} />
                             <input name="status" type="hidden" value={selectedUser.status} />
-                            <input name="techStack" type="hidden" value={selectedUser.techStack[0] ?? ""} />
+                            {/* Pass all selected techs as hidden inputs */}
+                            {editTechStack.map(tech => (
+                              <input key={tech} name="techStack" type="hidden" value={tech} />
+                            ))}
                           </>
                         ) : null}
                         {editSection !== "profile" ? (
@@ -500,11 +802,17 @@ export function EmployeesManagementPanel({
                               <Field defaultValue={selectedUser.phone} label="Phone" name="phone" placeholder="Enter phone number" />
                               <Field defaultValue={selectedUser.joiningDate} fallbackTodayForDate label="Joining Date" name="joiningDate" placeholder="Select joining date" type="date" />
                             </div>
-                            <div className="grid gap-4 sm:grid-cols-3">
+                            <div className="grid gap-4 sm:grid-cols-2">
                               <SelectField defaultValue={selectedUser.role} label="Role" labels={{ EMPLOYEE: "Employee", MANAGER: "Admin", SALES: "Sales" }} name="role" options={["EMPLOYEE", "MANAGER", "SALES"]} />
                               <SelectField defaultValue={selectedUser.status} label="Status" name="status" options={["ACTIVE", "SUSPENDED"]} />
-                              <SelectField defaultValue={selectedUser.techStack[0] ?? ""} includePlaceholder label="Tech Focus" name="techStack" options={salesTechnologyOptions} placeholder="No tech focus" />
                             </div>
+                            {/* Multi-select Tech Stack Picker for edit */}
+                            <TechStackPicker
+                              label="Tech Focus / Skills"
+                              options={salesTechnologyOptions}
+                              value={editTechStack}
+                              onChangeValue={setEditTechStack}
+                            />
                           </div>
                         ) : null}
 
@@ -545,26 +853,6 @@ export function EmployeesManagementPanel({
                       </form>
                     </div>
 
-                    {/* ── Footer — Delete ── */}
-                    <div className="shrink-0 border-t border-slate-100 bg-rose-50/40 px-6 py-3">
-                      <form action={deleteManagedUser} className="flex items-center justify-between gap-3">
-                        <input name="userId" type="hidden" value={selectedUser.id} />
-                        <div className="flex items-center gap-2">
-                          <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="shrink-0 text-rose-400">
-                            <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"/>
-                          </svg>
-                          <p className="text-xs text-rose-400">This will permanently delete the account.</p>
-                        </div>
-                        <FormActionButton
-                          className="w-auto shrink-0 border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-none hover:border-rose-300 hover:bg-rose-600 hover:text-white"
-                          pendingLabel="Deleting…"
-                          type="submit"
-                          variant="primary"
-                        >
-                          Delete
-                        </FormActionButton>
-                      </form>
-                    </div>
                   </div>
                 </div>
               ) : null}
@@ -606,6 +894,183 @@ export function EmployeesManagementPanel({
     </div>
   );
 }
+
+// ── TechStackPicker ───────────────────────────────────────────────────────────
+type TechStackPickerProps = {
+  label?: string;
+  options: string[];
+  value: string[];
+  onChangeValue: (techs: string[]) => void;
+};
+
+function TechStackPicker({ label = "Tech Focus / Skills", options, value, onChangeValue }: TechStackPickerProps) {
+  const [search, setSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filteredCategories = useMemo(() => {
+    const availableSet = new Set(options);
+
+    if (!search.trim()) {
+      return Object.entries(TECH_CATEGORIES)
+        .map(([cat, techs]) => ({
+          category: cat,
+          techs: techs.filter(t => availableSet.has(t)),
+        }))
+        .filter(c => c.techs.length > 0);
+    }
+
+    const q = search.toLowerCase();
+    const matched = options.filter(t => t.toLowerCase().includes(q));
+    return matched.length > 0 ? [{ category: "🔍 Search Results", techs: matched }] : [];
+  }, [search, options]);
+
+  const toggle = (tech: string) => {
+    const next = value.includes(tech)
+      ? value.filter(t => t !== tech)
+      : [...value, tech];
+    onChangeValue(next);
+  };
+
+  const remove = (tech: string) => {
+    onChangeValue(value.filter(t => t !== tech));
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isOpen]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+
+      {/* Trigger area — shows selected chips */}
+      <div
+        className={`min-h-[46px] w-full cursor-pointer rounded-2xl border bg-white px-3 py-2 transition ${
+          isOpen ? "border-blue-300 ring-4 ring-blue-50" : "border-slate-200 hover:border-slate-300"
+        }`}
+        onClick={() => setIsOpen(o => !o)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setIsOpen(o => !o); } }}
+      >
+        {value.length === 0 ? (
+          <div className="flex items-center gap-2 py-0.5">
+            <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-slate-400">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+            </svg>
+            <span className="text-sm text-slate-400">Click to add tech skills…</span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {value.map(tech => (
+              <span
+                key={tech}
+                className="flex items-center gap-1 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700"
+              >
+                {tech}
+                <button
+                  aria-label={`Remove ${tech}`}
+                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-violet-200"
+                  onClick={(e) => { e.stopPropagation(); remove(tech); }}
+                  type="button"
+                >
+                  <svg fill="none" height="9" viewBox="0 0 24 24" width="9">
+                    <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+            <span className="flex items-center py-0.5 text-xs text-slate-400">
+              {isOpen ? "▲" : "▼"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Count badge */}
+      {value.length > 0 ? (
+        <span className="absolute right-3 top-0 -translate-y-1/2 rounded-full bg-violet-600 px-2 py-0.5 text-[0.6rem] font-bold text-white">
+          {value.length}
+        </span>
+      ) : null}
+
+      {/* Dropdown */}
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_16px_48px_rgba(15,23,42,0.14)]">
+          {/* Search bar */}
+          <div className="sticky top-0 border-b border-slate-100 bg-white px-3 pt-3 pb-2">
+            <input
+              autoFocus
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white"
+              onClick={e => e.stopPropagation()}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search tech skills..."
+              value={search}
+            />
+          </div>
+
+          {/* Categories + options */}
+          <div className="max-h-52 overflow-y-auto p-2">
+            {filteredCategories.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">No tech found matching &ldquo;{search}&rdquo;</p>
+            ) : (
+              filteredCategories.map(({ category, techs }) => (
+                <div key={category} className="mb-3 last:mb-0">
+                  <p className="mb-1.5 px-2 text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">{category}</p>
+                  <div className="flex flex-wrap gap-1.5 px-1">
+                    {techs.map(tech => {
+                      const selected = value.includes(tech);
+                      return (
+                        <button
+                          key={tech}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                            selected
+                              ? "border-violet-300 bg-violet-100 text-violet-800"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+                          }`}
+                          onClick={(e) => { e.stopPropagation(); toggle(tech); }}
+                          type="button"
+                        >
+                          {selected ? "✓ " : ""}{tech}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2">
+            <span className="text-xs text-slate-400">{value.length} selected</span>
+            {value.length > 0 ? (
+              <button
+                className="text-xs font-medium text-rose-400 transition hover:text-rose-600"
+                onClick={(e) => { e.stopPropagation(); onChangeValue([]); }}
+                type="button"
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Helper components ─────────────────────────────────────────────────────────
 
 function getInitials(name: string) {
   return name.trim().split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
@@ -690,16 +1155,24 @@ function EmployeeRow({
         {user.joiningDate ? <p className="mt-0.5 text-xs text-slate-400">Joined {user.joiningDate}</p> : null}
       </div>
 
-      {/* Col 4 — Action */}
-      {canEdit ? (
-        <button
-          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-          onClick={onEdit}
-          type="button"
+      {/* Col 4 — Actions */}
+      <div className="flex shrink-0 items-center gap-2">
+        <Link
+          className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+          href={`/dashboard/employees/${user.id}`}
         >
-          Edit
-        </button>
-      ) : null}
+          View
+        </Link>
+        {canEdit ? (
+          <button
+            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+            onClick={onEdit}
+            type="button"
+          >
+            Edit
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -714,6 +1187,100 @@ function OverviewCard({ detail, label, value }: { detail: string; label: string;
   );
 }
 
+// ── Controlled Field (for create form with draft persistence) ─────────────────
+type ControlledFieldProps = {
+  autoComplete?: string;
+  label: string;
+  name: string;
+  placeholder: string;
+  value: string;
+  onChangeValue: (v: string) => void;
+  required?: boolean;
+  type?: string;
+  uncontrolled?: boolean; // for password — not persisted
+};
+
+function ControlledField({
+  autoComplete,
+  label,
+  name,
+  placeholder,
+  value,
+  onChangeValue,
+  required,
+  type = "text",
+  uncontrolled = false,
+}: ControlledFieldProps) {
+  const resolvedRequired = required ?? true;
+
+  if (uncontrolled) {
+    return (
+      <label className="block">
+        <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+        <input
+          autoComplete={autoComplete}
+          className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 ${
+            type === "date" ? "[color-scheme:light]" : ""
+          }`}
+          name={name}
+          placeholder={placeholder}
+          required={resolvedRequired}
+          type={type}
+        />
+      </label>
+    );
+  }
+
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <input
+        autoComplete={autoComplete}
+        className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 ${
+          type === "date" ? "[color-scheme:light]" : ""
+        }`}
+        name={name}
+        onChange={(e) => onChangeValue(e.target.value)}
+        placeholder={placeholder}
+        required={resolvedRequired}
+        type={type}
+        value={value}
+      />
+    </label>
+  );
+}
+
+// ── Controlled SelectField (for create form) ──────────────────────────────────
+type ControlledSelectFieldProps = {
+  label: string;
+  name: string;
+  options: string[];
+  labels?: Record<string, string>;
+  value: string;
+  onChangeValue: (v: string) => void;
+};
+
+function ControlledSelectField({ label, name, options, labels, value, onChangeValue }: ControlledSelectFieldProps) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <select
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
+        name={name}
+        onChange={(e) => onChangeValue(e.target.value)}
+        value={value}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {labels?.[option] ?? option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+// ── Original (uncontrolled) Field — used by edit modal ───────────────────────
 type FieldProps = {
   autoComplete?: string;
   defaultValue?: string;

@@ -5,6 +5,7 @@ import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
 import { LeaveRequestModel } from "@/database/mongodb/models/leave-request";
 import { ProjectModel } from "@/database/mongodb/models/project";
 import { SalesLeadModel } from "@/database/mongodb/models/sales-lead";
+import { SalesPaymentModel } from "@/database/mongodb/models/sales-payment";
 import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
 import type { DashboardListItem, DashboardOverviewData, ExecutiveOverviewSection } from "@/features/dashboard/types";
@@ -27,26 +28,30 @@ export async function buildLeadershipDashboardOverview(
   copy: Pick<DashboardOverviewData, "title" | "description">,
 ): Promise<DashboardOverviewData> {
   const { notifications, today, weekStart } = await getDashboardOverviewContext(session);
-  const activeEmployees = await UserModel.find({ role: "EMPLOYEE", status: "ACTIVE" }, { fullName: 1, email: 1, phone: 1, joiningDate: 1 })
-    .sort({ fullName: 1 })
-    .lean();
-  const activeSalesUsers =
-    session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER"
-      ? await UserModel.find({ role: "SALES", status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean()
-      : [];
+  const isLeadership = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
+  // Run both user queries in parallel instead of sequentially — saves ~100-200ms
+  const [activeEmployees, activeSalesUsers] = await Promise.all([
+    UserModel.find({ role: "EMPLOYEE", status: "ACTIVE" }, { fullName: 1, email: 1, phone: 1, joiningDate: 1 })
+      .sort({ fullName: 1 })
+      .lean(),
+    isLeadership
+      ? UserModel.find({ role: "SALES", status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean()
+      : Promise.resolve([]),
+  ]);
   const employeeIds = activeEmployees.map((employee) => employee._id.toString());
   const salesUserIds = activeSalesUsers.map((user) => user._id.toString());
   const employeeMap = new Map(
     activeEmployees.map((employee) => [employee._id.toString(), { fullName: employee.fullName, email: employee.email }]),
   );
   const scope = inScope(employeeIds);
-  const [todaysAttendance, leaveRows, taskRows, weekAttendance, weekUpdates, projects, salesLeads, operationalTasks] = await Promise.all([
+  const [todaysAttendance, leaveRows, taskRows, weekAttendance, weekUpdates, projects, salesLeads, operationalTasks, allPayments] = await Promise.all([
     AttendanceModel.find({ userId: scope, dateKey: today }, { userId: 1 }).lean(),
     LeaveRequestModel.find({ userId: scope }, { userId: 1, leaveType: 1, startDate: 1, endDate: 1, status: 1, reason: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
     TaskModel.find({ assignedUserId: scope }, { title: 1, dueDate: 1, status: 1, assignedUserId: 1, priority: 1, completedAt: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
     AttendanceModel.find({ userId: scope, dateKey: { $gte: weekStart, $lte: today } }, { userId: 1, status: 1, dateKey: 1 }).lean(),
     DailyUpdateModel.find({ userId: scope, workDate: { $gte: weekStart, $lte: today } }, { userId: 1, workDate: 1 }).lean(),
-    ProjectModel.find({}, { name: 1, summary: 1, status: 1, assignedUserIds: 1, dueDate: 1 }).sort({ createdAt: -1 }).lean(),
+    ProjectModel.find({}, { name: 1, summary: 1, status: 1, priority: 1, assignedUserIds: 1, dueDate: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1 }).sort({ createdAt: -1 }).lean(),
     SalesLeadModel.find({ salesUserId: inScope(salesUserIds) }, { salesUserId: 1, clientName: 1, clientPhone: 1, clientEmail: 1, technologies: 1, meetingDate: 1, meetingTime: 1, budget: 1, pitchedPrice: 1, deliveryDate: 1, createdAt: 1 })
       .sort({ createdAt: -1 })
       .lean(),
@@ -56,6 +61,10 @@ export async function buildLeadershipDashboardOverview(
     )
       .sort({ createdAt: -1 })
       .lean(),
+    SalesPaymentModel.find(
+      {},
+      { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, status: 1 },
+    ).lean(),
   ]);
   const presentTodayIds = new Set(todaysAttendance.map((row) => row.userId));
   const onLeaveTodayIds = new Set(
@@ -109,6 +118,7 @@ export async function buildLeadershipDashboardOverview(
           projects,
           leaveRows,
           salesLeads,
+          allPayments,
           salesUserMap: new Map(activeSalesUsers.map((user) => [user._id.toString(), user])),
           operationalTasks,
         })
@@ -177,6 +187,7 @@ function buildExecutiveOverviewSections({
   activeEmployees,
   activeSalesUsers,
   absentToday,
+  allPayments,
   leaveRows,
   onLeaveToday,
   operationalTasks,
@@ -189,11 +200,12 @@ function buildExecutiveOverviewSections({
   activeEmployees: Array<{ _id: { toString(): string }; fullName: string; email: string; phone?: string; joiningDate?: Date | null }>;
   activeSalesUsers: Array<{ _id: { toString(): string }; fullName: string; email: string }>;
   absentToday: number;
+  allPayments: Array<{ _id: { toString(): string }; salesUserId: string; clientName?: string; projectName?: string; invoiceNumber?: string; amount?: number; receivedAmount?: number; dueDate?: string; status?: string }>;
   leaveRows: Array<{ _id: { toString(): string }; userId: string; leaveType?: string; startDate: string; endDate: string; status?: string; reason?: string }>;
   onLeaveToday: number;
   operationalTasks: Array<{ _id: { toString(): string }; title: string; description?: string; dueDate: string; status?: string; assignedUserId: string; labels?: string[] }>;
   presentToday: number;
-  projects: Array<{ _id: { toString(): string }; name: string; summary: string; status?: string; assignedUserIds?: string[]; dueDate?: Date | null }>;
+  projects: Array<{ _id: { toString(): string }; name: string; summary: string; status?: string; priority?: string; assignedUserIds?: string[]; dueDate?: Date | null; closedByEmployeeId?: string | null; closedByEmployeeAt?: Date | null }>;
   salesLeads: Array<{
     _id: { toString(): string };
     salesUserId: string;
@@ -214,19 +226,51 @@ function buildExecutiveOverviewSections({
   const closedProjects = projects.filter((project) => project.status === "COMPLETED").length;
   const ongoingProjects = projects.filter((project) => project.status === "IN_PROGRESS").length;
   const planningProjects = projects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
+  const closedByEmployeeProjects = projects.filter((project) => project.closedByEmployeeId).length;
 
-  const projectItems: DashboardListItem[] = projects.slice(0, 6).map((project) => ({
+  // Encode raw status + priority + closedByEmployee in meta for rich card rendering on frontend
+  const projectItems: DashboardListItem[] = projects.slice(0, 8).map((project) => ({
     id: project._id.toString(),
     title: project.name,
-    meta: `${formatLabel(project.status ?? "PLANNING")} | ${project.assignedUserIds?.length ?? 0} assignee(s)`,
-    description: project.summary?.trim()
-      ? `${project.summary} ${project.dueDate ? `| Due ${formatDate(project.dueDate)}` : ""}`.trim()
-      : project.dueDate
-        ? `Due ${formatDate(project.dueDate)}`
-        : "Project timeline is not set yet.",
+    meta: [
+      project.status ?? "PLANNING",
+      project.priority ?? "MEDIUM",
+      project.closedByEmployeeId ? "1" : "0",
+      String(project.assignedUserIds?.length ?? 0),
+      project.dueDate ? formatDate(project.dueDate) : "",
+    ].join("||"),
+    description: project.summary?.trim() || "No project description added.",
   }));
 
-  const paymentItems: DashboardListItem[] = [];
+  // ── Real payment aggregations ──
+  const paymentTotalCollected = allPayments.reduce((sum, p) => sum + Number(p.receivedAmount ?? 0), 0);
+  const paymentTotalAmount = allPayments.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+  const paymentTotalBalance = Math.max(paymentTotalAmount - paymentTotalCollected, 0);
+  const overduePayments = allPayments.filter((p) => {
+    const status = p.status ?? "PENDING";
+    const isOverdue = status === "OVERDUE" || (status === "PENDING" && p.dueDate && p.dueDate < today);
+    return isOverdue;
+  });
+  const paidPayments = allPayments.filter((p) => p.status === "PAID");
+  const partialPayments = allPayments.filter((p) => p.status === "PARTIAL");
+  const pendingPayments = allPayments.filter((p) => {
+    const status = p.status ?? "PENDING";
+    return status === "PENDING" && (!p.dueDate || p.dueDate >= today);
+  });
+
+  const paymentItems: DashboardListItem[] = allPayments.slice(0, 8).map((p) => {
+    const amount = Number(p.amount ?? 0);
+    const received = Number(p.receivedAmount ?? 0);
+    const balance = Math.max(amount - received, 0);
+    const status = p.status ?? "PENDING";
+    const resolvedStatus = status === "PENDING" && p.dueDate && p.dueDate < today ? "OVERDUE" : status;
+    return {
+      id: p._id.toString(),
+      title: p.clientName || p.invoiceNumber || "Unnamed client",
+      meta: `${resolvedStatus}||${formatCurrency(amount)}||${formatCurrency(received)}||${formatCurrency(balance)}||${p.dueDate ?? ""}`,
+      description: p.projectName ? `Project: ${p.projectName}` : "No project name",
+    };
+  });
 
   const employeeItems: DashboardListItem[] = [
     ...activeEmployees.slice(0, 6).map((employee) => {
@@ -280,9 +324,10 @@ function buildExecutiveOverviewSections({
       description: "Total projects, closed work, and current execution pipeline for the company.",
       metrics: [
         { label: "Total Projects", value: String(totalProjects), detail: "All projects currently tracked in the company workspace." },
-        { label: "Closed", value: String(closedProjects), detail: "Projects already marked as completed." },
-        { label: "Ongoing", value: String(ongoingProjects), detail: "Projects actively moving in execution." },
+        { label: "In Progress", value: String(ongoingProjects), detail: "Projects actively moving in execution." },
+        { label: "Completed", value: String(closedProjects), detail: "Projects already marked as completed." },
         { label: "Planned / Hold", value: String(planningProjects), detail: "Projects waiting, planning, or on hold." },
+        { label: "Closed by Employee", value: String(closedByEmployeeProjects), detail: "Projects self-reported as closed by assigned employees." },
       ],
       items: projectItems,
       emptyMessage: "No projects are available yet.",
@@ -292,15 +337,19 @@ function buildExecutiveOverviewSections({
       badge: "Finance",
       title: "Payment Pipeline",
       description: "Collected, pending, and partially received payment visibility for leadership review.",
-      note: "Payment records are not connected in the current database schema yet, so these values stay at zero until a payment module is added.",
+      note: overduePayments.length > 0
+        ? `⚠️ ${overduePayments.length} payment${overduePayments.length !== 1 ? "s are" : " is"} overdue. Review immediately from the Payments page.`
+        : allPayments.length === 0
+          ? "No payment records added yet. Go to the Payments page to add client payment records."
+          : undefined,
       metrics: [
-        { label: "Received", value: "0", detail: "Fully collected payments recorded in the system." },
-        { label: "Pending", value: "0", detail: "Payments still not received." },
-        { label: "Partial", value: "0", detail: "Projects where partial payment has come in." },
-        { label: "Balance Due", value: "0", detail: "Outstanding amount still remaining." },
+        { label: "Total Collected", value: formatCurrency(paymentTotalCollected), detail: `${paidPayments.length} fully paid + ${partialPayments.length} partial payments received.` },
+        { label: "Pending", value: String(pendingPayments.length), detail: "Payment records still awaiting receipt." },
+        { label: "Overdue", value: String(overduePayments.length), detail: "Past due date and still not fully paid." },
+        { label: "Balance Due", value: formatCurrency(paymentTotalBalance), detail: "Total outstanding amount across all active records." },
       ],
       items: paymentItems,
-      emptyMessage: "No payment records are connected yet.",
+      emptyMessage: "No payment records added yet. Use the Payments page to track client invoices.",
     },
     {
       id: "workforce",

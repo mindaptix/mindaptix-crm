@@ -51,6 +51,25 @@ const projectSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    clientName: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: "",
+    },
+    clientBudget: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    closedByEmployeeId: {
+      type: String,
+      default: null,
+    },
+    closedByEmployeeAt: {
+      type: Date,
+      default: null,
+    },
   },
   baseSchemaOptions,
 );
@@ -63,7 +82,10 @@ const cachedProjectModel = mongoose.models.Project as Model<ProjectRecord> | und
 const hasLatestProjectFields =
   cachedProjectModel?.schema.path("techStack") &&
   cachedProjectModel.schema.path("assignedUserIds") &&
-  cachedProjectModel.schema.path("createdByUserId");
+  cachedProjectModel.schema.path("createdByUserId") &&
+  cachedProjectModel.schema.path("closedByEmployeeId") &&
+  cachedProjectModel.schema.path("clientName") &&
+  cachedProjectModel.schema.path("clientBudget");
 
 if (cachedProjectModel && !hasLatestProjectFields) {
   delete mongoose.models.Project;

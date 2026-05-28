@@ -7,6 +7,7 @@ import connectDb from "@/database/mongodb/connect";
 import { SettingModel } from "@/database/mongodb/models/setting";
 import { UserModel } from "@/database/mongodb/models/user";
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
+import { UserSessionModel } from "@/database/mongodb/models/user-session";
 import { headers } from "next/headers";
 
 type SettingsState = {
@@ -195,12 +196,22 @@ export async function updateAccountPassword(
   }
 
   const passwordHash = await hashPassword(newPassword);
-  await UserModel.findByIdAndUpdate(session.user.id, { passwordHash });
+
+  // Update password + invalidate all OTHER active sessions (force re-login on other devices)
+  const currentSessionId = session.sessionId;
+  await Promise.all([
+    UserModel.findByIdAndUpdate(session.user.id, { passwordHash }),
+    UserSessionModel.deleteMany({
+      userId: session.user.id,
+      // Keep the current session alive so user stays logged in after change
+      _id: { $ne: currentSessionId },
+    }),
+  ]);
 
   revalidatePath("/dashboard/settings");
 
   return {
-    success: "Password updated successfully.",
+    success: "Password updated successfully. All other devices have been signed out.",
     values: { confirmPassword: "", currentPassword: "", newPassword: "" },
   };
 }

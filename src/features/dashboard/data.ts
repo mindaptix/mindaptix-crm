@@ -33,14 +33,26 @@ import type {
   AnnouncementsPageData,
   AttendanceMonthlyRow,
   AttendancePageData,
+  ClientPaymentEntry,
   DashboardBreakdownSlice,
   DashboardOverviewData,
   DsrPageData,
+  EmployeeDetailAttendance,
+  EmployeeDetailData,
+  EmployeeDetailLeaveEntry,
+  EmployeeDetailPayslip,
+  EmployeeDetailProjectEntry,
+  EmployeeDetailSalary,
+  EmployeeDirectoryEntry,
   EmployeesPageData,
+  ProjectDetailData,
+  ProjectDetailEmployeeEntry,
+  ProjectDetailPaymentEntry,
   ExpensePageData,
   LeaveBalanceEntry,
   LeaveEmployeeSummary,
   LeavePageData,
+  PaymentsPageData,
   PayrollPageData,
   PerformanceScoreRow,
   ProjectsPageData,
@@ -115,6 +127,8 @@ export type {
   LeavePageData,
   LeaveTrendPoint,
   PerformanceScoreRow,
+  ClientPaymentEntry,
+  PaymentsPageData,
   ProjectsPageData,
   ReportsPageData,
   SalesCustomerEntry,
@@ -411,7 +425,7 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
   ] = await Promise.all([
     ProjectModel.find(
       hasAdminLikeAccess ? {} : isSalesSelfView ? { assignedUserIds: session.user.id } : { _id: { $in: [] } },
-      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1 },
+      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1 },
     )
       .sort({ createdAt: -1 })
       .lean(),
@@ -635,6 +649,10 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
       assignedUserIds: project.assignedUserIds ?? [],
       assignedUserNames: (project.assignedUserIds ?? []).map((userId) => userMap.get(userId)?.fullName ?? "Assigned employee"),
       createdByUserId: project.createdByUserId ?? "",
+      closedByEmployeeId: (project as { closedByEmployeeId?: string }).closedByEmployeeId ?? "",
+      closedByEmployeeAt: formatDate((project as { closedByEmployeeAt?: Date | null }).closedByEmployeeAt ?? null),
+      clientName: String((project as { clientName?: string }).clientName ?? ""),
+      clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
     })),
     salesLeadRows,
     salesWorkspace,
@@ -662,7 +680,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
     // Employee: return only projects assigned to them
     const myProjects = await ProjectModel.find(
       { assignedUserIds: session.user.id },
-      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1 },
+      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1 },
     ).sort({ updatedAt: -1 }).lean();
 
     return {
@@ -682,27 +700,38 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
         assignedUserIds: project.assignedUserIds ?? [],
         assignedUserNames: [],
         createdByUserId: "",
+        closedByEmployeeId: project.closedByEmployeeId ?? "",
+        closedByEmployeeAt: formatDate(project.closedByEmployeeAt ?? null),
+        clientName: String((project as { clientName?: string }).clientName ?? ""),
+        clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
       })),
       employeeOptions: [],
       technologyOptions: [...SALES_TECH_OPTIONS],
     };
   }
 
-  const [projects, employees] = await Promise.all([
+  const [projects, assignableUsers] = await Promise.all([
     ProjectModel.find(
       {},
-      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1 },
+      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1 },
     )
       .sort({ updatedAt: -1 })
       .lean(),
-    UserModel.find({ role: "EMPLOYEE", status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean(),
+    // Include EMPLOYEE + MANAGER + SUPER_ADMIN — all can be assigned to projects
+    UserModel.find(
+      { role: { $in: ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"] }, status: "ACTIVE" },
+      { fullName: 1, email: 1, role: 1 },
+    ).sort({ role: 1, fullName: 1 }).lean(),
   ]);
 
+  // Keep backwards compat: employees = all assignable users
+  const employees = assignableUsers;
   const employeeMap = new Map(employees.map((employee) => [employee._id.toString(), employee]));
   const uniqueAssignedEmployeeIds = new Set(projects.flatMap((project) => project.assignedUserIds ?? []));
   const inProgressProjects = projects.filter((project) => project.status === "IN_PROGRESS").length;
   const completedProjects = projects.filter((project) => project.status === "COMPLETED").length;
   const plannedProjects = projects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
+  const closedByEmployeeCount = projects.filter((project) => project.closedByEmployeeId).length;
 
   return {
     summaryCards: [
@@ -710,6 +739,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
       { label: "In Progress", value: String(inProgressProjects), detail: "Projects currently under active execution." },
       { label: "Completed", value: String(completedProjects), detail: "Projects already marked complete." },
       { label: "Planned / Hold", value: String(plannedProjects), detail: "Projects still waiting to start or paused." },
+      { label: "Closed by Employee", value: String(closedByEmployeeCount), detail: "Projects employees have self-reported as closed." },
       { label: "Assigned Employees", value: String(uniqueAssignedEmployeeIds.size), detail: "Employees currently mapped to at least one project." },
     ],
     projects: projects.map((project) => ({
@@ -723,10 +753,15 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
       assignedUserIds: project.assignedUserIds ?? [],
       assignedUserNames: (project.assignedUserIds ?? []).map((userId) => employeeMap.get(userId)?.fullName ?? "Assigned employee"),
       createdByUserId: project.createdByUserId ?? "",
+      closedByEmployeeId: project.closedByEmployeeId ?? "",
+      closedByEmployeeAt: formatDate(project.closedByEmployeeAt ?? null),
+      clientName: String((project as { clientName?: string }).clientName ?? ""),
+      clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
     })),
     employeeOptions: employees.map((employee) => ({
       id: employee._id.toString(),
       label: `${employee.fullName} (${employee.email})`,
+      role: (employee as unknown as { role?: string }).role ?? "EMPLOYEE",
     })),
     technologyOptions: [...SALES_TECH_OPTIONS],
   };
@@ -1641,6 +1676,79 @@ export async function getAnnouncementsPageData(session: AuthenticatedSession): P
   };
 }
 
+export async function getPaymentsPageData(session: AuthenticatedSession): Promise<PaymentsPageData> {
+  const canManage = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
+  await connectDb();
+
+  const today = getTodayDate();
+
+  // Fetch all payment records — admin sees all, no scope filter
+  const rawPayments = await SalesPaymentModel.find(
+    {},
+    { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1 },
+  )
+    .sort({ dueDate: 1, createdAt: -1 })
+    .lean();
+
+  // Auto-mark overdue in memory (don't save to DB on every read — that's done lazily)
+  const creatorIds = Array.from(new Set(rawPayments.map((p) => p.salesUserId).filter(Boolean)));
+  const creatorUsers = creatorIds.length
+    ? await UserModel.find({ _id: { $in: creatorIds } }, { fullName: 1 }).lean()
+    : [];
+  const creatorMap = new Map(creatorUsers.map((u) => [u._id.toString(), u.fullName]));
+
+  const payments: ClientPaymentEntry[] = rawPayments.map((p) => {
+    const amount = Number(p.amount ?? 0);
+    const receivedAmount = Number(p.receivedAmount ?? 0);
+    const balanceDue = Math.max(amount - receivedAmount, 0);
+    // Auto-resolve status for display
+    let status = p.status as string;
+    if (status === "PENDING" && p.dueDate && p.dueDate < today) {
+      status = "OVERDUE";
+    }
+
+    return {
+      id: p._id.toString(),
+      clientName: (p as unknown as { clientName?: string }).clientName ?? "",
+      projectName: (p as unknown as { projectName?: string }).projectName ?? "",
+      invoiceNumber: p.invoiceNumber ?? "",
+      totalAmount: amount,
+      receivedAmount,
+      balanceDue,
+      dueDate: p.dueDate ?? "",
+      receivedDate: p.receivedDate ?? "",
+      status,
+      note: p.note ?? "",
+      createdByUserId: p.salesUserId,
+      createdByName: creatorMap.get(p.salesUserId) ?? "Unknown",
+      createdAt: formatDateTime(p.createdAt),
+    };
+  });
+
+  const totalCollected = payments.filter((p) => p.status === "PAID" || p.receivedAmount > 0).reduce((sum, p) => sum + p.receivedAmount, 0);
+  const totalPending = payments.filter((p) => p.status === "PENDING").reduce((sum, p) => sum + p.balanceDue, 0);
+  const totalOverdue = payments.filter((p) => p.status === "OVERDUE").reduce((sum, p) => sum + p.balanceDue, 0);
+  const totalBalance = payments.filter((p) => p.status !== "PAID").reduce((sum, p) => sum + p.balanceDue, 0);
+  const overdueCount = payments.filter((p) => p.status === "OVERDUE").length;
+  const paidCount = payments.filter((p) => p.status === "PAID").length;
+  const partialCount = payments.filter((p) => p.status === "PARTIAL").length;
+  const pendingCount = payments.filter((p) => p.status === "PENDING").length;
+
+  return {
+    payments,
+    canManage,
+    totalCollected,
+    totalPending,
+    totalOverdue,
+    totalBalance,
+    overdueCount,
+    paidCount,
+    partialCount,
+    pendingCount,
+  };
+}
+
 export async function getLeaveBalanceData(session: AuthenticatedSession): Promise<LeaveBalanceEntry[]> {
   await connectDb();
 
@@ -1682,6 +1790,425 @@ export async function getLeaveBalanceData(session: AuthenticatedSession): Promis
       compOffRemaining: (b?.compOffEarned ?? 0) - (b?.compOffUsed ?? 0),
     };
   });
+}
+
+export async function getEmployeeDetailData(
+  session: AuthenticatedSession,
+  employeeId: string,
+): Promise<EmployeeDetailData> {
+  await connectDb();
+
+  const canViewSensitive = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  const today = getTodayDate();
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const currentYear = today.slice(0, 4);
+  const yearStart = `${currentYear}-01-01`;
+
+  const targetUser = await UserModel.findById(employeeId).lean();
+  if (!targetUser) throw new Error("Employee not found");
+
+  const [managerUser, todayAttendance, todayLeave, projects, allPayments] = await Promise.all([
+    targetUser.managerId
+      ? UserModel.findById(targetUser.managerId, { fullName: 1 }).lean()
+      : Promise.resolve(null),
+    AttendanceModel.findOne({ userId: employeeId, dateKey: today }, { status: 1 }).lean(),
+    LeaveRequestModel.findOne({
+      userId: employeeId,
+      status: "APPROVED",
+      startDate: { $lte: today },
+      endDate: { $gte: today },
+    }).lean(),
+    ProjectModel.find(
+      { assignedUserIds: employeeId },
+      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1 },
+    )
+      .sort({ createdAt: -1 })
+      .lean(),
+    SalesPaymentModel.find(
+      {},
+      { clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, status: 1 },
+    ).lean(),
+  ]);
+
+  let todayStatus = "Absent";
+  if (todayAttendance) todayStatus = "Present";
+  else if (todayLeave) todayStatus = "On Leave";
+
+  const projectIds = projects.map((p) => p._id.toString());
+  const allAssigneeIds = [...new Set(projects.flatMap((p) => p.assignedUserIds ?? []))];
+
+  const [
+    assigneeUsers,
+    dsrEntries,
+    monthlyAttendance,
+    leaveHistory,
+    leaveBalance,
+    activeSalary,
+    recentPayslipsRaw,
+    approvedLeavesThisMonth,
+  ] = await Promise.all([
+    allAssigneeIds.length
+      ? UserModel.find({ _id: { $in: allAssigneeIds } }, { fullName: 1 }).lean()
+      : Promise.resolve([]),
+    projectIds.length
+      ? DailyUpdateModel.find(
+          { userId: employeeId, projectId: { $in: projectIds } },
+          { projectId: 1, workDate: 1, summary: 1, accomplishments: 1, blockers: 1, nextPlan: 1 },
+        )
+          .sort({ workDate: -1 })
+          .lean()
+      : Promise.resolve([]),
+    AttendanceModel.find(
+      { userId: employeeId, dateKey: { $gte: monthStart, $lte: today } },
+      { dateKey: 1, status: 1, isLate: 1 },
+    ).lean(),
+    LeaveRequestModel.find(
+      { userId: employeeId, startDate: { $gte: yearStart } },
+      { leaveType: 1, startDate: 1, endDate: 1, requestedDays: 1, reason: 1, status: 1 },
+    )
+      .sort({ createdAt: -1 })
+      .lean(),
+    LeaveBalanceModel.findOne({ userId: employeeId, year: Number(currentYear) }).lean(),
+    canViewSensitive
+      ? SalaryModel.findOne(
+          { userId: employeeId, status: "ACTIVE" },
+          { basicSalary: 1, hra: 1, transportAllowance: 1, medicalAllowance: 1, otherAllowances: 1, tds: 1, providentFund: 1, otherDeductions: 1, effectiveFrom: 1, status: 1 },
+        ).lean()
+      : Promise.resolve(null),
+    canViewSensitive
+      ? PayslipModel.find(
+          { userId: employeeId },
+          { monthKey: 1, netSalary: 1, grossSalary: 1, totalDeductions: 1, presentDays: 1, workingDays: 1, status: 1, paidOn: 1 },
+        )
+          .sort({ monthKey: -1 })
+          .limit(6)
+          .lean()
+      : Promise.resolve([]),
+    LeaveRequestModel.find({
+      userId: employeeId,
+      status: "APPROVED",
+      startDate: { $lte: today },
+      endDate: { $gte: monthStart },
+    }).lean(),
+  ]);
+
+  const assigneeMap = new Map(assigneeUsers.map((u) => [u._id.toString(), u.fullName]));
+
+  const leaveDaysThisMonth = approvedLeavesThisMonth.reduce((sum, leave) => {
+    const overlapStart = leave.startDate > monthStart ? leave.startDate : monthStart;
+    const overlapEnd = leave.endDate < today ? leave.endDate : today;
+    return overlapEnd >= overlapStart ? sum + getDateRangeDays(overlapStart, overlapEnd) : sum;
+  }, 0);
+
+  const projectEntries: EmployeeDetailProjectEntry[] = projects.map((project) => {
+    const projectId = project._id.toString();
+    const projectName = project.name.toLowerCase();
+
+    const projectDsr = dsrEntries
+      .filter((d) => d.projectId === projectId)
+      .slice(0, 15)
+      .map((d) => ({
+        id: d._id.toString(),
+        workDate: String(d.workDate ?? ""),
+        summary: String(d.summary ?? ""),
+        accomplishments: String(d.accomplishments ?? ""),
+        blockers: String(d.blockers ?? ""),
+        nextPlan: String(d.nextPlan ?? ""),
+      }));
+
+    const projectPayments = allPayments
+      .filter((p) => String((p as Record<string, unknown>).projectName ?? "").toLowerCase() === projectName)
+      .map((p) => {
+        const amount = Number(p.amount ?? 0);
+        const received = Number(p.receivedAmount ?? 0);
+        let status = String(p.status ?? "PENDING");
+        if (status === "PENDING" && p.dueDate && String(p.dueDate) < today) status = "OVERDUE";
+        return {
+          id: p._id.toString(),
+          clientName: String((p as Record<string, unknown>).clientName ?? ""),
+          invoiceNumber: String(p.invoiceNumber ?? ""),
+          totalAmount: amount,
+          receivedAmount: received,
+          balanceDue: Math.max(amount - received, 0),
+          dueDate: String(p.dueDate ?? ""),
+          status,
+        };
+      });
+
+    return {
+      id: projectId,
+      name: project.name,
+      summary: String(project.summary ?? ""),
+      status: String(project.status ?? "PLANNING"),
+      priority: String(project.priority ?? "MEDIUM"),
+      dueDate: project.dueDate ? formatDate(project.dueDate) : "",
+      techStack: (project.techStack ?? []) as string[],
+      assignedUserNames: (project.assignedUserIds ?? [])
+        .map((id) => assigneeMap.get(String(id)) ?? "")
+        .filter(Boolean),
+      createdByUserId: String(project.createdByUserId ?? ""),
+      dsrEntries: projectDsr,
+      payments: projectPayments,
+    };
+  });
+
+  let salary: EmployeeDetailSalary | null = null;
+  if (activeSalary) {
+    const gross =
+      Number(activeSalary.basicSalary ?? 0) +
+      Number(activeSalary.hra ?? 0) +
+      Number(activeSalary.transportAllowance ?? 0) +
+      Number(activeSalary.medicalAllowance ?? 0) +
+      Number(activeSalary.otherAllowances ?? 0);
+    const deductions =
+      Number(activeSalary.tds ?? 0) +
+      Number(activeSalary.providentFund ?? 0) +
+      Number(activeSalary.otherDeductions ?? 0);
+    salary = {
+      basicSalary: Number(activeSalary.basicSalary ?? 0),
+      hra: Number(activeSalary.hra ?? 0),
+      transportAllowance: Number(activeSalary.transportAllowance ?? 0),
+      medicalAllowance: Number(activeSalary.medicalAllowance ?? 0),
+      otherAllowances: Number(activeSalary.otherAllowances ?? 0),
+      grossSalary: gross,
+      tds: Number(activeSalary.tds ?? 0),
+      providentFund: Number(activeSalary.providentFund ?? 0),
+      otherDeductions: Number(activeSalary.otherDeductions ?? 0),
+      netSalary: Math.max(gross - deductions, 0),
+      effectiveFrom: String(activeSalary.effectiveFrom ?? ""),
+      status: String(activeSalary.status ?? "ACTIVE"),
+    };
+  }
+
+  const attendance: EmployeeDetailAttendance = {
+    monthLabel: today.slice(0, 7),
+    daysPresent: monthlyAttendance.length,
+    daysCompleted: monthlyAttendance.filter((a) => a.status === "COMPLETED").length,
+    daysOnLeave: leaveDaysThisMonth,
+    lateCount: monthlyAttendance.filter((a) => a.isLate).length,
+    totalWorkingDays: getDateRangeDays(monthStart, today),
+  };
+
+  const leaveHistoryEntries: EmployeeDetailLeaveEntry[] = leaveHistory.map((leave) => ({
+    id: leave._id.toString(),
+    leaveType: String(leave.leaveType ?? "PAID"),
+    startDate: String(leave.startDate ?? ""),
+    endDate: String(leave.endDate ?? ""),
+    requestedDays: getDateRangeDays(String(leave.startDate ?? ""), String(leave.endDate ?? "")),
+    reason: String(leave.reason ?? ""),
+    status: String(leave.status ?? "PENDING"),
+  }));
+
+  const recentPayslips: EmployeeDetailPayslip[] = recentPayslipsRaw.map((p) => ({
+    id: p._id.toString(),
+    monthKey: String(p.monthKey ?? ""),
+    netSalary: Number(p.netSalary ?? 0),
+    grossSalary: Number(p.grossSalary ?? 0),
+    totalDeductions: Number(p.totalDeductions ?? 0),
+    presentDays: Number(p.presentDays ?? 0),
+    workingDays: Number(p.workingDays ?? 26),
+    status: String(p.status ?? "DRAFT"),
+    paidOn: String(p.paidOn ?? ""),
+  }));
+
+  const employee: EmployeeDirectoryEntry = {
+    id: targetUser._id.toString(),
+    fullName: String(targetUser.fullName ?? ""),
+    email: String(targetUser.email ?? ""),
+    phone: String(targetUser.phone ?? ""),
+    joiningDate: String(targetUser.joiningDate ?? ""),
+    managerId: String(targetUser.managerId ?? ""),
+    managerName: String(managerUser?.fullName ?? ""),
+    techStack: (targetUser.techStack ?? []) as string[],
+    todayStatus,
+    role: (targetUser.role ?? "EMPLOYEE") as EmployeeDirectoryEntry["role"],
+    status: (targetUser.status ?? "ACTIVE") as "ACTIVE" | "SUSPENDED",
+    projectIds: (targetUser.projectIds ?? []) as string[],
+    documentName: String(targetUser.documentName ?? ""),
+    documentUrl: String(targetUser.documentUrl ?? ""),
+    employeeId: String(targetUser.employeeId ?? ""),
+    department: String(targetUser.department ?? ""),
+    designation: String(targetUser.designation ?? ""),
+    dateOfBirth: String(targetUser.dateOfBirth ?? ""),
+    address: String(targetUser.address ?? ""),
+    emergencyContact: String(targetUser.emergencyContact ?? ""),
+    bankAccountNumber: String(targetUser.bankAccountNumber ?? ""),
+    bankName: String(targetUser.bankName ?? ""),
+    bankIfscCode: String(targetUser.bankIfscCode ?? ""),
+    panNumber: String(targetUser.panNumber ?? ""),
+    profilePhotoUrl: String(targetUser.profilePhotoUrl ?? ""),
+  };
+
+  return {
+    employee,
+    salary,
+    projects: projectEntries,
+    currentMonthAttendance: attendance,
+    leaveHistory: leaveHistoryEntries,
+    leaveBalance: leaveBalance
+      ? {
+          paidLeaveTotal: leaveBalance.paidLeaveTotal ?? 12,
+          paidLeaveUsed: leaveBalance.paidLeaveUsed ?? 0,
+          paidLeaveRemaining: (leaveBalance.paidLeaveTotal ?? 12) - (leaveBalance.paidLeaveUsed ?? 0),
+          sickLeaveTotal: leaveBalance.sickLeaveTotal ?? 6,
+          sickLeaveUsed: leaveBalance.sickLeaveUsed ?? 0,
+          sickLeaveRemaining: (leaveBalance.sickLeaveTotal ?? 6) - (leaveBalance.sickLeaveUsed ?? 0),
+          casualLeaveTotal: leaveBalance.casualLeaveTotal ?? 8,
+          casualLeaveUsed: leaveBalance.casualLeaveUsed ?? 0,
+          casualLeaveRemaining: (leaveBalance.casualLeaveTotal ?? 8) - (leaveBalance.casualLeaveUsed ?? 0),
+        }
+      : null,
+    recentPayslips,
+    canViewSensitive,
+  };
+}
+
+export async function getProjectDetailData(
+  session: AuthenticatedSession,
+  projectId: string,
+): Promise<ProjectDetailData> {
+  await connectDb();
+
+  const canView = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  if (!canView) throw new Error("Unauthorized");
+
+  const today = getTodayDate();
+
+  const project = await ProjectModel.findById(
+    projectId,
+    { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1 },
+  ).lean();
+  if (!project) throw new Error("Project not found");
+
+  const assignedIds = (project.assignedUserIds ?? []) as string[];
+  const creatorId = String(project.createdByUserId ?? "");
+
+  const [assignedUsers, creatorUser, dsrEntries, allPayments, todayAttendance, activeLeaves] = await Promise.all([
+    assignedIds.length
+      ? UserModel.find(
+          { _id: { $in: assignedIds } },
+          { fullName: 1, email: 1, phone: 1, role: 1, designation: 1, department: 1, employeeId: 1 },
+        ).lean()
+      : Promise.resolve([]),
+    creatorId
+      ? UserModel.findById(creatorId, { fullName: 1 }).lean()
+      : Promise.resolve(null),
+    assignedIds.length
+      ? DailyUpdateModel.find(
+          { userId: { $in: assignedIds }, projectId },
+          { userId: 1, workDate: 1, summary: 1, accomplishments: 1, blockers: 1, nextPlan: 1 },
+        )
+          .sort({ workDate: -1 })
+          .lean()
+      : Promise.resolve([]),
+    SalesPaymentModel.find(
+      {},
+      { clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, salesUserId: 1 },
+    ).lean(),
+    assignedIds.length
+      ? AttendanceModel.find({ userId: { $in: assignedIds }, dateKey: today }, { userId: 1 }).lean()
+      : Promise.resolve([]),
+    assignedIds.length
+      ? LeaveRequestModel.find({
+          userId: { $in: assignedIds },
+          status: "APPROVED",
+          startDate: { $lte: today },
+          endDate: { $gte: today },
+        }, { userId: 1 }).lean()
+      : Promise.resolve([]),
+  ]);
+
+  // Resolve payment creator names
+  const paymentCreatorIds = [...new Set(allPayments.map((p) => p.salesUserId).filter(Boolean))];
+  const paymentCreators = paymentCreatorIds.length
+    ? await UserModel.find({ _id: { $in: paymentCreatorIds } }, { fullName: 1 }).lean()
+    : [];
+  const paymentCreatorMap = new Map(paymentCreators.map((u) => [u._id.toString(), u.fullName]));
+
+  const presentTodayIds = new Set(todayAttendance.map((a) => a.userId));
+  const onLeaveTodayIds = new Set(activeLeaves.map((l) => l.userId));
+
+  const assignedEmployees: ProjectDetailEmployeeEntry[] = assignedUsers.map((user) => {
+    const userId = user._id.toString();
+    let todayStatus = "Absent";
+    if (presentTodayIds.has(userId)) todayStatus = "Present";
+    else if (onLeaveTodayIds.has(userId)) todayStatus = "On Leave";
+
+    const userDsr = dsrEntries
+      .filter((d) => d.userId === userId)
+      .slice(0, 20)
+      .map((d) => ({
+        id: d._id.toString(),
+        workDate: String(d.workDate ?? ""),
+        summary: String(d.summary ?? ""),
+        accomplishments: String(d.accomplishments ?? ""),
+        blockers: String(d.blockers ?? ""),
+        nextPlan: String(d.nextPlan ?? ""),
+      }));
+
+    return {
+      id: userId,
+      fullName: user.fullName,
+      email: user.email,
+      phone: String(user.phone ?? ""),
+      role: String(user.role ?? "EMPLOYEE"),
+      designation: String(user.designation ?? ""),
+      department: String(user.department ?? ""),
+      employeeId: String(user.employeeId ?? ""),
+      todayStatus,
+      dsrEntries: userDsr,
+    };
+  });
+
+  // Match payments by project name
+  const projectNameLower = project.name.toLowerCase();
+  const payments: ProjectDetailPaymentEntry[] = allPayments
+    .filter((p) => String((p as Record<string, unknown>).projectName ?? "").toLowerCase() === projectNameLower)
+    .map((p) => {
+      const amount = Number(p.amount ?? 0);
+      const received = Number(p.receivedAmount ?? 0);
+      let status = String(p.status ?? "PENDING");
+      if (status === "PENDING" && p.dueDate && String(p.dueDate) < today) status = "OVERDUE";
+      return {
+        id: p._id.toString(),
+        clientName: String((p as Record<string, unknown>).clientName ?? ""),
+        invoiceNumber: String(p.invoiceNumber ?? ""),
+        totalAmount: amount,
+        receivedAmount: received,
+        balanceDue: Math.max(amount - received, 0),
+        dueDate: String(p.dueDate ?? ""),
+        receivedDate: String(p.receivedDate ?? ""),
+        status,
+        note: String(p.note ?? ""),
+        createdByName: paymentCreatorMap.get(p.salesUserId) ?? "Unknown",
+      };
+    });
+
+  const totalPayment = payments.reduce((s, p) => s + p.totalAmount, 0);
+  const totalReceived = payments.reduce((s, p) => s + p.receivedAmount, 0);
+  const totalBalance = payments.reduce((s, p) => s + p.balanceDue, 0);
+
+  return {
+    id: projectId,
+    name: project.name,
+    summary: String(project.summary ?? ""),
+    status: String(project.status ?? "PLANNING"),
+    priority: String(project.priority ?? "MEDIUM"),
+    dueDate: project.dueDate ? formatDate(project.dueDate) : "",
+    techStack: (project.techStack ?? []) as string[],
+    createdByUserId: creatorId,
+    createdByName: String(creatorUser?.fullName ?? "Unknown"),
+    closedByEmployeeId: String(project.closedByEmployeeId ?? ""),
+    closedByEmployeeAt: project.closedByEmployeeAt ? formatDate(project.closedByEmployeeAt) : "",
+    clientName: String((project as { clientName?: string }).clientName ?? ""),
+    clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
+    assignedEmployees,
+    payments,
+    totalPayment,
+    totalReceived,
+    totalBalance,
+    dsrTotalCount: dsrEntries.length,
+  };
 }
 
 function buildSalesWorkspaceData({

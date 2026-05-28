@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import {
@@ -361,6 +362,10 @@ export function AdminDashboardOverview({
 function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection }) {
   const accent = getExecutiveSectionAccent(section.id, true);
 
+  if (section.id === "projects") {
+    return <ProjectPortfolioPanel section={section} accent={accent} />;
+  }
+
   return (
     <section className="mt-5 overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
       <div className={`h-1.5 ${accent.bar}`} />
@@ -412,24 +417,268 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {section.items.length ? (
-              section.items.map((item) => (
-                <article className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]" key={item.id}>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-blue-700">
-                      {item.meta}
-                    </span>
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{section.badge}</span>
-                  </div>
-                  <h6 className="mt-4 text-lg font-semibold text-slate-950">{item.title}</h6>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
-                </article>
-              ))
+              section.items.map((item) => {
+                const isWorkforce = section.id === "workforce";
+                const content = (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-blue-700">
+                        {item.meta}
+                      </span>
+                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{section.badge}</span>
+                    </div>
+                    <h6 className="mt-4 text-lg font-semibold text-slate-950">{item.title}</h6>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
+                    {isWorkforce ? (
+                      <p className="mt-3 text-xs font-semibold text-blue-500">View profile →</p>
+                    ) : null}
+                  </>
+                );
+                return isWorkforce ? (
+                  <Link
+                    className="block rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)]"
+                    href={`/dashboard/employees/${item.id}`}
+                    key={item.id}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <article className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]" key={item.id}>
+                    {content}
+                  </article>
+                );
+              })
             ) : (
               <div className="lg:col-span-2">
                 <EmptyState message={section.emptyMessage} />
               </div>
             )}
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Project Portfolio Panel ─── */
+function parseProjectMeta(meta: string) {
+  const parts = meta.split("||");
+  if (parts.length === 5) {
+    return {
+      status: parts[0] ?? "PLANNING",
+      priority: parts[1] ?? "MEDIUM",
+      closedByEmployee: parts[2] === "1",
+      assignees: Number(parts[3] ?? "0"),
+      dueDate: parts[4] ?? "",
+    };
+  }
+  return { status: "PLANNING", priority: "MEDIUM", closedByEmployee: false, assignees: 0, dueDate: "" };
+}
+
+const PROJECT_STATUS_CFG: Record<string, { label: string; dot: string; chipBg: string; chipText: string; border: string }> = {
+  IN_PROGRESS: { label: "In Progress",  dot: "#10b981", chipBg: "#ecfdf5", chipText: "#065f46", border: "#10b981" },
+  PLANNING:    { label: "Planning",     dot: "#3b82f6", chipBg: "#eff6ff", chipText: "#1d4ed8", border: "#3b82f6" },
+  ON_HOLD:     { label: "On Hold",      dot: "#f59e0b", chipBg: "#fffbeb", chipText: "#92400e", border: "#f59e0b" },
+  COMPLETED:   { label: "Completed",    dot: "#64748b", chipBg: "#f1f5f9", chipText: "#334155", border: "#64748b" },
+  CLOSED_EMP:  { label: "Closed by Emp",dot: "#7c3aed", chipBg: "#f5f3ff", chipText: "#4c1d95", border: "#7c3aed" },
+};
+
+const PRIORITY_CFG: Record<string, { bg: string; text: string }> = {
+  HIGH:   { bg: "#fff1f2", text: "#be123c" },
+  MEDIUM: { bg: "#fffbeb", text: "#92400e" },
+  LOW:    { bg: "#f8fafc", text: "#64748b" },
+};
+
+function ProjectPortfolioPanel({
+  section,
+}: {
+  accent: ReturnType<typeof getExecutiveSectionAccent>;
+  section: ExecutiveOverviewSection;
+}) {
+  const closedByEmpCount = Number(section.metrics.find((m) => m.label === "Closed by Employee")?.value ?? "0");
+
+  const statColors = ["#2563eb", "#10b981", "#64748b", "#f59e0b", "#7c3aed"];
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.07)]">
+
+      {/* ── Top accent line ── */}
+      <div className="h-1 bg-gradient-to-r from-blue-600 via-cyan-400 to-sky-300" />
+
+      <div className="p-6">
+
+        {/* ── Title row ── */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[0.65rem] font-bold uppercase tracking-[0.32em] text-blue-600">Project Portfolio</p>
+            <h4 className="mt-1.5 text-[1.6rem] font-bold tracking-tight text-slate-900">Project Overview</h4>
+            <p className="mt-1 text-sm text-slate-500">Live execution status across all company projects.</p>
+          </div>
+          <span className="rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-sm font-bold text-blue-700">
+            {section.items.length} Project{section.items.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {/* ── Stat cards ── */}
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          {section.metrics.map((metric, i) => {
+            const color = statColors[i % statColors.length];
+            const lightBgs = ["#eff6ff", "#ecfdf5", "#f1f5f9", "#fffbeb", "#f5f3ff"];
+            return (
+              <div
+                className="relative overflow-hidden rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                key={metric.label}
+                style={{
+                  background: lightBgs[i % lightBgs.length],
+                  border: `1px solid ${color}22`,
+                  boxShadow: `0 2px 12px ${color}14`,
+                }}
+              >
+                {/* Decorative circle */}
+                <div
+                  className="pointer-events-none absolute -right-3 -top-3 h-16 w-16 rounded-full opacity-10"
+                  style={{ background: color }}
+                />
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+                  <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em]" style={{ color }}>
+                    {metric.label}
+                  </p>
+                </div>
+                <p className="mt-2 text-[2.4rem] font-black leading-none tracking-tight" style={{ color }}>
+                  {metric.value}
+                </p>
+                <p className="mt-2 text-[0.66rem] leading-4 text-slate-500">{metric.detail}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Closed by employee alert ── */}
+        {closedByEmpCount > 0 ? (
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-3.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100">
+              <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="#7c3aed" strokeLinecap="round" strokeWidth="2.2" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-violet-900">
+                {closedByEmpCount} project{closedByEmpCount !== 1 ? "s" : ""} self-reported as closed by employees
+              </p>
+              <p className="mt-0.5 text-xs text-violet-600">Go to the Projects page to review and verify these closures.</p>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ── Project cards — horizontal scroll so dashboard stays compact ── */}
+        <div className="mt-5">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">
+              {section.items.length} Project{section.items.length !== 1 ? "s" : ""} · scroll to see all →
+            </p>
+          </div>
+
+          {section.items.length === 0 ? (
+            <EmptyState message={section.emptyMessage} />
+          ) : (
+            <div
+              className="flex gap-4 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:#e2e8f0_transparent]"
+              style={{ scrollSnapType: "x mandatory" }}
+            >
+              {section.items.map((item) => {
+                const p = parseProjectMeta(item.meta);
+                const sc = p.closedByEmployee ? PROJECT_STATUS_CFG.CLOSED_EMP : (PROJECT_STATUS_CFG[p.status] ?? PROJECT_STATUS_CFG.PLANNING);
+                const pc = PRIORITY_CFG[p.priority] ?? PRIORITY_CFG.LOW;
+
+                const accentBg =
+                  p.closedByEmployee ? "linear-gradient(135deg,#f5f3ff,#ede9fe)"
+                  : p.status === "IN_PROGRESS" ? "linear-gradient(135deg,#ecfdf5,#d1fae5)"
+                  : p.status === "ON_HOLD" ? "linear-gradient(135deg,#fffbeb,#fef3c7)"
+                  : p.status === "COMPLETED" ? "linear-gradient(135deg,#f8fafc,#f1f5f9)"
+                  : "linear-gradient(135deg,#eff6ff,#dbeafe)";
+
+                return (
+                  <Link
+                    href={`/dashboard/projects/${item.id}`}
+                    key={item.id}
+                    className="group flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-white transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-pointer"
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderTop: `3px solid ${sc.border}`,
+                      boxShadow: "0 4px 18px rgba(15,23,42,0.06)",
+                      scrollSnapAlign: "start",
+                    }}
+                  >
+                    {/* Card tinted header */}
+                    <div className="px-4 pt-4 pb-3" style={{ background: accentBg }}>
+                      <div className="flex items-start justify-between gap-2">
+                        <h6
+                          className="text-[0.92rem] font-bold leading-snug text-slate-900 transition-colors group-hover:text-blue-700"
+                          style={{ maxWidth: "calc(100% - 90px)" }}
+                        >
+                          {item.title}
+                        </h6>
+                        <span
+                          className="shrink-0 rounded-full px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider"
+                          style={{ background: sc.chipBg, color: sc.chipText, border: `1px solid ${sc.border}22` }}
+                        >
+                          {sc.label}
+                        </span>
+                      </div>
+
+                      {/* Priority pill */}
+                      <div className="mt-2 flex items-center gap-2">
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[0.56rem] font-bold uppercase tracking-wider"
+                          style={{ background: pc.bg, color: pc.text }}
+                        >
+                          {p.priority} Priority
+                        </span>
+                        {p.closedByEmployee ? (
+                          <span className="text-[0.62rem] font-semibold text-violet-600">✓ Employee closed</span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex flex-1 flex-col px-4 py-3">
+                      <p className="line-clamp-2 text-[0.76rem] leading-5 text-slate-500">
+                        {item.description}
+                      </p>
+
+                      {/* Footer */}
+                      <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 mt-3">
+                        <span className="flex items-center gap-1 text-[0.65rem] font-semibold text-slate-400">
+                          <svg fill="none" height="11" viewBox="0 0 24 24" width="11">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                            <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
+                          </svg>
+                          {p.assignees > 0 ? `${p.assignees} member${p.assignees !== 1 ? "s" : ""}` : "Unassigned"}
+                        </span>
+                        {p.dueDate ? (
+                          <span className="flex items-center gap-1 text-[0.65rem] font-semibold text-slate-400">
+                            <svg fill="none" height="11" viewBox="0 0 24 24" width="11">
+                              <rect height="18" rx="2" stroke="currentColor" strokeWidth="2" width="18" x="3" y="4" />
+                              <line stroke="currentColor" strokeWidth="2" x1="3" x2="21" y1="10" y2="10" />
+                            </svg>
+                            {p.dueDate}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {/* Open arrow */}
+                      <div className="mt-2 flex items-center justify-end">
+                        <span className="text-[0.65rem] font-semibold text-blue-500 group-hover:text-blue-700 transition-colors">
+                          Open Project →
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </section>

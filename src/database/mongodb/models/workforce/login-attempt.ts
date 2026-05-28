@@ -12,6 +12,7 @@ const loginAttemptSchema = new mongoose.Schema(
 );
 
 loginAttemptSchema.index({ email: 1, attemptedAt: -1 });
+loginAttemptSchema.index({ ipAddress: 1, attemptedAt: -1 });
 loginAttemptSchema.index({ attemptedAt: 1 }, { expireAfterSeconds: 3600 });
 
 export type LoginAttemptRecord = InferSchemaType<typeof loginAttemptSchema> & { _id: mongoose.Types.ObjectId };

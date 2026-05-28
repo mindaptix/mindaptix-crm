@@ -30,8 +30,14 @@ export async function connectDb() {
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(resolvedMongoDbUrl,{
+    cached.promise = mongoose.connect(resolvedMongoDbUrl, {
       dbName: "MindaptixCRM",
+      maxPoolSize: 20,
+      minPoolSize: 5,
+      maxIdleTimeMS: 45000,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
     });
   }
 

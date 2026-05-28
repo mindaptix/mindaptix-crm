@@ -11,6 +11,7 @@ export type DashboardNavKey =
   | "reports"
   | "payroll"
   | "expenses"
+  | "payments"
   | "announcements"
   | "settings";
 
@@ -37,6 +38,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   { key: "reports", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "payroll", label: "Payroll", href: "/dashboard/payroll", allowedRoles: ["SUPER_ADMIN", "EMPLOYEE"] },
   { key: "expenses", label: "Expenses", href: "/dashboard/expenses", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
+  { key: "payments", label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
   { key: "announcements", label: "Announcements", href: "/dashboard/announcements", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
   { key: "settings", label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
 ];

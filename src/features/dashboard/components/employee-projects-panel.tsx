@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { markProjectClosedByEmployee } from "@/features/dashboard/actions/projects";
+import { subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
 import type { ProjectsPageData } from "@/features/dashboard/types";
 
 type Props = { data: ProjectsPageData };
@@ -21,8 +24,16 @@ const PRIORITY_CONFIG: Record<string, { bg: string; text: string; border: string
 const STATUS_FILTERS = ["ALL", "PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"] as const;
 
 export function EmployeeProjectsPanel({ data }: Props) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("ALL");
+
+  // Auto-refresh when admin assigns a new project (same-browser BroadcastChannel)
+  useEffect(() => {
+    return subscribeDashboardSync(() => {
+      router.refresh();
+    });
+  }, [router]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -150,6 +161,15 @@ function ProjectCard({ project }: { project: ProjectsPageData["projects"][number
   const sc = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.PLANNING;
   const pc = PRIORITY_CONFIG[project.priority] ?? PRIORITY_CONFIG.LOW;
   const isOverdue = project.dueDate && project.dueDate !== "—" && new Date(project.dueDate) < new Date() && project.status !== "COMPLETED";
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [closeState, closeAction, closePending] = useActionState(markProjectClosedByEmployee, {});
+
+  const isClosedByEmployee = Boolean(project.closedByEmployeeId);
+  const isCompleted = project.status === "COMPLETED";
+
+  useEffect(() => {
+    if (closeState.success) setConfirmClose(false);
+  }, [closeState.success]);
 
   return (
     <article
@@ -157,19 +177,25 @@ function ProjectCard({ project }: { project: ProjectsPageData["projects"][number
       style={{ border: "1px solid rgba(226,232,240,0.9)", background: "#fff", boxShadow: "0 4px 20px rgba(15,23,42,0.06)" }}
     >
       {/* Colored top accent bar */}
-      <div className="absolute inset-x-0 top-0 h-1 rounded-t-[1.4rem]" style={{ background: sc.gradient }} />
+      <div className="absolute inset-x-0 top-0 h-1 rounded-t-[1.4rem]" style={{ background: isClosedByEmployee ? "linear-gradient(135deg,#7c3aed,#a78bfa)" : sc.gradient }} />
 
-      {/* Header: name + status dot */}
+      {/* Header: name + status chip */}
       <div className="mt-1 flex items-start justify-between gap-3">
-        <h3 className="text-base font-bold leading-snug text-slate-800 group-hover:text-indigo-700 transition-colors">
+        <h3 className="text-base font-bold leading-snug text-slate-800 transition-colors group-hover:text-indigo-700">
           {project.name}
         </h3>
-        <div className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1"
-          style={{ background: sc.chipBg }}>
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: sc.dot }} />
-          <span className="text-[0.6rem] font-bold uppercase tracking-wider" style={{ color: sc.chipText }}>
-            {sc.label}
-          </span>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          {isClosedByEmployee ? (
+            <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "rgba(124,58,237,0.1)" }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+              <span className="text-[0.6rem] font-bold uppercase tracking-wider text-violet-700">Closed by You</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: sc.chipBg }}>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: sc.dot }} />
+              <span className="text-[0.6rem] font-bold uppercase tracking-wider" style={{ color: sc.chipText }}>{sc.label}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -178,7 +204,6 @@ function ProjectCard({ project }: { project: ProjectsPageData["projects"][number
 
       {/* Meta row */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {/* Priority */}
         <span
           className="rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wider"
           style={{ background: pc.bg, color: pc.text, border: `1px solid ${pc.border}` }}
@@ -186,7 +211,6 @@ function ProjectCard({ project }: { project: ProjectsPageData["projects"][number
           {project.priority}
         </span>
 
-        {/* Due date */}
         {project.dueDate && project.dueDate !== "—" && (
           <span
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.6rem] font-semibold"
@@ -202,6 +226,12 @@ function ProjectCard({ project }: { project: ProjectsPageData["projects"][number
             {isOverdue ? "Overdue · " : ""}{project.dueDate}
           </span>
         )}
+
+        {isClosedByEmployee && project.closedByEmployeeAt && project.closedByEmployeeAt !== "—" ? (
+          <span className="rounded-full px-2.5 py-1 text-[0.6rem] font-semibold" style={{ background: "rgba(124,58,237,0.07)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.15)" }}>
+            Closed {project.closedByEmployeeAt}
+          </span>
+        ) : null}
       </div>
 
       {/* Tech stack */}
@@ -217,13 +247,72 @@ function ProjectCard({ project }: { project: ProjectsPageData["projects"][number
             </span>
           ))}
           {project.techStack.length > 4 && (
-            <span className="rounded-lg px-2 py-0.5 text-[0.58rem] font-semibold text-slate-400"
-              style={{ background: "#f1f5f9" }}>
+            <span className="rounded-lg px-2 py-0.5 text-[0.58rem] font-semibold text-slate-400" style={{ background: "#f1f5f9" }}>
               +{project.techStack.length - 4}
             </span>
           )}
         </div>
       )}
+
+      {/* ── Mark as Closed section ── */}
+      {!isClosedByEmployee && !isCompleted ? (
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          {closeState.error ? (
+            <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-[0.72rem] font-semibold text-rose-600">{closeState.error}</p>
+          ) : null}
+
+          {!confirmClose ? (
+            <button
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 py-2 text-[0.72rem] font-bold uppercase tracking-wider text-violet-700 transition hover:border-violet-300 hover:bg-violet-100"
+              onClick={() => setConfirmClose(true)}
+              type="button"
+            >
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+              </svg>
+              Mark as Closed
+            </button>
+          ) : (
+            <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
+              <p className="text-[0.72rem] font-semibold text-violet-900">Mark this project as closed?</p>
+              <p className="mt-0.5 text-[0.68rem] text-violet-600">This will set the status to Completed. Admin will be notified.</p>
+              <div className="mt-2.5 flex gap-2">
+                <form action={closeAction} className="flex-1">
+                  <input name="projectId" type="hidden" value={project.id} />
+                  <button
+                    className="w-full rounded-lg bg-violet-600 py-1.5 text-[0.72rem] font-bold text-white transition hover:bg-violet-700 disabled:opacity-60"
+                    disabled={closePending}
+                    type="submit"
+                  >
+                    {closePending ? "Closing…" : "Yes, Close It"}
+                  </button>
+                </form>
+                <button
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[0.72rem] font-semibold text-slate-500 transition hover:bg-slate-50"
+                  onClick={() => setConfirmClose(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : isClosedByEmployee ? (
+        <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
+          <svg className="shrink-0 text-violet-500" fill="none" height="14" viewBox="0 0 24 24" width="14">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+          </svg>
+          <p className="text-[0.72rem] font-semibold text-violet-700">You have reported this project as closed</p>
+        </div>
+      ) : isCompleted ? (
+        <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
+          <svg className="shrink-0 text-emerald-500" fill="none" height="14" viewBox="0 0 24 24" width="14">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+          </svg>
+          <p className="text-[0.72rem] font-semibold text-emerald-700">Project marked complete by admin</p>
+        </div>
+      ) : null}
     </article>
   );
 }

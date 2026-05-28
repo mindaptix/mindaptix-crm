@@ -142,20 +142,24 @@ function getSessionSecret() {
 async function getSessionByToken(token: string): Promise<AuthenticatedSession | null> {
   await connectDb();
 
-  const sessionRecord = await UserSessionModel.findOne({
-    sessionTokenHash: hashSessionToken(token),
-    expiresAt: { $gt: new Date() },
-  }).lean();
+  const tokenHash = hashSessionToken(token);
+  const now = new Date();
 
-  if (!sessionRecord) {
-    return null;
-  }
+  // Step 1: find session
+  const sessionRecord = await UserSessionModel.findOne(
+    { sessionTokenHash: tokenHash, expiresAt: { $gt: now } },
+    { _id: 1, userId: 1 },
+  ).lean();
 
-  const user = await UserModel.findById(sessionRecord.userId).lean<UserRecord | null>();
+  if (!sessionRecord) return null;
 
-  if (!user) {
-    return null;
-  }
+  // Step 2: fetch only the fields we need from user (projection = faster)
+  const user = await UserModel.findById(
+    sessionRecord.userId,
+    { fullName: 1, email: 1, role: 1, managerId: 1, projectIds: 1, leadIds: 1, status: 1 },
+  ).lean<UserRecord | null>();
+
+  if (!user || user.status === "SUSPENDED") return null;
 
   return {
     sessionId: sessionRecord._id.toString(),
