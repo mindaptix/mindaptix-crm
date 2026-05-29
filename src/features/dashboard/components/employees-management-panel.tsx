@@ -8,7 +8,6 @@ import { SalesWorkspacePanel } from "@/features/dashboard/components/sales-works
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
 import { Button } from "@/shared/ui/button";
-import { FormActionButton } from "@/shared/ui/form-action-button";
 import { INITIAL_USER_MANAGEMENT_STATE } from "@/features/auth/lib/user-management-form-state";
 import type {
   EmployeeDirectoryEntry,
