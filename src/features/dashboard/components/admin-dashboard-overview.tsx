@@ -32,8 +32,11 @@ import type {
   LeaveTrendPoint,
   PerformanceScoreRow,
   SummaryCard,
+  UnreadAssignment,
 } from "@/features/dashboard/types";
 import { createClientMeeting, type ClientMeetingFormState } from "@/features/dashboard/actions/client-meetings";
+import { AssignmentAlertBanner } from "@/features/dashboard/components/assignment-alert-banner";
+import { DashboardFilterBar } from "@/features/dashboard/components/dashboard-filter-bar";
 
 type AdminDashboardOverviewProps = {
   attendanceBreakdown?: DashboardBreakdownSlice[];
@@ -47,6 +50,9 @@ type AdminDashboardOverviewProps = {
   dsrTrend?: DsrTrendPoint[];
   employeeProjectRows?: EmployeeProjectSummaryRow[];
   executiveSections?: ExecutiveOverviewSection[];
+  filterDate?: string;
+  filterLabel?: string;
+  filterMonth?: string;
   financeNote?: string;
   leaveTrend?: LeaveTrendPoint[];
   notificationTitle?: string;
@@ -63,6 +69,7 @@ type AdminDashboardOverviewProps = {
   secondaryListTitle: string;
   taskStatusBreakdown?: DashboardBreakdownSlice[];
   title: string;
+  unreadAssignments?: UnreadAssignment[];
   weeklySummaryCards?: SummaryCard[];
   weeklySummaryTitle?: string;
 };
@@ -78,6 +85,9 @@ export function AdminDashboardOverview({
   dsrTrend,
   employeeProjectRows,
   executiveSections,
+  filterDate,
+  filterLabel,
+  filterMonth,
   leaveTrend,
   notificationTitle,
   notifications,
@@ -92,6 +102,7 @@ export function AdminDashboardOverview({
   secondaryItems,
   secondaryListTitle,
   taskStatusBreakdown,
+  unreadAssignments,
   weeklySummaryCards,
   weeklySummaryTitle,
 }: AdminDashboardOverviewProps) {
@@ -104,9 +115,20 @@ export function AdminDashboardOverview({
     Boolean(dsrTrend?.length);
   const [activeExecutiveSectionId, setActiveExecutiveSectionId] = useState(executiveSections?.[0]?.id ?? "");
   const activeExecutiveSection = executiveSections?.find((section) => section.id === activeExecutiveSectionId) ?? executiveSections?.[0];
+  const [isAssignmentBannerOpen, setIsAssignmentBannerOpen] = useState(Boolean(unreadAssignments?.length));
 
   return (
     <div className="space-y-4 px-3 pb-4 pt-1 sm:px-7 sm:pb-6 sm:pt-1">
+      <DashboardFilterBar filterDate={filterDate} filterLabel={filterLabel} filterMonth={filterMonth} />
+
+      {/* Assignment notification banner — auto-opens when admin/super-admin has unread assignments */}
+      {isAssignmentBannerOpen && unreadAssignments && unreadAssignments.length > 0 && (
+        <AssignmentAlertBanner
+          assignments={unreadAssignments}
+          onDismiss={() => setIsAssignmentBannerOpen(false)}
+        />
+      )}
+
       {executiveSections?.length ? (
         <section className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),linear-gradient(180deg,#eff6ff_0%,#ffffff_42%,#f8fafc_100%)] p-2 shadow-[0_18px_42px_rgba(15,23,42,0.06)] sm:rounded-[2.2rem] sm:p-4">
           <div className="rounded-[1.3rem] border border-white/70 bg-white/75 p-3 backdrop-blur sm:rounded-[1.8rem] sm:p-4">

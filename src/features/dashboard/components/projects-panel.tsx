@@ -867,19 +867,52 @@ function MultiSelect({
   label: string;
   name: string;
   optionLabels?: Record<string, string>;
-  optionRoles?: Record<string, string>; // id → role string
+  optionRoles?: Record<string, string>;
   options: string[];
   placeholder: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>(defaultValue);
   const [search, setSearch] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
+  // Recalculate dropdown position whenever it opens
+  useEffect(() => {
+    if (!isOpen || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+  }, [isOpen]);
+
+  // Close on outside click (handles both trigger and portal)
+  useEffect(() => {
+    if (!isOpen) return;
+    function onPointer(e: PointerEvent) {
+      const target = e.target as Node;
+      if (!triggerRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [isOpen]);
+
+  // Close when the parent scrollable container scrolls or window resizes
+  useEffect(() => {
+    if (!isOpen) return;
+    function close() { setIsOpen(false); }
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [isOpen]);
 
   function toggle(val: string) {
     setSelected((prev) => prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]);
   }
 
-  // Group options by role when optionRoles is provided
+  function clearAll() { setSelected([]); }
+
   const hasRoles = Boolean(optionRoles && Object.keys(optionRoles).length > 0);
   const roleOrder = ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"];
 
@@ -887,7 +920,6 @@ function MultiSelect({
     ? options.filter((opt) => (optionLabels?.[opt] ?? opt).toLowerCase().includes(search.trim().toLowerCase()))
     : options;
 
-  // Build grouped structure
   const grouped: Array<{ roleKey: string; items: string[] }> = hasRoles
     ? roleOrder
         .map((roleKey) => ({
@@ -897,157 +929,151 @@ function MultiSelect({
         .filter((g) => g.items.length > 0)
     : [{ roleKey: "", items: filteredOptions }];
 
+  const dropdownEl = (
+    <div
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]"
+      ref={dropdownRef}
+      style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }}
+    >
+      {/* Search + count + clear */}
+      <div className="border-b border-slate-100 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
+          <svg className="shrink-0 text-slate-400" fill="none" height="13" viewBox="0 0 24 24" width="13">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+            <path d="m16.5 16.5 4 4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          </svg>
+          <input
+            autoFocus
+            className="flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search…"
+            value={search}
+          />
+          {selected.length > 0 ? (
+            <button
+              className="shrink-0 rounded-md px-1.5 py-0.5 text-[0.62rem] font-bold text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+              onClick={clearAll}
+              type="button"
+            >
+              Clear all
+            </button>
+          ) : null}
+        </div>
+        {selected.length > 0 ? (
+          <p className="mt-1 px-1 text-[0.65rem] font-semibold text-blue-600">{selected.length} selected</p>
+        ) : null}
+      </div>
+
+      <div className="max-h-60 overflow-y-auto p-1.5">
+        {filteredOptions.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-slate-400">No matches found.</p>
+        ) : (
+          grouped.map(({ roleKey, items }) => (
+            <div key={roleKey || "all"}>
+              {roleKey && ROLE_BADGE[roleKey] ? (
+                <div className="mb-0.5 mt-1.5 flex items-center gap-2 px-3">
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-wide"
+                    style={{ background: ROLE_BADGE[roleKey].bg, color: ROLE_BADGE[roleKey].text }}
+                  >
+                    {ROLE_BADGE[roleKey].label}
+                  </span>
+                  <span className="h-px flex-1 bg-slate-100" />
+                </div>
+              ) : null}
+              {items.map((opt) => {
+                const checked = selected.includes(opt);
+                const role = optionRoles?.[opt];
+                const rb = role ? ROLE_BADGE[role] : undefined;
+                const fullLabel = optionLabels?.[opt] ?? opt;
+                const parenIdx = fullLabel.indexOf(" (");
+                const namePart = parenIdx > -1 ? fullLabel.slice(0, parenIdx) : fullLabel;
+                const emailPart = parenIdx > -1 ? fullLabel.slice(parenIdx + 2, -1) : "";
+
+                return (
+                  <label
+                    className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 transition ${checked ? "bg-blue-50" : "hover:bg-slate-50"}`}
+                    key={opt}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border transition ${checked ? "border-blue-500 bg-blue-500" : "border-slate-300 bg-white"}`}>
+                        {checked ? (
+                          <svg fill="none" height="10" viewBox="0 0 12 10" width="10">
+                            <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                          </svg>
+                        ) : null}
+                      </div>
+                      <input checked={checked} className="sr-only" name={name} onChange={() => toggle(opt)} type="checkbox" value={opt} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-sm font-semibold truncate ${checked ? "text-blue-800" : "text-slate-800"}`}>{namePart}</span>
+                          {rb ? (
+                            <span className="shrink-0 rounded-full px-1.5 py-px text-[0.52rem] font-bold" style={{ background: rb.bg, color: rb.text }}>
+                              {rb.label}
+                            </span>
+                          ) : null}
+                        </div>
+                        {emailPart ? (
+                          <p className={`text-[0.65rem] truncate ${checked ? "text-blue-500" : "text-slate-400"}`}>{emailPart}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    {checked ? (
+                      <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[0.6rem] font-bold text-blue-600">✓</span>
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <input name={`${name}Csv`} type="hidden" value={selected.join(",")} />
-      <div className="relative">
-        {/* Trigger button */}
-        <button
-          className="flex min-h-[2.9rem] w-full flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-slate-900 outline-none transition focus:border-blue-300 hover:border-blue-300"
-          onClick={() => setIsOpen((v) => !v)}
-          type="button"
-        >
-          <div className="flex flex-1 flex-wrap gap-1.5">
-            {selected.length ? (
-              selected.map((v) => {
-                const role = optionRoles?.[v];
-                const rb = role ? ROLE_BADGE[role] : undefined;
-                return (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-blue-700"
-                    key={v}
-                  >
-                    {/* Short name only (before the email paren) */}
-                    {(optionLabels?.[v] ?? v).split(" (")[0]}
-                    {rb ? (
-                      <span
-                        className="rounded-full px-1.5 py-px text-[0.52rem] font-bold"
-                        style={{ background: rb.bg, color: rb.text }}
-                      >
-                        {rb.label}
-                      </span>
-                    ) : null}
-                  </span>
-                );
-              })
-            ) : (
-              <span className="text-sm text-slate-400">{placeholder}</span>
-            )}
-          </div>
-          <svg className={`shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" height="14" viewBox="0 0 24 24" width="14">
-            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          </svg>
-        </button>
 
-        {/* Dropdown */}
-        <div
-          className={`absolute z-20 mt-1.5 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.14)] transition-all ${
-            isOpen ? "visible opacity-100" : "invisible pointer-events-none opacity-0"
-          }`}
-        >
-          {/* Search box */}
-          <div className="border-b border-slate-100 px-3 py-2">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
-              <svg className="shrink-0 text-slate-400" fill="none" height="13" viewBox="0 0 24 24" width="13">
-                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-                <path d="m16.5 16.5 4 4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-              </svg>
-              <input
-                className="flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or email…"
-                value={search}
-              />
-            </div>
-          </div>
-
-          <div className="max-h-56 overflow-y-auto p-1.5">
-            {filteredOptions.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-slate-400">No matches found.</p>
-            ) : (
-              grouped.map(({ roleKey, items }) => (
-                <div key={roleKey || "all"}>
-                  {/* Role group header */}
-                  {roleKey && ROLE_BADGE[roleKey] ? (
-                    <div className="mb-0.5 mt-1.5 flex items-center gap-2 px-3">
-                      <span
-                        className="rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-wide"
-                        style={{ background: ROLE_BADGE[roleKey].bg, color: ROLE_BADGE[roleKey].text }}
-                      >
-                        {ROLE_BADGE[roleKey].label}
-                      </span>
-                      <span className="h-px flex-1 bg-slate-100" />
-                    </div>
+      {/* Trigger */}
+      <button
+        className="flex min-h-[2.9rem] w-full flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-slate-900 outline-none transition focus:border-blue-300 hover:border-blue-300"
+        onClick={() => setIsOpen((v) => !v)}
+        ref={triggerRef}
+        type="button"
+      >
+        <div className="flex flex-1 flex-wrap gap-1.5">
+          {selected.length ? (
+            selected.map((v) => {
+              const role = optionRoles?.[v];
+              const rb = role ? ROLE_BADGE[role] : undefined;
+              return (
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-blue-700" key={v}>
+                  {(optionLabels?.[v] ?? v).split(" (")[0]}
+                  {rb ? (
+                    <span className="rounded-full px-1.5 py-px text-[0.52rem] font-bold" style={{ background: rb.bg, color: rb.text }}>
+                      {rb.label}
+                    </span>
                   ) : null}
-
-                  {items.map((opt) => {
-                    const checked = selected.includes(opt);
-                    const role = optionRoles?.[opt];
-                    const rb = role ? ROLE_BADGE[role] : undefined;
-                    const fullLabel = optionLabels?.[opt] ?? opt;
-                    // Split "Name (email)" into parts
-                    const parenIdx = fullLabel.indexOf(" (");
-                    const namePart = parenIdx > -1 ? fullLabel.slice(0, parenIdx) : fullLabel;
-                    const emailPart = parenIdx > -1 ? fullLabel.slice(parenIdx + 2, -1) : "";
-
-                    return (
-                      <label
-                        className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 transition ${
-                          checked ? "bg-blue-50" : "hover:bg-slate-50"
-                        }`}
-                        key={opt}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {/* Custom checkbox */}
-                          <div
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border transition ${
-                              checked ? "border-blue-500 bg-blue-500" : "border-slate-300 bg-white"
-                            }`}
-                            onClick={() => toggle(opt)}
-                          >
-                            {checked ? (
-                              <svg fill="none" height="10" viewBox="0 0 12 10" width="10">
-                                <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                              </svg>
-                            ) : null}
-                          </div>
-                          <input checked={checked} className="sr-only" name={name} onChange={() => toggle(opt)} type="checkbox" value={opt} />
-
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-sm font-semibold truncate ${checked ? "text-blue-800" : "text-slate-800"}`}>
-                                {namePart}
-                              </span>
-                              {rb ? (
-                                <span
-                                  className="shrink-0 rounded-full px-1.5 py-px text-[0.52rem] font-bold"
-                                  style={{ background: rb.bg, color: rb.text }}
-                                >
-                                  {rb.label}
-                                </span>
-                              ) : null}
-                            </div>
-                            {emailPart ? (
-                              <p className={`text-[0.65rem] truncate ${checked ? "text-blue-500" : "text-slate-400"}`}>{emailPart}</p>
-                            ) : null}
-                          </div>
-                        </div>
-                        {checked ? (
-                          <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[0.6rem] font-bold text-blue-600">✓</span>
-                        ) : null}
-                      </label>
-                    );
-                  })}
-                </div>
-              ))
-            )}
-          </div>
+                </span>
+              );
+            })
+          ) : (
+            <span className="text-sm text-slate-400">{placeholder}</span>
+          )}
         </div>
-      </div>
+        <svg className={`shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" height="14" viewBox="0 0 24 24" width="14">
+          <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+        </svg>
+      </button>
+
       {selected.length > 0 ? (
-        <p className="mt-1.5 text-[0.7rem] font-semibold text-slate-400">{selected.length} selected</p>
+        <p className="mt-1.5 text-[0.7rem] font-semibold text-slate-400">{selected.length} selected — click to edit</p>
       ) : null}
+
+      {/* Portal dropdown — renders outside any overflow container */}
+      {isOpen && typeof document !== "undefined" ? createPortal(dropdownEl, document.body) : null}
     </div>
   );
 }

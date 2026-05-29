@@ -463,7 +463,13 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
   const managerCount = users.filter((user) => user.role === "MANAGER").length;
   const employeeCount = users.filter((user) => user.role === "EMPLOYEE").length;
   const salesCount = users.filter((user) => user.role === "SALES").length;
-  const salesUserMap = new Map(salesUsers.map((user) => [user._id.toString(), user]));
+  // Extend map with admin/super-admin who may have personal pitches assigned to themselves
+  const salesUserMap = new Map<string, { fullName: string; email: string }>(
+    salesUsers.map((user) => [user._id.toString(), { fullName: user.fullName, email: user.email }]),
+  );
+  if (session && (session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER")) {
+    salesUserMap.set(session.user.id, { fullName: session.user.fullName, email: session.user.email });
+  }
   const presentTodayIds = new Set(todayAttendance.map((row) => row.userId));
   const onLeaveTodayIds = new Set(todayLeaves.map((row) => row.userId));
   const presentTodayCount = presentTodayIds.size;
@@ -492,6 +498,11 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
     pitchedPrice: Number(lead.pitchedPrice ?? 0),
     deliveryDate: lead.deliveryDate ?? "",
     notes: lead.notes ?? "",
+    callStatus: lead.callStatus ?? "",
+    dateOfFirstCall: lead.dateOfFirstCall ?? "",
+    dateOfLastCall: lead.dateOfLastCall ?? "",
+    callbackReminderDate: lead.callbackReminderDate ?? "",
+    callNotes: lead.callNotes ?? "",
     createdAt: formatDate(lead.createdAt),
   }));
   const salesCustomerRows: SalesCustomerEntry[] = salesCustomers.map((customer) => ({
@@ -594,10 +605,16 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
       id: manager._id.toString(),
       label: `${manager.fullName} (${manager.email})`,
     })),
-    salesOptions: salesUsers.map((salesUser) => ({
-      id: salesUser._id.toString(),
-      label: `${salesUser.fullName} (${salesUser.email})`,
-    })),
+    salesOptions: [
+      // Admin/Super Admin can pitch personally — show "Me" as the first option
+      ...(hasAdminLikeAccess && session
+        ? [{ id: session.user.id, label: `${session.user.fullName} — Personal Pitch (Me)` }]
+        : []),
+      ...salesUsers.map((salesUser) => ({
+        id: salesUser._id.toString(),
+        label: `${salesUser.fullName} (${salesUser.email})`,
+      })),
+    ],
     salesTechnologyOptions: [...SALES_TECH_OPTIONS],
     salesLeadSourceOptions: [...SALES_LEAD_SOURCES],
     salesLeadStatusOptions: [...SALES_LEAD_STATUSES],
@@ -988,11 +1005,12 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
     hasAdminLikeAccess
       ? {}
       : { $or: [{ assignedUserId: session.user.id }, { assignedByUserId: session.user.id }] };
-  const employeeFilter = { role: "EMPLOYEE", status: "ACTIVE" };
+  // Tasks can be assigned to employees, managers, and super admins (self-assign supported)
+  const assignableRoleFilter = { role: { $in: ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"] }, status: "ACTIVE" };
 
   const [tasks, employees, users, assignedProjects] = await Promise.all([
     TaskModel.find(taskFilter).sort({ createdAt: -1 }).lean(),
-    UserModel.find(employeeFilter, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean(),
+    UserModel.find(assignableRoleFilter, { fullName: 1, email: 1, role: 1 }).sort({ fullName: 1 }).lean(),
     UserModel.find({}, { fullName: 1 }).lean(),
     hasAdminLikeAccess
       ? Promise.resolve([])
@@ -1022,10 +1040,17 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
       dueDate: formatDate(project.dueDate),
       techStack: resolveProjectTechStack(project),
     })),
-    employeeOptions: employees.map((employee) => ({
-      id: employee._id.toString(),
-      label: `${employee.fullName} (${employee.email})`,
-    })),
+    employeeOptions: employees.map((employee) => {
+      const isSelf = employee._id.toString() === session.user.id;
+      const role = (employee as unknown as { role?: string }).role ?? "EMPLOYEE";
+      const roleSuffix = role === "SUPER_ADMIN" ? "Super Admin" : role === "MANAGER" ? "Admin" : "";
+      const label = isSelf
+        ? `${employee.fullName} — Me (${roleSuffix || "Employee"})`
+        : roleSuffix
+          ? `${employee.fullName} — ${roleSuffix} (${employee.email})`
+          : `${employee.fullName} (${employee.email})`;
+      return { id: employee._id.toString(), label, role };
+    }),
     labelOptions: [...TASK_LABELS],
   };
 }

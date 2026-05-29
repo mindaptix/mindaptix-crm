@@ -2,19 +2,42 @@ import { AdminDashboardOverview, EmployeeDashboardOverview } from "@/features/da
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import { getAdminDashboardOverview, getEmployeeDashboardOverview, getManagerDashboardOverview } from "@/features/dashboard/roles";
 import { getDisplayRoleLabel } from "@/features/dashboard/config";
+import type { DashboardDateFilter } from "@/features/dashboard/types";
 
-export default async function DashboardPage() {
+// YYYY-MM-DD regex
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// YYYY-MM regex
+const MONTH_RE = /^\d{4}-\d{2}$/;
+
+function parseFilter(params: { date?: string; month?: string }): DashboardDateFilter {
+  if (params.date && DATE_RE.test(params.date)) {
+    return { type: "date", value: params.date };
+  }
+  if (params.month && MONTH_RE.test(params.month)) {
+    return { type: "month", value: params.month };
+  }
+  return null;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string; month?: string }>;
+}) {
   const session = await getCurrentSession();
 
   if (!session) {
     return null;
   }
 
+  const params = await searchParams;
+  const filter = parseFilter(params);
+
   const overview =
     session.user.role === "SUPER_ADMIN"
-      ? await getAdminDashboardOverview(session)
+      ? await getAdminDashboardOverview(session, filter)
       : session.user.role === "MANAGER"
-        ? await getManagerDashboardOverview(session)
+        ? await getManagerDashboardOverview(session, filter)
         : await getEmployeeDashboardOverview(session);
 
   if (session.user.role === "EMPLOYEE") {
@@ -34,6 +57,9 @@ export default async function DashboardPage() {
       dsrTrend={overview.dsrTrend}
       employeeProjectRows={overview.employeeProjectRows}
       executiveSections={overview.executiveSections}
+      filterDate={params.date}
+      filterLabel={overview.filterLabel}
+      filterMonth={params.month}
       financeNote={overview.financeNote}
       leaveTrend={overview.leaveTrend}
       notificationTitle={overview.notificationTitle}
@@ -50,10 +76,9 @@ export default async function DashboardPage() {
       secondaryListTitle={overview.secondaryListTitle}
       taskStatusBreakdown={overview.taskStatusBreakdown}
       title={overview.title}
+      unreadAssignments={overview.unreadAssignments}
       weeklySummaryCards={overview.weeklySummaryCards}
       weeklySummaryTitle={overview.weeklySummaryTitle}
     />
   );
 }
-
-

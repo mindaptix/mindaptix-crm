@@ -8,8 +8,11 @@ import { SalesLeadModel } from "@/database/mongodb/models/sales-lead";
 import { SalesPaymentModel } from "@/database/mongodb/models/sales-payment";
 import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
-import type { DashboardListItem, DashboardOverviewData, ExecutiveOverviewSection } from "@/features/dashboard/types";
+import type { DashboardListItem, DashboardOverviewData, ExecutiveOverviewSection, UnreadAssignment } from "@/features/dashboard/types";
+import type { DashboardDateFilter } from "@/features/dashboard/types";
+import { getUnreadAssignmentsForUser } from "@/features/notifications/service";
 import {
+  addDaysToDate,
   buildOverviewAttendanceTrend,
   buildOverviewCalendarItems,
   buildOverviewDsrTrend,
@@ -26,8 +29,10 @@ import {
 export async function buildLeadershipDashboardOverview(
   session: AuthenticatedSession,
   copy: Pick<DashboardOverviewData, "title" | "description">,
+  filter?: DashboardDateFilter,
 ): Promise<DashboardOverviewData> {
-  const { notifications, today, weekStart } = await getDashboardOverviewContext(session);
+  const { notifications, today: realToday } = await getDashboardOverviewContext(session);
+  const { anchor, rangeStart, filterLabel, presentLabel, leaveLabel } = resolveDateFilter(filter ?? null, realToday);
   const isLeadership = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
 
   // Run both user queries in parallel instead of sequentially — saves ~100-200ms
@@ -45,12 +50,12 @@ export async function buildLeadershipDashboardOverview(
     activeEmployees.map((employee) => [employee._id.toString(), { fullName: employee.fullName, email: employee.email }]),
   );
   const scope = inScope(employeeIds);
-  const [todaysAttendance, leaveRows, taskRows, weekAttendance, weekUpdates, projects, salesLeads, operationalTasks, allPayments] = await Promise.all([
-    AttendanceModel.find({ userId: scope, dateKey: today }, { userId: 1 }).lean(),
+  const [todaysAttendance, leaveRows, taskRows, weekAttendance, weekUpdates, projects, salesLeads, operationalTasks, allPayments, rawUnreadAssignments] = await Promise.all([
+    AttendanceModel.find({ userId: scope, dateKey: anchor }, { userId: 1 }).lean(),
     LeaveRequestModel.find({ userId: scope }, { userId: 1, leaveType: 1, startDate: 1, endDate: 1, status: 1, reason: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
     TaskModel.find({ assignedUserId: scope }, { title: 1, dueDate: 1, status: 1, assignedUserId: 1, priority: 1, completedAt: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
-    AttendanceModel.find({ userId: scope, dateKey: { $gte: weekStart, $lte: today } }, { userId: 1, status: 1, dateKey: 1 }).lean(),
-    DailyUpdateModel.find({ userId: scope, workDate: { $gte: weekStart, $lte: today } }, { userId: 1, workDate: 1 }).lean(),
+    AttendanceModel.find({ userId: scope, dateKey: { $gte: rangeStart, $lte: anchor } }, { userId: 1, status: 1, dateKey: 1 }).lean(),
+    DailyUpdateModel.find({ userId: scope, workDate: { $gte: rangeStart, $lte: anchor } }, { userId: 1, workDate: 1 }).lean(),
     ProjectModel.find({}, { name: 1, summary: 1, status: 1, priority: 1, assignedUserIds: 1, dueDate: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1 }).sort({ createdAt: -1 }).lean(),
     SalesLeadModel.find({ salesUserId: inScope(salesUserIds) }, { salesUserId: 1, clientName: 1, clientPhone: 1, clientEmail: 1, technologies: 1, meetingDate: 1, meetingTime: 1, budget: 1, pitchedPrice: 1, deliveryDate: 1, createdAt: 1 })
       .sort({ createdAt: -1 })
@@ -65,19 +70,20 @@ export async function buildLeadershipDashboardOverview(
       {},
       { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, status: 1 },
     ).lean(),
+    getUnreadAssignmentsForUser(session.user.id),
   ]);
   const presentTodayIds = new Set(todaysAttendance.map((row) => row.userId));
   const onLeaveTodayIds = new Set(
     leaveRows
-      .filter((leave) => leave.status === "APPROVED" && leave.startDate <= today && leave.endDate >= today)
+      .filter((leave) => leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= anchor)
       .map((leave) => leave.userId),
   );
   const presentToday = presentTodayIds.size;
   const onLeaveToday = Array.from(onLeaveTodayIds).filter((userId) => !presentTodayIds.has(userId)).length;
   const absentToday = Math.max(activeEmployees.length - presentToday - onLeaveToday, 0);
-  const todayLeaveRows = leaveRows.filter((leave) => leave.status === "APPROVED" && leave.startDate <= today && leave.endDate >= today);
-  const currentWindowLeaveRows = leaveRows.filter((leave) => leave.endDate >= weekStart && leave.startDate <= today);
-  const currentWindowTaskRows = taskRows.filter((task) => !task.createdAt || formatDate(task.createdAt) >= weekStart);
+  const todayLeaveRows = leaveRows.filter((leave) => leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= anchor);
+  const currentWindowLeaveRows = leaveRows.filter((leave) => leave.endDate >= rangeStart && leave.startDate <= anchor);
+  const currentWindowTaskRows = taskRows.filter((task) => !task.createdAt || formatDate(task.createdAt) >= rangeStart);
   const pendingProjects = projects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
   const inProgressProjects = projects.filter((project) => project.status === "IN_PROGRESS").length;
   const completedProjects = projects.filter((project) => project.status === "COMPLETED").length;
@@ -96,9 +102,9 @@ export async function buildLeadershipDashboardOverview(
     { label: "In Progress", value: inProgressProjects, color: "#2563eb" },
     { label: "Completed", value: completedProjects, color: "#10b981" },
   ];
-  const attendanceTrend = buildOverviewAttendanceTrend({ activeEmployeeIds: employeeIds, attendanceRows: weekAttendance, leaveRows, today, weekStart });
-  const leaveTrend = buildOverviewLeaveTrend(leaveRows, today, 6);
-  const dsrTrend = buildOverviewDsrTrend({ activeEmployeeIds: employeeIds, dsrRows: weekUpdates, today, weekStart });
+  const attendanceTrend = buildOverviewAttendanceTrend({ activeEmployeeIds: employeeIds, attendanceRows: weekAttendance, leaveRows, today: anchor, weekStart: rangeStart });
+  const leaveTrend = buildOverviewLeaveTrend(leaveRows, anchor, 6);
+  const dsrTrend = buildOverviewDsrTrend({ activeEmployeeIds: employeeIds, dsrRows: weekUpdates, today: anchor, weekStart: rangeStart });
   const employeeProjectRows = buildOverviewEmployeeProjectSummaryRows({
     activeEmployees,
     projects: projects.map((project) => ({
@@ -114,7 +120,7 @@ export async function buildLeadershipDashboardOverview(
           presentToday,
           onLeaveToday,
           absentToday,
-          today,
+          today: anchor,
           projects,
           leaveRows,
           salesLeads,
@@ -124,15 +130,28 @@ export async function buildLeadershipDashboardOverview(
         })
       : undefined;
 
+  const unreadAssignments: UnreadAssignment[] = rawUnreadAssignments.map((n) => ({
+    id: n._id.toString(),
+    type: n.type as "TASK_ASSIGNED" | "PROJECT_ASSIGNED",
+    title: n.title,
+    message: n.message,
+    actionUrl: n.actionUrl ?? "",
+    createdAt: n.createdAt
+      ? new Date(n.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      : "",
+  }));
+
   return {
     ...copy,
+    filterLabel,
+    unreadAssignments,
     cards: [
-      { label: "Present Today", value: String(presentToday), detail: "Employees who marked attendance today." },
-      { label: "On Leave Today", value: String(onLeaveToday), detail: "Approved leave records active for today." },
+      { label: presentLabel, value: String(presentToday), detail: `Employees who marked attendance on ${filterLabel}.` },
+      { label: leaveLabel, value: String(onLeaveToday), detail: `Approved leave records active for ${filterLabel}.` },
       { label: "Projects Pending", value: String(pendingProjects), detail: "Projects in planning or hold state." },
       { label: "Projects In Progress", value: String(inProgressProjects), detail: "Projects currently under execution." },
       { label: "Projects Completed", value: String(completedProjects), detail: "Projects already closed successfully." },
-      { label: "DSR Missing", value: String(dsrTrend.at(-1)?.missing ?? 0), detail: "Employees still missing today's DSR." },
+      { label: "DSR Missing", value: String(dsrTrend.at(-1)?.missing ?? 0), detail: `Employees missing DSR for ${filterLabel}.` },
     ],
     notificationTitle: "System Notifications",
     notifications,
@@ -156,8 +175,8 @@ export async function buildLeadershipDashboardOverview(
       meta: employee.joiningDate ? `Joined ${formatDate(employee.joiningDate)}` : "Joining date not added",
       description: [employee.email, employee.phone || "Phone not added"].join(" | "),
     })),
-    primaryListTitle: "Today On Leave",
-    primaryEmptyMessage: "No employees are on leave today.",
+    primaryListTitle: filter ? `On Leave — ${filterLabel}` : "Today On Leave",
+    primaryEmptyMessage: `No employees are on leave for ${filterLabel}.`,
     primaryItems: todayLeaveRows.map((row) => ({
       id: row._id.toString(),
       title: employeeMap.get(row.userId)?.fullName ?? "Unknown employee",
@@ -434,6 +453,58 @@ function formatCurrency(value: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function resolveDateFilter(
+  filter: DashboardDateFilter,
+  realToday: string,
+): { anchor: string; rangeStart: string; filterLabel: string; presentLabel: string; leaveLabel: string } {
+  if (!filter) {
+    return {
+      anchor: realToday,
+      rangeStart: addDaysToDate(realToday, -6),
+      filterLabel: "Today",
+      presentLabel: "Present Today",
+      leaveLabel: "On Leave Today",
+    };
+  }
+
+  if (filter.type === "date") {
+    const label = formatFilterDateLabel(filter.value);
+    return {
+      anchor: filter.value,
+      rangeStart: addDaysToDate(filter.value, -6),
+      filterLabel: label,
+      presentLabel: `Present — ${label}`,
+      leaveLabel: `On Leave — ${label}`,
+    };
+  }
+
+  // month filter: YYYY-MM
+  const [year, month] = filter.value.split("-").map(Number);
+  const lastDayNum = new Date(year, month, 0).getDate();
+  const lastDay = `${filter.value}-${String(lastDayNum).padStart(2, "0")}`;
+  const anchor = lastDay <= realToday ? lastDay : realToday;
+  const label = formatFilterMonthLabel(filter.value);
+  return {
+    anchor,
+    rangeStart: `${filter.value}-01`,
+    filterLabel: label,
+    presentLabel: `Present in ${label}`,
+    leaveLabel: `On Leave in ${label}`,
+  };
+}
+
+function formatFilterDateLabel(dateKey: string): string {
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+function formatFilterMonthLabel(monthKey: string): string {
+  const date = new Date(`${monthKey}-01T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return monthKey;
+  return date.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 

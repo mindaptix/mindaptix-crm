@@ -90,9 +90,19 @@ export type UnreadAssignment = {
   createdAt: string;
 };
 
+// ─── Dashboard Date Filter ───────────────────────────────────────────────────
+
+export type DashboardDateFilter =
+  | { type: "date"; value: string }   // YYYY-MM-DD — specific day
+  | { type: "month"; value: string }  // YYYY-MM    — full month
+  | null;                             // default: today
+
+// ─── Dashboard Overview ──────────────────────────────────────────────────────
+
 export type DashboardOverviewData = {
   title: string;
   description: string;
+  filterLabel?: string;
   cards: SummaryCard[];
   unreadAssignments?: UnreadAssignment[];
   priorityAlert?: {
@@ -196,6 +206,11 @@ export type SalesLeadEntry = {
   pitchedPrice: number;
   deliveryDate: string;
   notes: string;
+  callStatus: string;
+  dateOfFirstCall: string;
+  dateOfLastCall: string;
+  callbackReminderDate: string;
+  callNotes: string;
   createdAt: string;
 };
 

@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
-import { assertAdminOrManager } from "@/features/auth/lib/user-admin";
 import connectDb from "@/database/mongodb/connect";
 import {
+  SALES_CALL_STATUSES,
   SALES_LEAD_PRIORITIES,
   SALES_LEAD_SOURCES,
   SALES_LEAD_STATUSES,
@@ -38,7 +38,17 @@ export type SalesLeadFormState = {
     pitchedPrice?: string;
     deliveryDate?: string;
     notes?: string;
+    callStatus?: string;
+    dateOfFirstCall?: string;
+    dateOfLastCall?: string;
+    callbackReminderDate?: string;
+    callNotes?: string;
   };
+};
+
+export type UpdateCallFormState = {
+  error?: string;
+  success?: string;
 };
 
 export async function createSalesLead(
@@ -47,19 +57,24 @@ export async function createSalesLead(
 ): Promise<SalesLeadFormState> {
   const session = await getCurrentSession();
 
-  try {
-    assertAdminOrManager(session);
-  } catch {
-    return { error: "Only admin can create sales records." };
+  const isSalesRole = session?.user.role === "SALES";
+  const isAdminOrManager = session?.user.role === "SUPER_ADMIN" || session?.user.role === "MANAGER";
+
+  if (!session || (!isSalesRole && !isAdminOrManager)) {
+    return { error: "Access denied." };
   }
 
-  const salesUserId = String(formData.get("salesUserId") ?? "").trim();
+  // SALES employees always create leads for themselves; admins pick from dropdown
+  const salesUserId = isSalesRole
+    ? session.user.id
+    : String(formData.get("salesUserId") ?? "").trim();
+
   const companyName = String(formData.get("companyName") ?? "").trim();
   const clientName = String(formData.get("clientName") ?? "").trim();
   const clientPhone = String(formData.get("clientPhone") ?? "").trim();
   const clientEmail = String(formData.get("clientEmail") ?? "").trim().toLowerCase();
   const source = String(formData.get("source") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim();
+  const status = isSalesRole ? "CONTACTED" : String(formData.get("status") ?? "").trim();
   const priority = String(formData.get("priority") ?? "").trim();
   const technologies = formData
     .getAll("technologies")
@@ -74,6 +89,11 @@ export async function createSalesLead(
   const pitchedPrice = String(formData.get("pitchedPrice") ?? "").trim();
   const deliveryDate = String(formData.get("deliveryDate") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
+  const callStatus = String(formData.get("callStatus") ?? "").trim();
+  const dateOfFirstCall = String(formData.get("dateOfFirstCall") ?? "").trim();
+  const dateOfLastCall = String(formData.get("dateOfLastCall") ?? "").trim();
+  const callbackReminderDate = String(formData.get("callbackReminderDate") ?? "").trim();
+  const callNotes = String(formData.get("callNotes") ?? "").trim();
 
   const values = {
     salesUserId,
@@ -94,6 +114,11 @@ export async function createSalesLead(
     pitchedPrice,
     deliveryDate,
     notes,
+    callStatus,
+    dateOfFirstCall,
+    dateOfLastCall,
+    callbackReminderDate,
+    callNotes,
   };
 
   if (!salesUserId) {
@@ -116,7 +141,11 @@ export async function createSalesLead(
     return { error: "Select a valid lead source.", values };
   }
 
-  if (!SALES_LEAD_STATUSES.includes(status as (typeof SALES_LEAD_STATUSES)[number])) {
+  if (!isAdminOrManager && callStatus && !SALES_CALL_STATUSES.includes(callStatus as (typeof SALES_CALL_STATUSES)[number])) {
+    return { error: "Select a valid call status.", values };
+  }
+
+  if (isAdminOrManager && !SALES_LEAD_STATUSES.includes(status as (typeof SALES_LEAD_STATUSES)[number])) {
     return { error: "Select a valid lead status.", values };
   }
 
@@ -151,16 +180,29 @@ export async function createSalesLead(
     return { error: "Notes must be 2000 characters or fewer.", values };
   }
 
+  if (callNotes.length > 2000) {
+    return { error: "Call notes must be 2000 characters or fewer.", values };
+  }
+
   await connectDb();
 
-  const salesUser = await UserModel.findById(salesUserId, { role: 1, status: 1 }).lean();
+  const salesUser = await UserModel.findById(salesUserId, { role: 1, status: 1, fullName: 1 }).lean();
 
-  if (!salesUser || salesUser.role !== "SALES") {
-    return { error: "Selected sales employee is invalid.", values };
+  if (!salesUser) {
+    return { error: "Selected user not found.", values };
+  }
+
+  // Super admin / manager can create pitches for themselves (self-pitch)
+  // For others, only SALES role accounts are valid targets
+  const isSelfPitch = isAdminOrManager && salesUserId === session.user.id;
+  const isValidSalesTarget = salesUser.role === "SALES" || isSelfPitch;
+
+  if (!isValidSalesTarget) {
+    return { error: "Select a sales employee or choose 'Personal Pitch (Me)' to assign to yourself.", values };
   }
 
   if (salesUser.status !== "ACTIVE") {
-    return { error: "Selected sales employee must be active.", values };
+    return { error: "Selected user account is suspended.", values };
   }
 
   const lead = await SalesLeadModel.create({
@@ -182,6 +224,11 @@ export async function createSalesLead(
     pitchedPrice: parsedPitchedPrice,
     deliveryDate,
     notes,
+    callStatus,
+    dateOfFirstCall,
+    dateOfLastCall,
+    callbackReminderDate,
+    callNotes,
   });
 
   if (nextFollowUpDate) {
@@ -238,7 +285,7 @@ export async function createSalesLead(
   revalidatePath("/dashboard");
 
   return {
-    success: "Sales pipeline record added successfully.",
+    success: "Sales record saved successfully.",
     values: {
       salesUserId,
       companyName,
@@ -254,8 +301,67 @@ export async function createSalesLead(
       pitchedPrice: "",
       deliveryDate,
       notes: "",
+      callStatus: "",
+      dateOfFirstCall,
+      dateOfLastCall,
+      callbackReminderDate: "",
+      callNotes: "",
     },
   };
+}
+
+export async function updateSalesLeadCall(
+  _previousState: UpdateCallFormState,
+  formData: FormData,
+): Promise<UpdateCallFormState> {
+  const session = await getCurrentSession();
+
+  if (!session) return { error: "Not authenticated." };
+
+  const isSalesRole = session.user.role === "SALES";
+  const isAdminOrManager = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
+  if (!isSalesRole && !isAdminOrManager) {
+    return { error: "Access denied." };
+  }
+
+  const leadId = String(formData.get("leadId") ?? "").trim();
+  const callStatus = String(formData.get("callStatus") ?? "").trim();
+  const dateOfLastCall = String(formData.get("dateOfLastCall") ?? "").trim();
+  const nextFollowUpDate = String(formData.get("nextFollowUpDate") ?? "").trim();
+  const callbackReminderDate = String(formData.get("callbackReminderDate") ?? "").trim();
+  const callNotes = String(formData.get("callNotes") ?? "").trim();
+
+  if (!leadId) return { error: "Lead ID is required." };
+
+  if (callStatus && !SALES_CALL_STATUSES.includes(callStatus as (typeof SALES_CALL_STATUSES)[number])) {
+    return { error: "Invalid call status." };
+  }
+
+  if (callNotes.length > 2000) return { error: "Call notes must be 2000 characters or fewer." };
+
+  await connectDb();
+
+  const lead = await SalesLeadModel.findById(leadId, { salesUserId: 1 }).lean();
+  if (!lead) return { error: "Lead not found." };
+
+  if (isSalesRole && lead.salesUserId !== session.user.id) {
+    return { error: "You can only update your own leads." };
+  }
+
+  const updateFields: Record<string, string> = {};
+  if (callStatus) updateFields.callStatus = callStatus;
+  if (dateOfLastCall) updateFields.dateOfLastCall = dateOfLastCall;
+  if (nextFollowUpDate) updateFields.nextFollowUpDate = nextFollowUpDate;
+  if (callbackReminderDate) updateFields.callbackReminderDate = callbackReminderDate;
+  if (callNotes) updateFields.callNotes = callNotes;
+
+  await SalesLeadModel.findByIdAndUpdate(leadId, { $set: updateFields });
+
+  revalidatePath("/dashboard/employees");
+  revalidatePath("/dashboard");
+
+  return { success: "Call log updated." };
 }
 
 function mapLeadStatusToDealStage(status: string) {

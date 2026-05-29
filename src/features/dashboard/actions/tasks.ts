@@ -56,10 +56,11 @@ export async function createTask(_previousState: TaskState, formData: FormData):
 
   await connectDb();
 
-  const employee = await UserModel.findById(assignedUserId, { role: 1 }).lean();
+  const employee = await UserModel.findById(assignedUserId, { role: 1, fullName: 1 }).lean();
 
-  if (!employee || employee.role !== "EMPLOYEE") {
-    return { error: "Tasks can only be assigned to employee accounts.", values: { title, description, assignedUserId, dueDate } };
+  const TASK_ASSIGNABLE_ROLES = ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"] as const;
+  if (!employee || !TASK_ASSIGNABLE_ROLES.includes(employee.role as (typeof TASK_ASSIGNABLE_ROLES)[number])) {
+    return { error: "Please select a valid employee, admin, or super admin to assign this task.", values: { title, description, assignedUserId, dueDate } };
   }
 
   const attachments = await saveTaskAttachments(attachmentFiles);

@@ -41,11 +41,11 @@ const settingSchema = new mongoose.Schema(
     },
     geoFenceRadiusMeters: {
       type: Number,
-      default: 200,
+      default: 500,
     },
     geoFenceEnabled: {
       type: Boolean,
-      default: false,
+      default: true,
     },
   },
   baseSchemaOptions,

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
-import { FormActionButton } from "@/shared/ui/form-action-button";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
 import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
 import type { AttendancePageData } from "@/features/dashboard/types";
 
@@ -172,11 +171,22 @@ function LocationCell({
   );
 }
 
+const UNDO_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in ms
+
 export function AttendancePanel({ data }: AttendancePanelProps) {
   const [workMode, setWorkMode] = useState<WorkMode>("OFFICE");
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoError, setGeoError] = useState<string | null>(null);
   const [checkInPending, startCheckIn] = useTransition();
+  // Checkout confirmation state: false = default, true = waiting for confirm
+  const [confirmingCheckout, setConfirmingCheckout] = useState(false);
+  const [checkOutPending, startCheckOut] = useTransition();
+  const [checkOutError, setCheckOutError] = useState<string | null>(null);
+  // Undo state
+  const [undoPending, startUndo] = useTransition();
+  const [undoError, setUndoError] = useState<string | null>(null);
+  const [undoVisible, setUndoVisible] = useState(false);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const checkedIn  = !!data.todayRecord?.checkInAt  && data.todayRecord.checkInAt  !== "Not marked";
   const checkedOut = !!data.todayRecord?.checkOutAt && data.todayRecord.checkOutAt !== "Not marked";
@@ -222,6 +232,37 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Check-in fail ho gaya. Dobara try karein.";
         setGeoError(msg);
+      }
+    });
+  }
+
+  function handleCheckOutConfirm() {
+    setCheckOutError(null);
+    setConfirmingCheckout(false);
+    startCheckOut(async () => {
+      try {
+        await checkOutAttendance();
+        // Show undo button for 15 minutes
+        setUndoVisible(true);
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = setTimeout(() => setUndoVisible(false), UNDO_WINDOW_MS);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Check-out fail ho gaya. Dobara try karein.";
+        setCheckOutError(msg);
+      }
+    });
+  }
+
+  function handleUndoCheckout() {
+    setUndoError(null);
+    startUndo(async () => {
+      try {
+        await cancelCheckout();
+        setUndoVisible(false);
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Undo fail ho gaya.";
+        setUndoError(msg);
       }
     });
   }
@@ -364,8 +405,46 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
               </div>
             )}
 
+            {/* Check-out error */}
+            {checkOutError && (
+              <div className="mx-6 mt-3 flex items-start gap-2.5 rounded-xl px-4 py-2.5"
+                style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)" }}>
+                <span className="mt-0.5 shrink-0 text-base">⚠️</span>
+                <p className="text-[0.68rem] font-semibold leading-relaxed text-rose-300">{checkOutError}</p>
+              </div>
+            )}
+
+            {/* Undo checkout banner — visible 15 min after checkout */}
+            {undoVisible && (
+              <div className="mx-6 mt-3 rounded-xl px-4 py-3"
+                style={{ background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.3)" }}>
+                <p className="text-[0.68rem] font-bold text-amber-300">Galti se check-out ho gaya?</p>
+                {undoError && <p className="mt-1 text-[0.65rem] text-rose-300">{undoError}</p>}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={undoPending}
+                    onClick={handleUndoCheckout}
+                    className="rounded-lg px-3 py-1.5 text-[0.68rem] font-bold transition-all disabled:opacity-50"
+                    style={{ background: "rgba(245,158,11,0.3)", color: "#fcd34d", border: "1px solid rgba(245,158,11,0.4)" }}
+                  >
+                    {undoPending ? "Undo ho raha hai…" : "↩ Checkout Undo Karo"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUndoVisible(false)}
+                    className="rounded-lg px-3 py-1.5 text-[0.68rem] font-semibold text-white/40 hover:text-white/60"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[0.6rem] text-white/30">Yeh option 15 minute tak available hai</p>
+              </div>
+            )}
+
             {/* Action buttons */}
-            <div className="mt-5 grid grid-cols-2 gap-3 px-6 pb-6">
+            <div className="mt-5 space-y-3 px-6 pb-6">
+              {/* Check-in button — full width */}
               <button
                 type="button"
                 disabled={checkInPending || geoStatus === "loading"}
@@ -375,16 +454,44 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
               >
                 {checkInPending || geoStatus === "loading" ? "📍 Locating…" : "↗ Check In"}
               </button>
-              <form action={checkOutAttendance} className="contents">
-                <FormActionButton
-                  className="w-full rounded-xl py-3.5 text-sm font-bold transition-all hover:brightness-110 active:scale-[0.98]"
+
+              {/* Check-out: 2-step confirmation */}
+              {!confirmingCheckout ? (
+                <button
+                  type="button"
+                  disabled={checkOutPending}
+                  onClick={() => { setCheckOutError(null); setConfirmingCheckout(true); }}
+                  className="w-full rounded-xl py-3.5 text-sm font-bold transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
                   style={{ background: "linear-gradient(135deg,#3b82f6,#0ea5e9)", color: "#fff", border: "none", boxShadow: "0 8px 24px rgba(59,130,246,0.35)" }}
-                  pendingLabel="Checking out…"
-                  type="submit"
                 >
                   ↙ Check Out
-                </FormActionButton>
-              </form>
+                </button>
+              ) : (
+                <div className="overflow-hidden rounded-xl" style={{ border: "1px solid rgba(245,158,11,0.35)", background: "rgba(245,158,11,0.1)" }}>
+                  <p className="px-4 pt-3 text-[0.7rem] font-bold text-amber-300">
+                    ⚠️ Kya aap sure hain? Check out karna chahte hain?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 p-3">
+                    <button
+                      type="button"
+                      disabled={checkOutPending}
+                      onClick={handleCheckOutConfirm}
+                      className="rounded-lg py-2.5 text-xs font-bold transition-all disabled:opacity-50"
+                      style={{ background: "linear-gradient(135deg,#3b82f6,#0ea5e9)", color: "#fff" }}
+                    >
+                      {checkOutPending ? "Checking out…" : "✓ Haan, Check Out"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingCheckout(false)}
+                      className="rounded-lg py-2.5 text-xs font-bold text-white/60 hover:text-white/80 transition-colors"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                    >
+                      ✕ Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -558,7 +665,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                         style={{ width: `${Math.min(pct, 100)}%`, background: `linear-gradient(90deg,${barColor},${barColor}cc)` }}
                       />
                     </div>
-                    <span className="min-w-[2.5rem] text-sm font-bold" style={{ color: barColor }}>
+                    <span className="min-w-10 text-sm font-bold" style={{ color: barColor }}>
                       {pct}%
                     </span>
                   </div>
@@ -641,7 +748,7 @@ function StatCard({ gradient, iconBg, icon, label, value }: {
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-4 text-white shadow-lg`}
+      className={`relative overflow-hidden rounded-2xl bg-linear-to-br ${gradient} p-4 text-white shadow-lg`}
       style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}
     >
       {/* subtle bg circle */}

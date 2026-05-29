@@ -10,6 +10,9 @@ import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time"
 const VALID_WORK_MODES = ["OFFICE", "WFH", "FIELD"] as const;
 type WorkMode = (typeof VALID_WORK_MODES)[number];
 
+// Minutes within which a checkout can be undone
+const CHECKOUT_UNDO_WINDOW_MINUTES = 15;
+
 type CompanySettings = {
   workStart?: string;
   lateGraceMinutes?: number;
@@ -62,21 +65,35 @@ export async function checkInAttendance(formData: FormData) {
   const companySettings = (settings ?? {}) as unknown as Partial<CompanySettings>;
   const workStart: string = companySettings.workStart ?? "09:00";
   const lateGraceMinutes: number = Number(companySettings.lateGraceMinutes ?? 15);
-  const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? false);
+  const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? true);
   const officeLatitude = companySettings.officeLatitude ?? null;
   const officeLongitude = companySettings.officeLongitude ?? null;
-  const geoFenceRadius = Number(companySettings.geoFenceRadiusMeters ?? 200);
+  const geoFenceRadius = Number(companySettings.geoFenceRadiusMeters ?? 500);
 
-  if (geoFenceEnabled && workMode === "OFFICE") {
+  // Enforce location for OFFICE mode when:
+  // - geo-fence is explicitly enabled, OR
+  // - office coordinates are configured (auto-enforce even if toggle not yet set)
+  const officeCoordsDefined = officeLatitude !== null && officeLongitude !== null;
+  const shouldEnforceGeoFence = workMode === "OFFICE" && (geoFenceEnabled || officeCoordsDefined);
+
+  if (shouldEnforceGeoFence) {
     if (employeeLat === null || employeeLng === null || isNaN(employeeLat) || isNaN(employeeLng)) {
-      throw new Error("Attendance mark karne ke liye location permission den. Browser mein location enable karein.");
+      throw new Error(
+        "Office attendance ke liye location permission zaroori hai. Browser mein location enable karein aur dobara try karein.",
+      );
     }
-    if (officeLatitude === null || officeLongitude === null) {
-      throw new Error("Office ki location abhi configure nahi ki gayi. Admin se sampark karein.");
+    if (!officeCoordsDefined) {
+      throw new Error(
+        "Office location abhi settings mein configure nahi ki gayi hai. Admin se sampark karein.",
+      );
     }
-    const distance = haversineDistanceMeters(employeeLat, employeeLng, officeLatitude, officeLongitude);
+    const distance = Math.round(
+      haversineDistanceMeters(employeeLat, employeeLng, officeLatitude!, officeLongitude!),
+    );
     if (distance > geoFenceRadius) {
-      throw new Error(`Aap office se ${Math.round(distance)} meter door hain. Office mein aakr hi attendance mark kar sakte hain (allowed range: ${geoFenceRadius}m).`);
+      throw new Error(
+        `Aap office se ${distance} meter door hain. Office ke ${geoFenceRadius} meter andar aakr hi attendance mark kar sakte hain.`,
+      );
     }
   }
 
@@ -127,7 +144,11 @@ export async function checkOutAttendance() {
   const existingAttendance = await AttendanceModel.findOne({ userId: session.user.id, dateKey }).lean();
 
   if (!existingAttendance) {
-    throw new Error("Check in first before checking out.");
+    throw new Error("Pehle check-in karein, phir check-out possible hai.");
+  }
+
+  if (existingAttendance.status === "COMPLETED") {
+    throw new Error("Aap already check-out kar chuke hain.");
   }
 
   const checkInAt = existingAttendance.checkInAt;
@@ -151,4 +172,50 @@ export async function checkOutAttendance() {
   revalidatePath("/dashboard/reports");
 }
 
+// Undo checkout — only allowed within CHECKOUT_UNDO_WINDOW_MINUTES of checking out
+export async function cancelCheckout() {
+  const session = await getCurrentSession();
 
+  if (!session) {
+    throw new Error("Authentication required.");
+  }
+
+  await connectDb();
+
+  const now = new Date();
+  const dateKey = formatIndiaDateKey(now);
+
+  const record = await AttendanceModel.findOne({ userId: session.user.id, dateKey }).lean();
+
+  if (!record) {
+    throw new Error("Aaj ki attendance record nahi mili.");
+  }
+
+  if (record.status !== "COMPLETED") {
+    throw new Error("Aap abhi check-out mein nahi hain.");
+  }
+
+  const checkOutAt = record.checkOutAt ? new Date(record.checkOutAt) : null;
+  if (!checkOutAt) {
+    throw new Error("Check-out time nahi mila.");
+  }
+
+  const minutesSinceCheckout = Math.round((now.getTime() - checkOutAt.getTime()) / 60000);
+  if (minutesSinceCheckout > CHECKOUT_UNDO_WINDOW_MINUTES) {
+    throw new Error(
+      `Checkout undo sirf ${CHECKOUT_UNDO_WINDOW_MINUTES} minute ke andar ho sakta hai. ${minutesSinceCheckout} minute ho chuke hain.`,
+    );
+  }
+
+  await AttendanceModel.findOneAndUpdate(
+    { userId: session.user.id, dateKey },
+    {
+      $set: { status: "PRESENT" },
+      $unset: { checkOutAt: "", workedMinutes: "" },
+    },
+  );
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/reports");
+}

@@ -136,6 +136,16 @@ export const SALES_LEAD_STATUSES = [
 
 export type SalesLeadStatus = (typeof SALES_LEAD_STATUSES)[number];
 
+export const SALES_CALL_STATUSES = [
+  "NO_ANSWER",
+  "CALLBACK",
+  "LOST",
+  "MAYBE_FUTURE",
+  "NOT_INTERESTED",
+] as const;
+
+export type SalesCallStatus = (typeof SALES_CALL_STATUSES)[number];
+
 export const SALES_LEAD_PRIORITIES = ["HOT", "WARM", "COLD"] as const;
 
 export type SalesLeadPriority = (typeof SALES_LEAD_PRIORITIES)[number];
@@ -241,6 +251,32 @@ const salesLeadSchema = new mongoose.Schema(
       default: "",
     },
     notes: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+      default: "",
+    },
+    callStatus: {
+      type: String,
+      enum: [...SALES_CALL_STATUSES, ""],
+      default: "",
+    },
+    dateOfFirstCall: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    dateOfLastCall: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    callbackReminderDate: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    callNotes: {
       type: String,
       trim: true,
       maxlength: 2000,
