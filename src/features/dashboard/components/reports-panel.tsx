@@ -137,14 +137,14 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
       : [];
 
     return (
-      <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+      <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
         {/* Hero */}
         <div
           className="overflow-hidden rounded-[1.8rem]"
           style={{ background: "linear-gradient(135deg,#6366f1 0%,#4f46e5 60%,#4338ca 100%)", boxShadow: "0 12px 40px rgba(99,102,241,0.35)" }}
         >
-          <div className="flex flex-col gap-4 p-7 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-7">
             <div>
               <p className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-indigo-200">Monthly Report</p>
               <h1 className="mt-1.5 text-2xl font-black text-white">{data.monthLabel} Employee Report</h1>
@@ -177,7 +177,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
           </div>
 
           {/* Search + Employee */}
-          <div className="flex flex-col gap-3 border-t border-white/10 bg-white/5 px-7 py-4 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-3 border-t border-white/10 bg-white/5 px-4 py-4 sm:flex-row sm:items-end sm:px-7">
             <div className="relative flex flex-1 items-center">
               <svg className="pointer-events-none absolute left-3.5 text-white/50" fill="none" height="13" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="13">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -189,7 +189,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="min-w-[200px]">
+            <div className="w-full sm:min-w-[200px] sm:w-auto">
               <p className="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-indigo-200">Employee</p>
               <select
                 className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white outline-none focus:border-white/30 scheme-dark"
@@ -275,7 +275,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
             </div>
 
             {/* Tasks + DSR */}
-            <div className="grid gap-5 xl:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-2">
               {/* Tasks */}
               <div
                 className="overflow-hidden rounded-[1.8rem]"
@@ -350,7 +350,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
 
   // ── Admin / Manager view ──────────────────────────────────────────────────────
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -380,7 +380,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
           <p className="text-[0.6rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Last 7 Days</p>
           <h2 className="mt-0.5 text-2xl font-bold text-slate-800">Weekly Snapshot</h2>
         </div>
-        <div className="grid gap-4 p-6 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 xl:grid-cols-5">
           {data.weeklySummaryCards.map((card, i) => {
             const colors = [
               { text: "#6366f1", bg: "rgba(99,102,241,0.07)", border: "rgba(99,102,241,0.12)" },
@@ -449,7 +449,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
       </div>
 
       {/* Three data cards */}
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
         {/* Attendance */}
         <ReportCard eyebrow="Attendance" eyebrowColor="#10b981" headerBg="linear-gradient(135deg,#f0fdf4,#dcfce7)" headerBorder="rgba(16,185,129,0.12)" title="Attendance Summary">

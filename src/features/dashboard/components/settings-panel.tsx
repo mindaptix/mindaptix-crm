@@ -39,6 +39,73 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function OptionalInputField({
+  defaultValue,
+  label,
+  name,
+  placeholder,
+  type = "text",
+}: {
+  defaultValue?: string;
+  label: string;
+  name: string;
+  placeholder: string;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-emerald-800">{label}</span>
+      <input
+        className="w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+        defaultValue={defaultValue}
+        name={name}
+        placeholder={placeholder}
+        type={type}
+      />
+    </label>
+  );
+}
+
+function GeoFenceToggle({
+  defaultChecked,
+  name,
+}: {
+  defaultChecked: boolean;
+  name: string;
+}) {
+  const [enabled, setEnabled] = useState(defaultChecked);
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-white px-4 py-3">
+      <div>
+        <p className="text-sm font-semibold text-slate-800">Geo-fence Enable karein</p>
+        <p className="text-xs text-slate-500">
+          {enabled
+            ? "OFFICE mode mein attendance sirf office ke andar hi lagegi"
+            : "Abhi location verification band hai"}
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <input type="hidden" name={name} value={String(enabled)} />
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          onClick={() => setEnabled((v) => !v)}
+          className={`relative h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none ${
+            enabled ? "bg-emerald-500" : "bg-slate-200"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+              enabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPanel({ data }: SettingsPanelProps) {
   const [settingsState, settingsAction, settingsPending] = useActionState(updateCompanySettings, {
     ...INITIAL_SETTINGS_STATE,
@@ -50,6 +117,10 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       workingDays: String(data.workingDays ?? 26),
       salaryDay: String(data.salaryDay ?? 1),
       lateGraceMinutes: String(data.lateGraceMinutes ?? 15),
+      officeLatitude: data.officeLatitude !== null ? String(data.officeLatitude) : "",
+      officeLongitude: data.officeLongitude !== null ? String(data.officeLongitude) : "",
+      geoFenceRadiusMeters: String(data.geoFenceRadiusMeters ?? 200),
+      geoFenceEnabled: String(data.geoFenceEnabled ?? false),
     },
   });
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAccountPassword, INITIAL_PASSWORD_STATE);
@@ -63,7 +134,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
   const initials = getInitials(data.currentUserName);
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
       {/* Page header */}
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.26em] text-blue-600">Account Settings</p>
@@ -249,6 +320,53 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
               placeholder="Write a short leave policy for employees"
             />
 
+            {/* ── Geo-fence / Location Attendance ── */}
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-700">
+                  <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                    <path d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7Z" stroke="currentColor" strokeWidth="1.8" />
+                    <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-emerald-700">Location Attendance</p>
+                  <p className="text-xs text-emerald-600">Office ki GPS location set karein aur geo-fence enable karein</p>
+                </div>
+              </div>
+
+              {/* Enable toggle */}
+              <GeoFenceToggle
+                defaultChecked={settingsState.values?.geoFenceEnabled === "true"}
+                name="geoFenceEnabled"
+              />
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <OptionalInputField
+                  defaultValue={settingsState.values?.officeLatitude ?? ""}
+                  label="Office Latitude"
+                  name="officeLatitude"
+                  placeholder="e.g. 28.61390"
+                />
+                <OptionalInputField
+                  defaultValue={settingsState.values?.officeLongitude ?? ""}
+                  label="Office Longitude"
+                  name="officeLongitude"
+                  placeholder="e.g. 77.20900"
+                />
+                <OptionalInputField
+                  defaultValue={settingsState.values?.geoFenceRadiusMeters ?? "200"}
+                  label="Allowed Radius (meters)"
+                  name="geoFenceRadiusMeters"
+                  placeholder="200"
+                  type="number"
+                />
+              </div>
+              <p className="text-[0.68rem] text-emerald-700/70">
+                💡 Tip: Google Maps mein apne office par right-click karein → &quot;What&apos;s here&quot; → latitude/longitude copy karein.
+              </p>
+            </div>
+
             <Button className="sm:w-auto" disabled={settingsPending} type="submit">
               {settingsPending ? "Saving..." : "Save Settings"}
             </Button>
@@ -322,9 +440,10 @@ type InputFieldProps = {
   name: string;
   placeholder: string;
   type?: string;
+  required?: boolean;
 };
 
-function InputField({ defaultValue, label, name, placeholder, type = "text" }: InputFieldProps) {
+function InputField({ defaultValue, label, name, placeholder, type = "text", required = true }: InputFieldProps) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
@@ -335,7 +454,7 @@ function InputField({ defaultValue, label, name, placeholder, type = "text" }: I
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
-        required
+        required={required}
         type={type}
       />
     </label>
@@ -461,3 +580,4 @@ function HolidayRow({
     </div>
   );
 }
+

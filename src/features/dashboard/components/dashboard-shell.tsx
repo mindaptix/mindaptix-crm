@@ -91,7 +91,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#f4f7fb] text-slate-900 lg:h-screen lg:overflow-hidden">
-      <div className="relative mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 lg:h-screen lg:max-w-none lg:gap-0 lg:px-0 lg:py-0">
+      <div className="relative mx-auto flex min-h-screen max-w-[1680px] gap-4 px-1 py-1 sm:px-3 sm:py-3 lg:h-screen lg:max-w-none lg:gap-0 lg:px-0 lg:py-0">
         <aside
           className={`fixed inset-y-0 left-0 z-40 flex h-screen w-[308px] flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#061227_0%,#0b1730_30%,#0b2040_68%,#0a4e87_100%)] px-4 py-4 text-white shadow-[28px_0_80px_rgba(2,6,23,0.3)] transition duration-300 lg:w-[320px] lg:px-5 lg:py-5 ${desktopSidebarClasses} ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -190,9 +190,9 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
           />
         ) : null}
 
-        <section className="relative z-10 flex min-w-0 flex-1 flex-col px-1 py-1 lg:h-screen lg:overflow-y-auto lg:px-4 lg:py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] lg:min-h-[calc(100dvh-2rem)]">
-            <header className="border-b border-slate-100 px-5 py-3 sm:px-7">
+        <section className="relative z-10 flex min-w-0 flex-1 flex-col lg:h-screen lg:overflow-y-auto lg:px-4 lg:py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="min-h-screen bg-white lg:min-h-[calc(100dvh-2rem)] lg:rounded-4xl lg:border lg:border-slate-200/80 lg:shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+            <header className="border-b border-slate-100 px-4 py-3 sm:px-7">
               <div className="flex items-center gap-3">
                 <button
                   aria-label="Open sidebar"

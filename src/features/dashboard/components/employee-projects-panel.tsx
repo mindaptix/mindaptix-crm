@@ -45,7 +45,7 @@ export function EmployeeProjectsPanel({ data }: Props) {
   }, [data.projects, search, statusFilter]);
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* ── Summary Cards ── */}
       <div className="grid gap-4 sm:grid-cols-3">

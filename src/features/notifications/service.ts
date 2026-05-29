@@ -63,6 +63,19 @@ export async function getNotificationsForUser(userId: string, limit = 8) {
   return NotificationModel.find({ recipientUserId: userId }).sort({ createdAt: -1 }).limit(limit).lean();
 }
 
+export async function getUnreadAssignmentsForUser(userId: string) {
+  await connectDb();
+
+  return NotificationModel.find({
+    recipientUserId: userId,
+    type: { $in: ["TASK_ASSIGNED", "PROJECT_ASSIGNED"] },
+    readAt: null,
+  })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean();
+}
+
 export async function getAdminUserIds() {
   await connectDb();
 

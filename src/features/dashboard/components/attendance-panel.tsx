@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
 import { FormActionButton } from "@/shared/ui/form-action-button";
 import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
@@ -24,11 +24,207 @@ const MODE_BADGE: Record<WorkMode, string> = {
   FIELD:  "bg-amber-100   text-amber-700   border-amber-200",
 };
 
+type GeoStatus = "idle" | "loading" | "error";
+
+function formatWorkedHours(minutes: number): string {
+  if (!minutes || minutes <= 0) return "—";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function WorkedHoursStrip({ minutes }: { minutes: number }) {
+  const REQUIRED = 9 * 60; // 9 hours in minutes
+  const completed = minutes >= REQUIRED;
+  const pct = Math.min(100, Math.round((minutes / REQUIRED) * 100));
+  const label = formatWorkedHours(minutes);
+  const remaining = REQUIRED - minutes;
+
+  return (
+    <div className="mx-6 mt-3 rounded-xl px-4 py-3"
+      style={{
+        background: completed ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
+        border: completed ? "1px solid rgba(16,185,129,0.25)" : "1px solid rgba(245,158,11,0.25)",
+      }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{completed ? "✅" : "⏳"}</span>
+          <p className="text-[0.7rem] font-bold" style={{ color: completed ? "#6ee7b7" : "#fcd34d" }}>
+            {completed
+              ? `${label} worked — Full day complete!`
+              : `${label} worked — ${formatWorkedHours(remaining)} remaining`}
+          </p>
+        </div>
+        <span className="text-[0.65rem] font-bold" style={{ color: completed ? "#6ee7b7" : "#fcd34d" }}>
+          {pct}%
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${pct}%`,
+            background: completed
+              ? "linear-gradient(90deg,#10b981,#34d399)"
+              : "linear-gradient(90deg,#f59e0b,#fbbf24)",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function HoursCell({ minutes, status }: { minutes: number; status: string }) {
+  if (status === "NOT_MARKED" || status === "PRESENT") {
+    if (status === "PRESENT") {
+      return (
+        <span className="text-[0.65rem] font-semibold text-slate-400">In progress…</span>
+      );
+    }
+    return <span className="text-slate-300 text-sm">—</span>;
+  }
+  const REQUIRED = 9 * 60;
+  const completed = minutes >= REQUIRED;
+  const label = formatWorkedHours(minutes);
+  return (
+    <div>
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.62rem] font-bold"
+        style={
+          completed
+            ? { background: "rgba(16,185,129,0.1)", color: "#059669", border: "1px solid rgba(16,185,129,0.2)" }
+            : { background: "rgba(245,158,11,0.1)", color: "#d97706", border: "1px solid rgba(245,158,11,0.2)" }
+        }
+      >
+        {completed ? "✓" : "⏱"} {label}
+      </span>
+      {!completed && (
+        <p className="mt-0.5 text-[0.6rem] text-slate-400">
+          {formatWorkedHours(REQUIRED - minutes)} short
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AttendanceTimeCell({ datetime, dimmed = false }: { datetime: string; dimmed?: boolean }) {
+  if (!datetime || datetime === "Not marked") {
+    return <span className="text-sm text-slate-300">—</span>;
+  }
+  const parts = datetime.split(" · ");
+  const datePart = parts[0] ?? datetime;
+  const timePart = parts[1] ?? "";
+
+  return (
+    <div>
+      <p className={`text-sm font-semibold ${dimmed ? "text-slate-500" : "text-slate-800"}`}>
+        {timePart || datePart}
+      </p>
+      {timePart && (
+        <p className="mt-0.5 text-[0.68rem] text-slate-400">{datePart}</p>
+      )}
+    </div>
+  );
+}
+
+function LocationCell({
+  location,
+  status,
+}: {
+  location: { lat: number; lng: number; accuracy: number | null } | null;
+  status: string;
+}) {
+  if (status === "NOT_MARKED") {
+    return <span className="text-sm text-slate-300">—</span>;
+  }
+  if (!location) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6rem] font-semibold"
+        style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.18)" }}>
+        <svg fill="none" height="10" viewBox="0 0 24 24" width="10">
+          <path d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7Z" stroke="currentColor" strokeWidth="2" />
+          <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        Not captured
+      </span>
+    );
+  }
+  const mapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
+  const accuracyText = location.accuracy !== null ? `±${Math.round(location.accuracy)}m` : "";
+  return (
+    <a
+      href={mapsUrl}
+      rel="noopener noreferrer"
+      target="_blank"
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6rem] font-semibold transition-opacity hover:opacity-75"
+      style={{ background: "rgba(16,185,129,0.1)", color: "#059669", border: "1px solid rgba(16,185,129,0.22)" }}
+      title={`Lat: ${location.lat.toFixed(5)}, Lng: ${location.lng.toFixed(5)}${accuracyText ? ` (${accuracyText})` : ""}`}
+    >
+      <svg fill="none" height="10" viewBox="0 0 24 24" width="10">
+        <path d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7Z" stroke="currentColor" strokeWidth="2" />
+        <circle cx="12" cy="9" r="2.5" fill="currentColor" />
+      </svg>
+      View on Map
+      {accuracyText && <span className="opacity-60 ml-0.5">{accuracyText}</span>}
+    </a>
+  );
+}
+
 export function AttendancePanel({ data }: AttendancePanelProps) {
   const [workMode, setWorkMode] = useState<WorkMode>("OFFICE");
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [checkInPending, startCheckIn] = useTransition();
 
   const checkedIn  = !!data.todayRecord?.checkInAt  && data.todayRecord.checkInAt  !== "Not marked";
   const checkedOut = !!data.todayRecord?.checkOutAt && data.todayRecord.checkOutAt !== "Not marked";
+
+  async function handleCheckIn() {
+    setGeoError(null);
+    setGeoStatus("loading");
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let accuracy: number | null = null;
+
+    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
+          })
+        );
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
+        accuracy = position.coords.accuracy;
+      } catch {
+        setGeoStatus("error");
+        setGeoError("Location access denied. Browser mein location permission allow karein aur dobara try karein.");
+        return;
+      }
+    }
+
+    setGeoStatus("idle");
+
+    const fd = new FormData();
+    fd.set("workMode", workMode);
+    if (lat !== null) fd.set("lat", String(lat));
+    if (lng !== null) fd.set("lng", String(lng));
+    if (accuracy !== null) fd.set("accuracy", String(accuracy));
+
+    startCheckIn(async () => {
+      try {
+        await checkInAttendance(fd);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Check-in fail ho gaya. Dobara try karein.";
+        setGeoError(msg);
+      }
+    });
+  }
 
   const presentToday = data.todayRecords.filter((r) => r.status !== "NOT_MARKED").length;
   const absentToday  = data.todayRecords.filter((r) => r.status === "NOT_MARKED").length;
@@ -36,7 +232,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
   const wfhToday     = data.todayRecords.filter((r) => r.workMode === "WFH").length;
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -113,15 +309,9 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
               <TimeBox label="Check Out" time={data.todayRecord?.checkOutAt ?? null} accent="sky" />
             </div>
 
-            {/* Late warning */}
-            {data.todayRecord?.isLate && (
-              <div className="mx-6 mt-3 flex items-center gap-2.5 rounded-xl px-4 py-2.5"
-                style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                <span className="text-base">⚠️</span>
-                <p className="text-[0.7rem] font-semibold text-rose-300">
-                  Late arrival — {data.todayRecord.lateByMinutes} min after scheduled time
-                </p>
-              </div>
+            {/* Worked hours strip — shows after checkout */}
+            {data.todayRecord?.status === "COMPLETED" && data.todayRecord.workedMinutes > 0 && (
+              <WorkedHoursStrip minutes={data.todayRecord.workedMinutes} />
             )}
 
             {/* Work mode */}
@@ -156,19 +346,35 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
               </div>
             </div>
 
+            {/* Geo error */}
+            {geoError && (
+              <div className="mx-6 mt-3 flex items-start gap-2.5 rounded-xl px-4 py-2.5"
+                style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)" }}>
+                <span className="mt-0.5 shrink-0 text-base">📍</span>
+                <p className="text-[0.68rem] font-semibold leading-relaxed text-rose-300">{geoError}</p>
+              </div>
+            )}
+
+            {/* GPS acquiring indicator */}
+            {geoStatus === "loading" && (
+              <div className="mx-6 mt-3 flex items-center gap-2.5 rounded-xl px-4 py-2.5"
+                style={{ background: "rgba(14,165,233,0.12)", border: "1px solid rgba(14,165,233,0.25)" }}>
+                <span className="h-2 w-2 animate-ping rounded-full bg-sky-400" />
+                <p className="text-[0.68rem] font-semibold text-sky-300">Location detect ho rahi hai…</p>
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="mt-5 grid grid-cols-2 gap-3 px-6 pb-6">
-              <form action={checkInAttendance} className="contents">
-                <input name="workMode" type="hidden" value={workMode} />
-                <FormActionButton
-                  className="w-full rounded-xl py-3.5 text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.4)] transition-all hover:brightness-105 active:scale-[0.98]"
-                  style={{ background: "linear-gradient(135deg,#10b981,#0d9488)", color: "#fff", border: "none" }}
-                  pendingLabel="Checking in…"
-                  type="submit"
-                >
-                  ↗ Check In
-                </FormActionButton>
-              </form>
+              <button
+                type="button"
+                disabled={checkInPending || geoStatus === "loading"}
+                onClick={handleCheckIn}
+                className="w-full rounded-xl py-3.5 text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.4)] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ background: "linear-gradient(135deg,#10b981,#0d9488)", color: "#fff", border: "none" }}
+              >
+                {checkInPending || geoStatus === "loading" ? "📍 Locating…" : "↗ Check In"}
+              </button>
               <form action={checkOutAttendance} className="contents">
                 <FormActionButton
                   className="w-full rounded-xl py-3.5 text-sm font-bold transition-all hover:brightness-110 active:scale-[0.98]"
@@ -223,8 +429,12 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                     <th className="px-5 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Employee</th>
                     <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Check In</th>
                     <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Check Out</th>
+                    <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Hours</th>
                     <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Mode</th>
                     <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Status</th>
+                    {data.canViewLocation && (
+                      <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Location</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -249,16 +459,19 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="text-sm font-semibold text-slate-700">{record.checkInAt || "—"}</p>
+                        <AttendanceTimeCell datetime={record.checkInAt} />
                         {record.isLate && (
-                          <span className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6rem] font-bold"
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6rem] font-bold"
                             style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}>
                             ⏱ Late +{record.lateByMinutes}m
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <p className="text-sm text-slate-500">{record.checkOutAt || <span className="text-slate-300">Not marked</span>}</p>
+                        <AttendanceTimeCell datetime={record.checkOutAt} dimmed />
+                      </td>
+                      <td className="px-4 py-4">
+                        <HoursCell minutes={record.workedMinutes} status={record.status} />
                       </td>
                       <td className="px-4 py-4">
                         {record.workMode ? (
@@ -272,6 +485,11 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                       <td className="px-4 py-4">
                         <StatusChip status={record.status} />
                       </td>
+                      {data.canViewLocation && (
+                        <td className="px-4 py-4">
+                          <LocationCell location={record.checkInLocation ?? null} status={record.status} />
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -391,13 +609,29 @@ function LiveClock() {
 function TimeBox({ label, time, accent }: { label: string; time: string | null; accent: "emerald" | "sky" }) {
   const accentColor = accent === "emerald" ? "rgba(52,211,153,0.5)" : "rgba(56,189,248,0.5)";
   const textColor   = accent === "emerald" ? "#6ee7b7" : "#7dd3fc";
+
+  const parts = time ? time.split(" · ") : [];
+  const datePart = parts[0] ?? null;
+  const timePart = parts[1] ?? null;
+
   return (
     <div className="rounded-xl px-4 py-3"
       style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
       <p className="text-[0.58rem] font-bold uppercase tracking-[0.24em]" style={{ color: accentColor }}>{label}</p>
-      <p className={`mt-1.5 text-base font-bold`} style={{ color: time ? textColor : "rgba(255,255,255,0.2)" }}>
-        {time ?? "Not marked"}
-      </p>
+      {time && timePart ? (
+        <>
+          <p className="mt-1.5 text-base font-bold uppercase" style={{ color: textColor }}>
+            {timePart}
+          </p>
+          <p className="mt-0.5 text-[0.62rem] font-medium" style={{ color: "rgba(255,255,255,0.4)" }}>
+            {datePart}
+          </p>
+        </>
+      ) : (
+        <p className="mt-1.5 text-base font-bold" style={{ color: "rgba(255,255,255,0.2)" }}>
+          Not marked
+        </p>
+      )}
     </div>
   );
 }

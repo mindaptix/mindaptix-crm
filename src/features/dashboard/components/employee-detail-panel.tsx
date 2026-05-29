@@ -274,7 +274,7 @@ export function EmployeeDetailPanel({ data }: { data: EmployeeDetailData }) {
         </div>
 
         {/* ── Tab Navigation ── */}
-        <div className="overflow-x-auto rounded-[1.6rem] border border-slate-200 bg-white px-2 py-2 shadow-sm">
+        <div className="overflow-x-auto rounded-[1.6rem] border border-slate-200 bg-white px-2 py-2 shadow-sm [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max gap-1">
             {tabs.map((tab) => (
               <button
@@ -670,7 +670,7 @@ function AttendanceLeaveTab({
         <section className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-[0.62rem] font-bold uppercase tracking-[0.26em] text-blue-600">Leave Balance</p>
           <h4 className="mt-1 text-lg font-bold text-slate-900">Current Year Quota</h4>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {[
               { label: "Paid Leave", total: leaveBalance.paidLeaveTotal, used: leaveBalance.paidLeaveUsed, remaining: leaveBalance.paidLeaveRemaining, color: "#2563eb" },
               { label: "Sick Leave", total: leaveBalance.sickLeaveTotal, used: leaveBalance.sickLeaveUsed, remaining: leaveBalance.sickLeaveRemaining, color: "#f59e0b" },

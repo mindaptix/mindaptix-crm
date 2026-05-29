@@ -105,10 +105,10 @@ export function AdminDashboardOverview({
   const activeExecutiveSection = executiveSections?.find((section) => section.id === activeExecutiveSectionId) ?? executiveSections?.[0];
 
   return (
-    <div className="space-y-4 px-5 pb-5 pt-1 sm:px-7 sm:pb-6 sm:pt-1">
+    <div className="space-y-4 px-3 pb-4 pt-1 sm:px-7 sm:pb-6 sm:pt-1">
       {executiveSections?.length ? (
-        <section className="overflow-hidden rounded-[2.2rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),linear-gradient(180deg,#eff6ff_0%,#ffffff_42%,#f8fafc_100%)] p-4 shadow-[0_18px_42px_rgba(15,23,42,0.06)]">
-          <div className="rounded-[1.8rem] border border-white/70 bg-white/75 p-4 backdrop-blur">
+        <section className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),linear-gradient(180deg,#eff6ff_0%,#ffffff_42%,#f8fafc_100%)] p-2 shadow-[0_18px_42px_rgba(15,23,42,0.06)] sm:rounded-[2.2rem] sm:p-4">
+          <div className="rounded-[1.3rem] border border-white/70 bg-white/75 p-3 backdrop-blur sm:rounded-[1.8rem] sm:p-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600">Executive Summary</p>
@@ -129,7 +129,7 @@ export function AdminDashboardOverview({
 
               return (
                 <button
-                  className={`group relative overflow-hidden rounded-[1.7rem] border p-4 text-left transition duration-200 ${accent.card}`}
+                  className={`group relative overflow-hidden rounded-[1.3rem] border p-3 text-left transition duration-200 sm:rounded-[1.7rem] sm:p-4 ${accent.card}`}
                   key={section.id}
                   onClick={() => setActiveExecutiveSectionId(section.id)}
                   type="button"
@@ -142,8 +142,8 @@ export function AdminDashboardOverview({
                     </span>
                   </div>
                   <h4 className={`mt-4 text-[1.15rem] font-semibold tracking-tight ${accent.title}`}>{section.title}</h4>
-                  <div className="mt-3 grid gap-2">
-                    <div className={`rounded-[1.2rem] border px-4 py-3 ${accent.metricShell}`}>
+                  <div className="mt-2 grid gap-2 sm:mt-3">
+                    <div className={`rounded-[1rem] border px-3 py-2.5 sm:rounded-[1.2rem] sm:px-4 sm:py-3 ${accent.metricShell}`}>
                       <div className="flex items-end justify-between gap-3">
                         <div>
                           <p className={`text-[0.65rem] font-semibold uppercase tracking-[0.2em] ${accent.metricLabel}`}>{leadMetric?.label ?? "Overview"}</p>
@@ -322,7 +322,7 @@ export function AdminDashboardOverview({
       {!executiveSections?.length && employeeProjectRows?.length ? <EmployeeProjectPanel rows={employeeProjectRows} /> : null}
 
       {!executiveSections?.length ? (
-        <section className="grid gap-6 xl:grid-cols-2">
+        <section className="grid gap-6 md:grid-cols-2">
           <ListPanel emptyMessage={primaryEmptyMessage} items={primaryItems} title={primaryListTitle} />
           <ListPanel emptyMessage={secondaryEmptyMessage} items={secondaryItems} title={secondaryListTitle} />
         </section>
@@ -344,7 +344,7 @@ export function AdminDashboardOverview({
       ) : null}
 
       {!executiveSections?.length && (notifications?.length || calendarItems?.length) ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <section className="grid gap-6 md:grid-cols-2">
           <NotificationPanel items={notifications ?? []} title={notificationTitle ?? "Notifications"} />
           <CalendarPanel items={calendarItems ?? []} title={calendarTitle ?? "Calendar"} />
         </section>

@@ -54,11 +54,20 @@ const attendanceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    workedMinutes: {
+      type: Number,
+      default: 0,
+    },
     regularizationReason: {
       type: String,
       trim: true,
       maxlength: 300,
       default: "",
+    },
+    checkInLocation: {
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+      accuracy: { type: Number, default: null },
     },
   },
   baseSchemaOptions,

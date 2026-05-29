@@ -13,11 +13,26 @@ type WorkMode = (typeof VALID_WORK_MODES)[number];
 type CompanySettings = {
   workStart?: string;
   lateGraceMinutes?: number;
+  officeLatitude?: number | null;
+  officeLongitude?: number | null;
+  geoFenceRadiusMeters?: number;
+  geoFenceEnabled?: boolean;
 };
 
 function parseTimeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return (h ?? 0) * 60 + (m ?? 0);
+}
+
+function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export async function checkInAttendance(formData: FormData) {
@@ -30,6 +45,13 @@ export async function checkInAttendance(formData: FormData) {
   const rawMode = String(formData.get("workMode") ?? "OFFICE");
   const workMode: WorkMode = VALID_WORK_MODES.includes(rawMode as WorkMode) ? (rawMode as WorkMode) : "OFFICE";
 
+  const latRaw = formData.get("lat");
+  const lngRaw = formData.get("lng");
+  const accuracyRaw = formData.get("accuracy");
+  const employeeLat = latRaw !== null && latRaw !== "" ? parseFloat(String(latRaw)) : null;
+  const employeeLng = lngRaw !== null && lngRaw !== "" ? parseFloat(String(lngRaw)) : null;
+  const employeeAccuracy = accuracyRaw !== null && accuracyRaw !== "" ? parseFloat(String(accuracyRaw)) : null;
+
   await connectDb();
 
   const now = new Date();
@@ -40,11 +62,33 @@ export async function checkInAttendance(formData: FormData) {
   const companySettings = (settings ?? {}) as unknown as Partial<CompanySettings>;
   const workStart: string = companySettings.workStart ?? "09:00";
   const lateGraceMinutes: number = Number(companySettings.lateGraceMinutes ?? 15);
+  const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? false);
+  const officeLatitude = companySettings.officeLatitude ?? null;
+  const officeLongitude = companySettings.officeLongitude ?? null;
+  const geoFenceRadius = Number(companySettings.geoFenceRadiusMeters ?? 200);
+
+  if (geoFenceEnabled && workMode === "OFFICE") {
+    if (employeeLat === null || employeeLng === null || isNaN(employeeLat) || isNaN(employeeLng)) {
+      throw new Error("Attendance mark karne ke liye location permission den. Browser mein location enable karein.");
+    }
+    if (officeLatitude === null || officeLongitude === null) {
+      throw new Error("Office ki location abhi configure nahi ki gayi. Admin se sampark karein.");
+    }
+    const distance = haversineDistanceMeters(employeeLat, employeeLng, officeLatitude, officeLongitude);
+    if (distance > geoFenceRadius) {
+      throw new Error(`Aap office se ${Math.round(distance)} meter door hain. Office mein aakr hi attendance mark kar sakte hain (allowed range: ${geoFenceRadius}m).`);
+    }
+  }
 
   const currentMinutes = parseTimeToMinutes(currentTimeKey);
   const graceDeadlineMinutes = parseTimeToMinutes(workStart) + lateGraceMinutes;
   const isLate = currentMinutes > graceDeadlineMinutes;
   const lateByMinutes = isLate ? currentMinutes - parseTimeToMinutes(workStart) : 0;
+
+  const checkInLocation =
+    employeeLat !== null && employeeLng !== null
+      ? { lat: employeeLat, lng: employeeLng, accuracy: employeeAccuracy }
+      : undefined;
 
   await AttendanceModel.findOneAndUpdate(
     { userId: session.user.id, dateKey },
@@ -57,6 +101,7 @@ export async function checkInAttendance(formData: FormData) {
         workMode,
         isLate,
         lateByMinutes,
+        ...(checkInLocation ? { checkInLocation } : {}),
       },
     },
     { returnDocument: "after", upsert: true },
@@ -85,12 +130,18 @@ export async function checkOutAttendance() {
     throw new Error("Check in first before checking out.");
   }
 
+  const checkInAt = existingAttendance.checkInAt;
+  const workedMinutes = checkInAt
+    ? Math.max(0, Math.round((now.getTime() - new Date(checkInAt).getTime()) / 60000))
+    : 0;
+
   await AttendanceModel.findOneAndUpdate(
     { userId: session.user.id, dateKey },
     {
       $set: {
         checkOutAt: now,
         status: "COMPLETED",
+        workedMinutes,
       },
     },
   );

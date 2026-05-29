@@ -447,7 +447,7 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
   }
 
   return (
-    <div className="space-y-5 px-5 pb-5 pt-2 sm:px-7 sm:pb-6">
+    <div className="space-y-5 px-3 pb-3 pt-2 sm:px-7 sm:pb-6">
 
       {/* ── Page header ── */}
       <div className="overflow-hidden rounded-[2.2rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_30%),linear-gradient(180deg,#fffbeb_0%,#ffffff_45%,#f8fafc_100%)] p-5 shadow-[0_18px_42px_rgba(15,23,42,0.06)]">

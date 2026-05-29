@@ -2,7 +2,7 @@ import "server-only";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
 import { getVisibleUserIdsForSession } from "@/features/dashboard/team-scope";
-import { syncWorkflowNotifications, getNotificationsForUser } from "@/features/notifications/service";
+import { syncWorkflowNotifications, getNotificationsForUser, getUnreadAssignmentsForUser } from "@/features/notifications/service";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
 import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
 import { LeaveRequestModel } from "@/database/mongodb/models/leave-request";
@@ -331,18 +331,29 @@ export async function getDashboardOverviewData(session: AuthenticatedSession): P
     };
   }
 
-  const [attendanceRow, pendingLeaves, openTasks, projectCount, dsrCount, taskRows] = await Promise.all([
+  const [attendanceRow, pendingLeaves, openTasks, projectCount, dsrCount, taskRows, rawUnread] = await Promise.all([
     AttendanceModel.findOne({ userId: session.user.id, dateKey: today }).lean(),
     LeaveRequestModel.countDocuments({ userId: session.user.id, status: "PENDING" }),
     TaskModel.countDocuments({ assignedUserId: session.user.id, status: { $ne: "COMPLETED" } }),
     ProjectModel.countDocuments({ assignedUserIds: session.user.id }),
     DailyUpdateModel.countDocuments({ userId: session.user.id, workDate: today }),
     TaskModel.find({ assignedUserId: session.user.id }, { title: 1, dueDate: 1, status: 1, priority: 1 }).sort({ createdAt: -1 }).limit(5).lean(),
+    getUnreadAssignmentsForUser(session.user.id),
   ]);
+
+  const unreadAssignments = rawUnread.map((n) => ({
+    id: n._id.toString(),
+    type: n.type as "TASK_ASSIGNED" | "PROJECT_ASSIGNED",
+    title: n.title,
+    message: n.message,
+    actionUrl: n.actionUrl ?? "",
+    createdAt: n.createdAt ? new Date(n.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "",
+  }));
 
   return {
     title: "Employee Dashboard",
     description: "Personal workflow view for attendance, assigned tasks, DSR discipline, and upcoming work.",
+    unreadAssignments,
     cards: [
       { label: "Attendance", value: attendanceRow ? formatLabel(attendanceRow.status) : "Not Marked", detail: "Your current attendance status for today." },
       { label: "Pending Leaves", value: String(pendingLeaves), detail: "Your leave requests waiting for review." },
@@ -808,8 +819,11 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
     monthlyMap.set(record.userId, entry);
   }
 
+  const canViewLocation = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
   return {
     canMarkAttendance: session.user.role === "EMPLOYEE",
+    canViewLocation,
     summaryCards: [
       { label: "Present Today", value: String(presentCount), detail: "Attendance entries marked for today." },
       { label: "Checked Out", value: String(completedCount), detail: "People who have completed checkout." },
@@ -830,6 +844,8 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           isLate: readBoolean(toRecord(todayRecord).isLate) ?? false,
           lateByMinutes: readNumberLike(toRecord(todayRecord).lateByMinutes) ?? 0,
           overtimeMinutes: readNumberLike(toRecord(todayRecord).overtimeMinutes) ?? 0,
+          workedMinutes: readNumberLike(toRecord(todayRecord).workedMinutes) ?? 0,
+          checkInLocation: null,
         }
       : null,
     todayRecords: activeUsers
@@ -850,8 +866,19 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
             isLate: false,
             lateByMinutes: 0,
             overtimeMinutes: 0,
+            workedMinutes: 0,
           };
         }
+
+        const rawLocation = (toRecord(record).checkInLocation ?? null) as { lat?: unknown; lng?: unknown; accuracy?: unknown } | null;
+        const checkInLocation =
+          canViewLocation && rawLocation && typeof rawLocation.lat === "number" && typeof rawLocation.lng === "number"
+            ? {
+                lat: rawLocation.lat,
+                lng: rawLocation.lng,
+                accuracy: typeof rawLocation.accuracy === "number" ? rawLocation.accuracy : null,
+              }
+            : null;
 
         return {
           id: record._id.toString(),
@@ -866,6 +893,8 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           isLate: readBoolean(toRecord(record).isLate) ?? false,
           lateByMinutes: readNumberLike(toRecord(record).lateByMinutes) ?? 0,
           overtimeMinutes: readNumberLike(toRecord(record).overtimeMinutes) ?? 0,
+          workedMinutes: readNumberLike(toRecord(record).workedMinutes) ?? 0,
+          checkInLocation,
         };
       })
       .sort((left, right) => {
@@ -1421,6 +1450,10 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     workingDays: readNumberLike(toRecord(settings).workingDays) ?? 26,
     salaryDay: readNumberLike(toRecord(settings).salaryDay) ?? 1,
     lateGraceMinutes: readNumberLike(toRecord(settings).lateGraceMinutes) ?? 15,
+    officeLatitude: readNumberLike(toRecord(settings).officeLatitude) ?? null,
+    officeLongitude: readNumberLike(toRecord(settings).officeLongitude) ?? null,
+    geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 200,
+    geoFenceEnabled: Boolean(toRecord(settings).geoFenceEnabled ?? false),
     holidays: holidays.map((h) => ({
       id: h._id.toString(),
       name: h.name,

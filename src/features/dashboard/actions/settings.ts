@@ -21,6 +21,10 @@ type SettingsState = {
     workingDays?: string;
     salaryDay?: string;
     lateGraceMinutes?: string;
+    officeLatitude?: string;
+    officeLongitude?: string;
+    geoFenceRadiusMeters?: string;
+    geoFenceEnabled?: string;
   };
 };
 
@@ -41,11 +45,24 @@ export async function updateCompanySettings(
   const workingDays = parseInt(String(formData.get("workingDays") ?? "26"), 10);
   const salaryDay = parseInt(String(formData.get("salaryDay") ?? "1"), 10);
   const lateGraceMinutes = parseInt(String(formData.get("lateGraceMinutes") ?? "15"), 10);
+  const officeLatitudeRaw = String(formData.get("officeLatitude") ?? "").trim();
+  const officeLongitudeRaw = String(formData.get("officeLongitude") ?? "").trim();
+  const geoFenceRadiusMeters = parseInt(String(formData.get("geoFenceRadiusMeters") ?? "200"), 10);
+  const geoFenceEnabled = formData.get("geoFenceEnabled") === "true";
+  const officeLatitude = officeLatitudeRaw !== "" ? parseFloat(officeLatitudeRaw) : null;
+  const officeLongitude = officeLongitudeRaw !== "" ? parseFloat(officeLongitudeRaw) : null;
 
   if (companyName.length < 2 || !/^\d{2}:\d{2}$/.test(workStart) || !/^\d{2}:\d{2}$/.test(workEnd)) {
     return {
       error: "Enter company name and valid working hours.",
       values: { companyName, workStart, workEnd, leavePolicy },
+    };
+  }
+
+  if (geoFenceEnabled && (officeLatitude === null || officeLongitude === null || isNaN(officeLatitude) || isNaN(officeLongitude))) {
+    return {
+      error: "Geo-fence enable karne ke liye office ka latitude aur longitude dena zaroori hai.",
+      values: { companyName, workStart, workEnd, leavePolicy, officeLatitude: officeLatitudeRaw, officeLongitude: officeLongitudeRaw, geoFenceEnabled: "true" },
     };
   }
 
@@ -61,6 +78,10 @@ export async function updateCompanySettings(
       workingDays: isNaN(workingDays) ? 26 : workingDays,
       salaryDay: isNaN(salaryDay) ? 1 : salaryDay,
       lateGraceMinutes: isNaN(lateGraceMinutes) ? 15 : lateGraceMinutes,
+      officeLatitude,
+      officeLongitude,
+      geoFenceRadiusMeters: isNaN(geoFenceRadiusMeters) ? 200 : geoFenceRadiusMeters,
+      geoFenceEnabled,
     },
     { upsert: true, new: true },
   );
@@ -80,7 +101,19 @@ export async function updateCompanySettings(
 
   return {
     success: "Settings updated successfully.",
-    values: { companyName, workStart, workEnd, leavePolicy, workingDays: String(workingDays), salaryDay: String(salaryDay), lateGraceMinutes: String(lateGraceMinutes) },
+    values: {
+      companyName,
+      workStart,
+      workEnd,
+      leavePolicy,
+      workingDays: String(workingDays),
+      salaryDay: String(salaryDay),
+      lateGraceMinutes: String(lateGraceMinutes),
+      officeLatitude: officeLatitude !== null ? String(officeLatitude) : "",
+      officeLongitude: officeLongitude !== null ? String(officeLongitude) : "",
+      geoFenceRadiusMeters: String(isNaN(geoFenceRadiusMeters) ? 200 : geoFenceRadiusMeters),
+      geoFenceEnabled: String(geoFenceEnabled),
+    },
   };
 }
 

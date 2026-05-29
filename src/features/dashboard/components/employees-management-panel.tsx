@@ -259,7 +259,7 @@ export function EmployeesManagementPanel({
   }, [isEditModalOpen, lastUpdateSuccess, updateUserState.success]);
 
   return (
-    <div className="space-y-6 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-6 px-3 py-3 sm:px-7 sm:py-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map((card) => (
           <OverviewCard detail={card.detail} key={card.label} label={card.label} value={card.value} />

@@ -61,7 +61,7 @@ export function LeavesPanel({ canApply, canReview, data }: LeavesPanelProps) {
   }, [refreshLeavesView]);
 
   return (
-    <div className="space-y-6 overflow-x-hidden px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-6 overflow-x-hidden px-3 py-3 sm:px-7 sm:py-6">
       {!isLeadershipReviewView ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {data.summaryCards.map((card) => (

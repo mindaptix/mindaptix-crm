@@ -289,7 +289,7 @@ export function ProjectDetailPanel({ data }: { data: ProjectDetailData }) {
         </div>
 
         {/* ── Tab Navigation ── */}
-        <div className="overflow-x-auto rounded-[1.6rem] border border-slate-200 bg-white px-2 py-2 shadow-sm">
+        <div className="overflow-x-auto rounded-[1.6rem] border border-slate-200 bg-white px-2 py-2 shadow-sm [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max gap-1">
             {tabs.map((tab) => (
               <button
@@ -651,7 +651,7 @@ function PaymentsTab({
   return (
     <div className="space-y-4">
       {/* Summary strip */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           { label: "Total Value", value: formatCurrency(totalPayment), color: "text-slate-900", bg: "bg-slate-50 border-slate-200" },
           { label: "Received", value: formatCurrency(totalReceived), color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-100" },

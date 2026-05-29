@@ -31,6 +31,22 @@ const settingSchema = new mongoose.Schema(
       maxlength: 600,
       default: "Paid Leave and Sick Leave are available for approved requests.",
     },
+    officeLatitude: {
+      type: Number,
+      default: null,
+    },
+    officeLongitude: {
+      type: Number,
+      default: null,
+    },
+    geoFenceRadiusMeters: {
+      type: Number,
+      default: 200,
+    },
+    geoFenceEnabled: {
+      type: Boolean,
+      default: false,
+    },
   },
   baseSchemaOptions,
 );

@@ -85,7 +85,7 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
   const high_count     = data.tasks.filter((t) => t.priority === "HIGH").length;
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

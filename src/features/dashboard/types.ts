@@ -80,10 +80,20 @@ export type ExecutiveOverviewSection = {
   emptyMessage: string;
 };
 
+export type UnreadAssignment = {
+  id: string;
+  type: "TASK_ASSIGNED" | "PROJECT_ASSIGNED";
+  title: string;
+  message: string;
+  actionUrl: string;
+  createdAt: string;
+};
+
 export type DashboardOverviewData = {
   title: string;
   description: string;
   cards: SummaryCard[];
+  unreadAssignments?: UnreadAssignment[];
   priorityAlert?: {
     title: string;
     detail: string;
@@ -310,6 +320,8 @@ export type AttendanceRecordView = {
   isLate: boolean;
   lateByMinutes: number;
   overtimeMinutes: number;
+  workedMinutes: number;
+  checkInLocation?: { lat: number; lng: number; accuracy: number | null } | null;
 };
 
 export type AttendanceMonthlyRow = {
@@ -321,6 +333,7 @@ export type AttendanceMonthlyRow = {
 
 export type AttendancePageData = {
   canMarkAttendance: boolean;
+  canViewLocation: boolean;
   summaryCards: SummaryCard[];
   todayRecord: AttendanceRecordView | null;
   todayRecords: AttendanceRecordView[];
@@ -528,6 +541,10 @@ export type SettingsPageData = {
   salaryDay: number;
   lateGraceMinutes: number;
   holidays: HolidayEntry[];
+  officeLatitude: number | null;
+  officeLongitude: number | null;
+  geoFenceRadiusMeters: number;
+  geoFenceEnabled: boolean;
 };
 
 // ─── Salary & Payroll ───────────────────────────────────────────────────────

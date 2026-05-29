@@ -31,7 +31,7 @@ export function AnnouncementsPanel({ data }: AnnouncementsPanelProps) {
   const regular = data.announcements.filter((announcement) => !announcement.isPinned);
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
       <section className="overflow-hidden rounded-[2rem] border border-amber-100 bg-[linear-gradient(135deg,#fffbeb_0%,#ffffff_52%,#f8fafc_100%)] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">

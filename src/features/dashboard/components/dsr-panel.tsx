@@ -42,7 +42,7 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
   }, [state.success]);
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -85,7 +85,7 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
         </div>
         <div className="p-5">
           {data.projects.length ? (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               {data.projects.map((p) => <EmployeeProjectCard key={p.id} project={p} />)}
             </div>
           ) : (
@@ -131,7 +131,7 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
               defaultValue={state.values?.summary} />
 
             {/* 3-column textarea grid */}
-            <div className="grid gap-4 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <DsrTextArea
                 icon="✅"
                 label="Completed Work"
@@ -240,7 +240,7 @@ function DsrReviewPanel({
       }));
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* Stat cards */}
       <div className={`grid gap-3 ${statCards.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>

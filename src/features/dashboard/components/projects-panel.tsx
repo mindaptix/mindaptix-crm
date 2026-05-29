@@ -112,7 +112,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
   }, [lastUpdateSuccess, updateState.success]);
 
   return (
-    <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* ── Header gradient card ── */}
       <section className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#0f172a_0%,#1e3a5f_52%,#0f4c81_100%)] p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">

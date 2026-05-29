@@ -49,13 +49,26 @@ export function formatIndiaTimeKey(value: Date | string | number = new Date()) {
 }
 
 export function formatIndiaDateTime(value: Date | string | number) {
-  const dateKey = formatIndiaDateKey(value);
-  const timeKey = formatIndiaTimeKey(value);
+  const date = value instanceof Date ? value : new Date(value);
 
-  if (!dateKey || !timeKey) {
+  if (Number.isNaN(date.getTime())) {
     return "Not marked";
   }
 
-  return `${dateKey} ${timeKey}`;
+  const datePart = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+
+  const timePart = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+
+  return `${datePart} · ${timePart}`;
 }
 
