@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ClientPaymentEntry, PaymentsPageData } from "@/features/dashboard/types";
 import {
   createClientPayment,
@@ -66,6 +67,140 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
   );
 }
 
+// ─── ComboField — input + portal dropdown ────────────────────────────────────
+
+function ComboField({
+  label,
+  name,
+  onChange,
+  options,
+  placeholder,
+  required,
+  value,
+}: {
+  label: string;
+  name: string;
+  onChange: (val: string) => void;
+  options: string[];
+  placeholder: string;
+  required?: boolean;
+  value: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  // Keep local search in sync when parent value changes (e.g. auto-fill)
+  useEffect(() => { setSearch(value); }, [value]);
+
+  // Reposition dropdown when it opens
+  useEffect(() => {
+    if (!open || !inputRef.current) return;
+    const r = inputRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, [open]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(e: PointerEvent) {
+      const t = e.target as Node;
+      if (!inputRef.current?.contains(t) && !dropdownRef.current?.contains(t)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [open]);
+
+  // Close on scroll / resize
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? options.filter((o) => o.toLowerCase().includes(q)) : options;
+  }, [options, search]);
+
+  function handleInput(val: string) {
+    setSearch(val);
+    onChange(val);
+    setOpen(true);
+  }
+
+  function handleSelect(val: string) {
+    setSearch(val);
+    onChange(val);
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative">
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}{required ? " *" : ""}</label>
+      {/* Hidden input carries the value into FormData */}
+      <input name={name} type="hidden" value={value} />
+      <div className="relative">
+        <input
+          autoComplete="off"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 pr-9"
+          onBlur={() => { /* don't close on blur — let pointerdown handle it */ }}
+          onChange={(e) => handleInput(e.target.value)}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          ref={inputRef}
+          required={required}
+          value={search}
+        />
+        {/* Chevron */}
+        <button
+          className="absolute inset-y-0 right-2.5 flex items-center text-slate-400 hover:text-slate-600"
+          onClick={() => setOpen((v) => !v)}
+          tabIndex={-1}
+          type="button"
+        >
+          <svg className={`transition-transform ${open ? "rotate-180" : ""}`} fill="none" height="14" viewBox="0 0 24 24" width="14">
+            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          </svg>
+        </button>
+      </div>
+      {options.length > 0 ? (
+        <p className="mt-1 text-[0.65rem] text-slate-400">{options.length} option{options.length !== 1 ? "s" : ""} available · ya khud type karein</p>
+      ) : null}
+
+      {/* Portal dropdown */}
+      {open && typeof document !== "undefined" ? createPortal(
+        <div
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_16px_48px_rgba(15,23,42,0.16)]"
+          ref={dropdownRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 9999, maxHeight: "14rem", overflowY: "auto" }}
+        >
+          {filtered.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-slate-400">No matches — type to use custom value</p>
+          ) : (
+            filtered.map((opt) => (
+              <button
+                className={`w-full px-4 py-2.5 text-left text-sm transition-colors hover:bg-blue-50 hover:text-blue-800 ${opt === value ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-700"}`}
+                key={opt}
+                onPointerDown={(e) => { e.preventDefault(); handleSelect(opt); }}
+                type="button"
+              >
+                {opt}
+                {opt === value ? <span className="ml-2 text-[0.6rem] font-bold text-blue-500">✓</span> : null}
+              </button>
+            ))
+          )}
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  );
+}
+
 // ─── Payment form (create / edit) ───────────────────────────────────────────
 
 function PaymentForm({
@@ -98,28 +233,42 @@ function PaymentForm({
       : {},
   });
 
-  const [selectedClient, setSelectedClient] = useState(initial?.clientName ?? "");
+  const v = state.values ?? {};
 
-  // Unique client names from projects
-  const clientNames = useMemo(
-    () => Array.from(new Set(suggestions.map((s) => s.clientName).filter(Boolean))).sort(),
-    [suggestions],
-  );
+  // Controlled state for both fields so they can auto-fill each other
+  const [clientName, setClientName] = useState(v.clientName ?? initial?.clientName ?? "");
+  const [projectName, setProjectName] = useState(v.projectName ?? initial?.projectName ?? "");
 
-  // Project names filtered by the currently typed/selected client (or all if blank)
-  const filteredProjectNames = useMemo(() => {
-    const trimmed = selectedClient.trim().toLowerCase();
-    const matched = trimmed
-      ? suggestions.filter((s) => s.clientName.toLowerCase() === trimmed).map((s) => s.projectName)
-      : suggestions.map((s) => s.projectName);
-    return Array.from(new Set(matched.filter(Boolean))).sort();
-  }, [suggestions, selectedClient]);
+  // Sync controlled state if server returns values after validation error
+  useEffect(() => {
+    if (v.clientName !== undefined) setClientName(v.clientName);
+    if (v.projectName !== undefined) setProjectName(v.projectName);
+  }, [v.clientName, v.projectName]);
 
   useEffect(() => {
     if (state.success) onSuccess();
   }, [state.success, onSuccess]);
 
-  const v = state.values ?? {};
+  // Unique client names from all projects
+  const clientNames = useMemo(
+    () => Array.from(new Set(suggestions.map((s) => s.clientName).filter(Boolean))).sort(),
+    [suggestions],
+  );
+
+  // All project names (always show every project in dropdown)
+  const allProjectNames = useMemo(
+    () => Array.from(new Set(suggestions.map((s) => s.projectName).filter(Boolean))).sort(),
+    [suggestions],
+  );
+
+  // When project is selected from datalist → auto-fill client name if project has one
+  function handleProjectChange(value: string) {
+    setProjectName(value);
+    const match = suggestions.find((s) => s.projectName === value);
+    if (match?.clientName) {
+      setClientName(match.clientName);
+    }
+  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -132,54 +281,26 @@ function PaymentForm({
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{state.success}</div>
       ) : null}
 
-      {/* Client name + project name — combobox using datalist */}
+      {/* Client name + project name — proper dropdown combobox */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Client Name *
-          </label>
-          {/* Datalist for suggestions — user can also type freely */}
-          <datalist id="pay-client-list">
-            {clientNames.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-          <input
-            autoComplete="off"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.clientName ?? ""}
-            list="pay-client-list"
-            name="clientName"
-            onChange={(e) => setSelectedClient(e.target.value)}
-            placeholder="Select or type client name"
-            required
-          />
-          {clientNames.length > 0 ? (
-            <p className="mt-1 text-[0.65rem] text-slate-400">{clientNames.length} existing client{clientNames.length !== 1 ? "s" : ""} available</p>
-          ) : null}
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Project Name *
-          </label>
-          <datalist id="pay-project-list">
-            {filteredProjectNames.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-          <input
-            autoComplete="off"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.projectName ?? ""}
-            list="pay-project-list"
-            name="projectName"
-            placeholder="Select or type project name"
-            required
-          />
-          {filteredProjectNames.length > 0 ? (
-            <p className="mt-1 text-[0.65rem] text-slate-400">{filteredProjectNames.length} project{filteredProjectNames.length !== 1 ? "s" : ""} available</p>
-          ) : null}
-        </div>
+        <ComboField
+          label="Client Name"
+          name="clientName"
+          onChange={setClientName}
+          options={clientNames}
+          placeholder="Select or type client name"
+          required
+          value={clientName}
+        />
+        <ComboField
+          label="Project Name"
+          name="projectName"
+          onChange={handleProjectChange}
+          options={allProjectNames}
+          placeholder="Select project or type name"
+          required
+          value={projectName}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

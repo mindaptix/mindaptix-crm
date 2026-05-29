@@ -1747,8 +1747,9 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
     { name: 1, clientName: 1 },
   ).sort({ name: 1 }).lean();
 
+  // Include ALL named projects — even those without a client name
   const projectSuggestions = projectsForSuggestions
-    .filter((p) => (p as unknown as { clientName?: string }).clientName || p.name)
+    .filter((p) => Boolean(p.name))
     .map((p) => ({
       clientName: String((p as unknown as { clientName?: string }).clientName ?? ""),
       projectName: p.name,
