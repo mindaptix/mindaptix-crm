@@ -1741,6 +1741,19 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
 
   const today = getTodayDate();
 
+  // Fetch projects for client name / project name suggestions in the payment form
+  const projectsForSuggestions = await ProjectModel.find(
+    {},
+    { name: 1, clientName: 1 },
+  ).sort({ name: 1 }).lean();
+
+  const projectSuggestions = projectsForSuggestions
+    .filter((p) => (p as unknown as { clientName?: string }).clientName || p.name)
+    .map((p) => ({
+      clientName: String((p as unknown as { clientName?: string }).clientName ?? ""),
+      projectName: p.name,
+    }));
+
   // Fetch all payment records — admin sees all, no scope filter
   const rawPayments = await SalesPaymentModel.find(
     {},
@@ -1804,6 +1817,7 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
     paidCount,
     partialCount,
     pendingCount,
+    projectSuggestions,
   };
 }
 

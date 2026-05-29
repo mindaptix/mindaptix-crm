@@ -922,4 +922,5 @@ export type PaymentsPageData = {
   paidCount: number;
   partialCount: number;
   pendingCount: number;
+  projectSuggestions: { clientName: string; projectName: string }[];
 };

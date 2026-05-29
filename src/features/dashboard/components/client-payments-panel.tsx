@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import type { ClientPaymentEntry, PaymentsPageData } from "@/features/dashboard/types";
 import {
   createClientPayment,
@@ -72,10 +72,12 @@ function PaymentForm({
   initial,
   onSuccess,
   onCancel,
+  suggestions,
 }: {
   initial?: ClientPaymentEntry;
   onSuccess: () => void;
   onCancel: () => void;
+  suggestions: { clientName: string; projectName: string }[];
 }) {
   const isEdit = Boolean(initial?.id);
   const action = isEdit ? updateClientPayment : createClientPayment;
@@ -96,10 +98,25 @@ function PaymentForm({
       : {},
   });
 
+  const [selectedClient, setSelectedClient] = useState(initial?.clientName ?? "");
+
+  // Unique client names from projects
+  const clientNames = useMemo(
+    () => Array.from(new Set(suggestions.map((s) => s.clientName).filter(Boolean))).sort(),
+    [suggestions],
+  );
+
+  // Project names filtered by the currently typed/selected client (or all if blank)
+  const filteredProjectNames = useMemo(() => {
+    const trimmed = selectedClient.trim().toLowerCase();
+    const matched = trimmed
+      ? suggestions.filter((s) => s.clientName.toLowerCase() === trimmed).map((s) => s.projectName)
+      : suggestions.map((s) => s.projectName);
+    return Array.from(new Set(matched.filter(Boolean))).sort();
+  }, [suggestions, selectedClient]);
+
   useEffect(() => {
-    if (state.success) {
-      onSuccess();
-    }
+    if (state.success) onSuccess();
   }, [state.success, onSuccess]);
 
   const v = state.values ?? {};
@@ -115,26 +132,53 @@ function PaymentForm({
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{state.success}</div>
       ) : null}
 
+      {/* Client name + project name — combobox using datalist */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Client Name *</label>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Client Name *
+          </label>
+          {/* Datalist for suggestions — user can also type freely */}
+          <datalist id="pay-client-list">
+            {clientNames.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
           <input
+            autoComplete="off"
             className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             defaultValue={v.clientName ?? ""}
+            list="pay-client-list"
             name="clientName"
-            placeholder="e.g. Acme Pvt Ltd"
+            onChange={(e) => setSelectedClient(e.target.value)}
+            placeholder="Select or type client name"
             required
           />
+          {clientNames.length > 0 ? (
+            <p className="mt-1 text-[0.65rem] text-slate-400">{clientNames.length} existing client{clientNames.length !== 1 ? "s" : ""} available</p>
+          ) : null}
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Project Name *</label>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Project Name *
+          </label>
+          <datalist id="pay-project-list">
+            {filteredProjectNames.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
           <input
+            autoComplete="off"
             className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             defaultValue={v.projectName ?? ""}
+            list="pay-project-list"
             name="projectName"
-            placeholder="e.g. E-commerce Website"
+            placeholder="Select or type project name"
             required
           />
+          {filteredProjectNames.length > 0 ? (
+            <p className="mt-1 text-[0.65rem] text-slate-400">{filteredProjectNames.length} project{filteredProjectNames.length !== 1 ? "s" : ""} available</p>
+          ) : null}
         </div>
       </div>
 
@@ -417,6 +461,7 @@ type Filter = (typeof FILTERS)[number];
 // ─── Main panel ──────────────────────────────────────────────────────────────
 
 export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
+  const suggestions = data.projectSuggestions ?? [];
   const [activeFilter, setActiveFilter] = useState<Filter>("ALL");
   const [editTarget, setEditTarget] = useState<ClientPaymentEntry | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -528,6 +573,7 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
             initial={editTarget ?? undefined}
             onCancel={() => { setShowForm(false); setEditTarget(null); }}
             onSuccess={handleFormSuccess}
+            suggestions={suggestions}
           />
         </div>
       ) : null}
