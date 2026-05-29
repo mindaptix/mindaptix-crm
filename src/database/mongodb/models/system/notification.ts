@@ -12,6 +12,7 @@ export const NOTIFICATION_TYPES = [
   "DEADLINE_REMINDER",
   "TASK_OVERDUE",
   "DSR_SUBMITTED",
+  "MEETING_REMINDER",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

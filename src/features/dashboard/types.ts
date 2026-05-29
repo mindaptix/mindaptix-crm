@@ -75,6 +75,7 @@ export type ExecutiveOverviewSection = {
   title: string;
   description: string;
   note?: string;
+  meetingOwners?: Array<{ id: string; name: string; email: string }>;
   metrics: SummaryCard[];
   items: DashboardListItem[];
   emptyMessage: string;

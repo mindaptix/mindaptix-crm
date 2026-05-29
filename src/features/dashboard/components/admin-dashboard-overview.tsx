@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -33,6 +33,7 @@ import type {
   PerformanceScoreRow,
   SummaryCard,
 } from "@/features/dashboard/types";
+import { createClientMeeting, type ClientMeetingFormState } from "@/features/dashboard/actions/client-meetings";
 
 type AdminDashboardOverviewProps = {
   attendanceBreakdown?: DashboardBreakdownSlice[];
@@ -126,20 +127,12 @@ export function AdminDashboardOverview({
               const leadMetric = section.metrics[0];
               const supportMetric = section.metrics[1];
               const accent = getExecutiveSectionAccent(section.id, isActive);
-
-              return (
-                <button
-                  className={`group relative overflow-hidden rounded-[1.3rem] border p-3 text-left transition duration-200 sm:rounded-[1.7rem] sm:p-4 ${accent.card}`}
-                  key={section.id}
-                  onClick={() => setActiveExecutiveSectionId(section.id)}
-                  type="button"
-                >
+              const cardClassName = `group relative overflow-hidden rounded-[1.3rem] border p-3 text-left transition duration-200 sm:rounded-[1.7rem] sm:p-4 ${accent.card}`;
+              const cardContent = (
+                <>
                   <div className={`absolute inset-x-0 top-0 h-1.5 ${accent.bar}`} />
                   <div className="flex items-start justify-between gap-3">
                     <p className={`text-[0.72rem] font-semibold uppercase tracking-[0.24em] ${accent.eyebrow}`}>{section.badge}</p>
-                    <span className={`rounded-full border px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] ${accent.pill}`}>
-                      {isActive ? "Selected" : "Open"}
-                    </span>
                   </div>
                   <h4 className={`mt-4 text-[1.15rem] font-semibold tracking-tight ${accent.title}`}>{section.title}</h4>
                   <div className="mt-2 grid gap-2 sm:mt-3">
@@ -159,7 +152,21 @@ export function AdminDashboardOverview({
                       ) : null}
                     </div>
                   </div>
+                </>
+              );
 
+              return section.id === "payments" ? (
+                <Link className={cardClassName} href="/dashboard/payments" key={section.id}>
+                  {cardContent}
+                </Link>
+              ) : (
+                <button
+                  className={cardClassName}
+                  key={section.id}
+                  onClick={() => setActiveExecutiveSectionId(section.id)}
+                  type="button"
+                >
+                  {cardContent}
                 </button>
               );
             })}
@@ -175,12 +182,6 @@ export function AdminDashboardOverview({
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-500">Operational Snapshot</p>
               <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{activeExecutiveSection.title} Insights</h3>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                The chart area below now follows the selected leadership box so the super admin can review only the relevant numbers.
-              </p>
-            </div>
-            <div className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">
-              Linked To Selection
             </div>
           </div>
 
@@ -366,6 +367,14 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
     return <ProjectPortfolioPanel section={section} accent={accent} />;
   }
 
+  if (section.id === "workforce") {
+    return <WorkforcePulsePanel section={section} />;
+  }
+
+  if (section.id === "meetings") {
+    return <MeetingSchedulePanel section={section} />;
+  }
+
   return (
     <section className="mt-5 overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
       <div className={`h-1.5 ${accent.bar}`} />
@@ -458,6 +467,358 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
       </div>
     </section>
   );
+}
+
+function parseEmployeeDescription(description: string) {
+  const [email = "", phone = "", status = "Active today"] = description.split("|").map((part) => part.trim());
+  return { email, phone, status };
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "EM";
+}
+
+function getMetricValue(metrics: SummaryCard[], label: string) {
+  return Number(metrics.find((metric) => metric.label === label)?.value.replace(/[^\d.-]/g, "") ?? "0") || 0;
+}
+
+function WorkforcePulsePanel({ section }: { section: ExecutiveOverviewSection }) {
+  const totalEmployees = getMetricValue(section.metrics, "Total Employees");
+  const presentToday = getMetricValue(section.metrics, "Present Today");
+  const onLeave = getMetricValue(section.metrics, "On Leave");
+  const notMarked = getMetricValue(section.metrics, "Not Marked");
+  const attendanceRate = totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0;
+  const todayCards = [
+    { label: "Total Employees", value: String(totalEmployees), detail: "Active team strength", tone: "slate" },
+    { label: "Aaye Aaj", value: String(presentToday), detail: "Attendance marked today", tone: "emerald" },
+    { label: "Chhutti / Leave", value: String(onLeave), detail: "Approved leave today", tone: "amber" },
+    { label: "Not Marked", value: String(notMarked), detail: "Attendance pending", tone: "rose" },
+  ];
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07)]">
+      <div className="h-1 bg-gradient-to-r from-emerald-700 via-teal-400 to-amber-300" />
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">{section.badge}</p>
+            <h4 className="mt-1 text-[1.8rem] font-semibold tracking-tight text-slate-950">{section.title}</h4>
+          </div>
+          <Link
+            className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100"
+            href="/dashboard/employees"
+          >
+            Manage Team
+          </Link>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {todayCards.map((card) => (
+            <article className={`rounded-[1.2rem] border p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${getWorkforceStatusCardClass(card.tone)}`} key={card.label}>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em]">{card.label}</p>
+              <p className="mt-3 text-[2rem] font-semibold leading-none">{card.value}</p>
+              <p className="mt-3 text-sm leading-5 opacity-75">{card.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-[1.3rem] border border-slate-100 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Today Summary</p>
+              <p className="mt-1 text-sm text-slate-600">
+                Attendance rate <span className="font-semibold text-emerald-700">{attendanceRate}%</span> | Present {presentToday} | Leave {onLeave} | Not marked {notMarked}
+              </p>
+            </div>
+            <div className="min-w-48 flex-1 sm:max-w-xs">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full rounded-full bg-gradient-to-r from-emerald-600 via-teal-400 to-amber-300" style={{ width: `${attendanceRate}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-[1.4rem] border border-slate-100 bg-white shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="p-5 pb-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">Employee List</p>
+              <h5 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">All Employee Details</h5>
+            </div>
+            <span className="mx-5 mt-5 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+              {section.items.length} employee(s)
+            </span>
+          </div>
+
+          <div className="mt-5 overflow-x-auto">
+            {section.items.length ? (
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-y border-slate-100 bg-slate-50 text-left text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <th className="px-5 py-3">Employee</th>
+                    <th className="px-5 py-3">Contact</th>
+                    <th className="px-5 py-3">Today Status</th>
+                    <th className="px-5 py-3">Joining</th>
+                    <th className="px-5 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {section.items.map((item) => {
+                    const employee = parseEmployeeDescription(item.description);
+                    const isOnLeave = /leave/i.test(item.meta) || /leave/i.test(employee.status);
+                    return (
+                      <tr className="transition hover:bg-emerald-50/40" key={item.id}>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(15,23,42,0.12)]">
+                              {getInitials(item.title)}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-950">{item.title}</p>
+                              <p className="mt-0.5 text-xs text-slate-500">Employee</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="font-medium text-slate-700">{employee.email || "Email not added"}</p>
+                          <p className="mt-1 text-xs text-slate-500">{employee.phone || "Phone not added"}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`rounded-full border px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] ${isOnLeave ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                            {isOnLeave ? "On Leave" : "Present / Active"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-slate-600">{item.meta.replace("Joined ", "") || "Not added"}</td>
+                        <td className="px-5 py-4 text-right">
+                          <Link className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 hover:text-emerald-900" href={`/dashboard/employees/${item.id}`}>
+                            Profile
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-5">
+                <EmptyState message={section.emptyMessage} />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function getWorkforceStatusCardClass(tone: string) {
+  if (tone === "emerald") {
+    return "border-emerald-100 bg-emerald-50 text-emerald-950";
+  }
+  if (tone === "amber") {
+    return "border-amber-100 bg-amber-50 text-amber-950";
+  }
+  if (tone === "rose") {
+    return "border-rose-100 bg-rose-50 text-rose-950";
+  }
+  return "border-slate-100 bg-slate-50 text-slate-950";
+}
+
+function parseMeetingMeta(meta: string) {
+  const [type = "Meeting", time = "Time not set", owner = "Team", status = "Scheduled"] = meta.split("||").map((part) => part.trim());
+  return { owner, status, time, type };
+}
+
+function parseMeetingDescription(description: string) {
+  const [contact = "Contact not added", technology = "Tech not added", budget = "N/A", quoted = "N/A", delivery = "Not fixed"] = description
+    .split("||")
+    .map((part) => part.trim());
+
+  return { budget, contact, delivery, quoted, technology };
+}
+
+function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }) {
+  const [showForm, setShowForm] = useState(false);
+  const [state, formAction, pending] = useActionState<ClientMeetingFormState, FormData>(createClientMeeting, {});
+  const totalMeetings = getMetricValue(section.metrics, "Meetings Today");
+  const clientMeetings = getMetricValue(section.metrics, "Client Meetings");
+  const peopleInMeetings = getMetricValue(section.metrics, "People In Meetings");
+  const pendingMeetings = getMetricValue(section.metrics, "Pending");
+  const meetingCards = [
+    { label: "Aaj Meetings", value: String(totalMeetings), detail: "Total scheduled today", tone: "rose" },
+    { label: "Client Meetings", value: String(clientMeetings), detail: "Sales client schedule", tone: "violet" },
+    { label: "Team Linked", value: String(peopleInMeetings), detail: "People assigned", tone: "sky" },
+    { label: "Pending", value: String(pendingMeetings), detail: "Still open", tone: "amber" },
+  ];
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07)]">
+      <div className="h-1 bg-gradient-to-r from-rose-600 via-pink-400 to-amber-300" />
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-700">{section.badge}</p>
+            <h4 className="mt-1 text-[1.8rem] font-semibold tracking-tight text-slate-950">{section.title}</h4>
+          </div>
+          <button
+            className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-rose-800 transition hover:border-rose-300 hover:bg-rose-100"
+            onClick={() => setShowForm((value) => !value)}
+            type="button"
+          >
+            {showForm ? "Close" : "Add Meeting"}
+          </button>
+        </div>
+
+        {showForm ? (
+          <form action={formAction} className="mt-4 rounded-[1.3rem] border border-rose-100 bg-rose-50/50 p-4">
+            {state.error ? <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{state.error}</p> : null}
+            {state.success ? <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{state.success}</p> : null}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Sales Owner
+                <select className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.salesUserId ?? section.meetingOwners?.[0]?.id ?? ""} name="salesUserId" required>
+                  <option value="">Select owner</option>
+                  {(section.meetingOwners ?? []).map((owner) => (
+                    <option key={owner.id} value={owner.id}>
+                      {owner.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Client Name
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.clientName ?? ""} name="clientName" placeholder="Client name" required />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Meeting Date
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.meetingDate ?? ""} name="meetingDate" required type="date" />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Meeting Time
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.meetingTime ?? ""} name="meetingTime" type="time" />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Phone
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.clientPhone ?? ""} name="clientPhone" placeholder="Client phone" />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Email
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.clientEmail ?? ""} name="clientEmail" placeholder="Client email" type="email" />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Budget
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.budget ?? ""} min="0" name="budget" placeholder="0" type="number" />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Quote
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.pitchedPrice ?? ""} min="0" name="pitchedPrice" placeholder="0" type="number" />
+              </label>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Note
+                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.notes ?? ""} name="notes" placeholder="Meeting agenda or note" />
+              </label>
+              <button className="rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60" disabled={pending || !section.meetingOwners?.length} type="submit">
+                {pending ? "Saving..." : "Save Meeting"}
+              </button>
+            </div>
+            {!section.meetingOwners?.length ? <p className="mt-3 text-xs font-semibold text-amber-700">Create an active Sales user first, then add client meetings.</p> : null}
+          </form>
+        ) : null}
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {meetingCards.map((card) => (
+            <article className={`rounded-[1.2rem] border p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${getMeetingStatusCardClass(card.tone)}`} key={card.label}>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em]">{card.label}</p>
+              <p className="mt-3 text-[2rem] font-semibold leading-none">{card.value}</p>
+              <p className="mt-3 text-sm leading-5 opacity-75">{card.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-[1.4rem] border border-slate-100 bg-white shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="p-5 pb-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-700">Meeting List</p>
+              <h5 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Client & Team Schedule</h5>
+            </div>
+            <span className="mx-5 mt-5 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+              {section.items.length} meeting(s)
+            </span>
+          </div>
+
+          <div className="mt-5 overflow-x-auto">
+            {section.items.length ? (
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-y border-slate-100 bg-slate-50 text-left text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <th className="px-5 py-3">Client / Meeting</th>
+                    <th className="px-5 py-3">Time</th>
+                    <th className="px-5 py-3">Owner</th>
+                    <th className="px-5 py-3">Contact / Tech</th>
+                    <th className="px-5 py-3">Budget / Quote</th>
+                    <th className="px-5 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {section.items.map((item) => {
+                    const meta = parseMeetingMeta(item.meta);
+                    const detail = parseMeetingDescription(item.description);
+                    const isCompleted = /completed/i.test(meta.status);
+                    return (
+                      <tr className="transition hover:bg-rose-50/40" key={item.id}>
+                        <td className="px-5 py-4">
+                          <p className="font-semibold text-slate-950">{item.title}</p>
+                          <p className="mt-1 text-xs text-slate-500">{meta.type}</p>
+                        </td>
+                        <td className="px-5 py-4 font-medium text-slate-700">{meta.time}</td>
+                        <td className="px-5 py-4 text-slate-600">{meta.owner}</td>
+                        <td className="px-5 py-4">
+                          <p className="font-medium text-slate-700">{detail.contact}</p>
+                          <p className="mt-1 text-xs text-slate-500">{detail.technology}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="font-medium text-slate-700">Budget {detail.budget}</p>
+                          <p className="mt-1 text-xs text-slate-500">Quote {detail.quoted}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`rounded-full border px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] ${isCompleted ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+                            {meta.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-5">
+                <EmptyState message={section.emptyMessage} />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function getMeetingStatusCardClass(tone: string) {
+  if (tone === "rose") {
+    return "border-rose-100 bg-rose-50 text-rose-950";
+  }
+  if (tone === "violet") {
+    return "border-violet-100 bg-violet-50 text-violet-950";
+  }
+  if (tone === "sky") {
+    return "border-sky-100 bg-sky-50 text-sky-950";
+  }
+  return "border-amber-100 bg-amber-50 text-amber-950";
 }
 
 /* ─── Project Portfolio Panel ─── */
@@ -787,14 +1148,14 @@ function getExecutiveSectionAccent(sectionId: string, isActive: boolean) {
           }
         : sectionId === "workforce"
           ? {
-              bar: "bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-300",
-              activeBg: "bg-[linear-gradient(135deg,#064e3b_0%,#059669_64%,#d1fae5_100%)]",
-              activeBorder: "border-emerald-300",
+              bar: "bg-gradient-to-r from-emerald-700 via-teal-400 to-amber-300",
+              activeBg: "bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.32),transparent_34%),linear-gradient(135deg,#052e2b_0%,#047857_58%,#d1fae5_100%)]",
+              activeBorder: "border-emerald-200",
               activeTitle: "text-white",
               activeDescription: "text-emerald-50/90",
               activeEyebrow: "text-emerald-100",
               activePill: "border-white/20 bg-white/10 text-white",
-              activeMetricShell: "border-white/10 bg-white/10",
+              activeMetricShell: "border-white/15 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]",
               activeMetricLabel: "text-emerald-100/80",
               activeMetricValue: "text-white",
               activeMetricHint: "text-emerald-100/75",

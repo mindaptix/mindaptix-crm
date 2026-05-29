@@ -4,6 +4,7 @@ import connectDb from "@/database/mongodb/connect";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
 import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
 import { NotificationModel, type NotificationType } from "@/database/mongodb/models/notification";
+import { SalesLeadModel } from "@/database/mongodb/models/sales-lead";
 import { SettingModel } from "@/database/mongodb/models/setting";
 import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
@@ -79,7 +80,7 @@ export async function getUnreadAssignmentsForUser(userId: string) {
 export async function getAdminUserIds() {
   await connectDb();
 
-  const admins = await UserModel.find({ role: "MANAGER", status: "ACTIVE" }, { _id: 1 }).lean();
+  const admins = await UserModel.find({ role: { $in: ["SUPER_ADMIN", "MANAGER"] }, status: "ACTIVE" }, { _id: 1 }).lean();
   return admins.map((admin) => admin._id.toString());
 }
 
@@ -90,6 +91,26 @@ export async function syncWorkflowNotifications(session: AuthenticatedSession) {
   const currentTime = formatIndiaTimeKey();
   const settings = await SettingModel.findOne({ key: "company" }, { workStart: 1 }).lean();
   const workStart = settings?.workStart ?? "09:00";
+  const todaysMeetings = await SalesLeadModel.find(
+    { meetingDate: today },
+    { salesUserId: 1, clientName: 1, meetingTime: 1 },
+  ).lean();
+
+  if (todaysMeetings.length > 0) {
+    const adminRecipients = await getAdminUserIds();
+
+    await Promise.all(
+      todaysMeetings.map((meeting) =>
+        createNotificationsForUsers([...adminRecipients, meeting.salesUserId], {
+          type: "MEETING_REMINDER",
+          title: "Client meeting today",
+          message: `${meeting.clientName} meeting${meeting.meetingTime ? ` at ${meeting.meetingTime}` : ""} is scheduled today.`,
+          actionUrl: "/dashboard",
+          sourceKey: `meeting-reminder:${meeting._id.toString()}:${today}`,
+        }),
+      ),
+    );
+  }
 
   if (session.user.role === "EMPLOYEE") {
     const [todayUpdate, todayAttendance, activeTasks] = await Promise.all([

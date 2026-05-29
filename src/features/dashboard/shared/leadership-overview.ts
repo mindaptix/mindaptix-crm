@@ -305,16 +305,36 @@ function buildExecutiveOverviewSections({
     };
   });
 
+  const clientMeetings = salesLeads.filter((lead) => lead.meetingDate === today);
   const meetingTasks = operationalTasks.filter((task) => task.dueDate === today && /\bmeeting\b/i.test(`${task.title} ${task.description ?? ""}`));
-  const todayMeetingUsers = new Set(meetingTasks.map((task) => task.assignedUserId)).size;
+  const todayMeetingUsers = new Set([...clientMeetings.map((lead) => lead.salesUserId), ...meetingTasks.map((task) => task.assignedUserId)]).size;
   const completedMeetings = meetingTasks.filter((task) => task.status === "COMPLETED").length;
-  const pendingMeetings = meetingTasks.filter((task) => task.status !== "COMPLETED").length;
-  const meetingItems: DashboardListItem[] = meetingTasks.slice(0, 6).map((task) => ({
-    id: task._id.toString(),
+  const totalMeetingsToday = clientMeetings.length + meetingTasks.length;
+  const pendingMeetings = Math.max(totalMeetingsToday - completedMeetings, 0);
+  const clientMeetingItems: DashboardListItem[] = clientMeetings.map((lead) => {
+    const salesOwner = salesUserMap.get(lead.salesUserId);
+    const techLabel = (lead.technologies ?? []).slice(0, 3).join(", ");
+
+    return {
+      id: `lead-${lead._id.toString()}`,
+      title: lead.clientName,
+      meta: ["Client Meeting", lead.meetingTime || "Time not set", salesOwner?.fullName ?? "Sales", "Scheduled"].join("||"),
+      description: [
+        lead.clientEmail || lead.clientPhone || "Client contact not added",
+        techLabel || "Tech not added",
+        formatCurrency(Number(lead.budget ?? 0)),
+        formatCurrency(Number(lead.pitchedPrice ?? 0)),
+        lead.deliveryDate || "Delivery not fixed",
+      ].join("||"),
+    };
+  });
+  const taskMeetingItems: DashboardListItem[] = meetingTasks.map((task) => ({
+    id: `task-${task._id.toString()}`,
     title: task.title,
-    meta: `${formatLabel(task.status ?? "PENDING")} | ${task.dueDate}`,
-    description: task.description?.trim() ? task.description : "Meeting task without extra description.",
+    meta: ["Internal Meeting", "Time not set", "Assigned Team", formatLabel(task.status ?? "PENDING")].join("||"),
+    description: [task.description?.trim() || "No meeting note added", "Task", "N/A", "N/A", task.dueDate].join("||"),
   }));
+  const meetingItems: DashboardListItem[] = [...clientMeetingItems, ...taskMeetingItems].slice(0, 10);
 
   return [
     {
@@ -344,9 +364,9 @@ function buildExecutiveOverviewSections({
           : undefined,
       metrics: [
         { label: "Total Collected", value: formatCurrency(paymentTotalCollected), detail: `${paidPayments.length} fully paid + ${partialPayments.length} partial payments received.` },
-        { label: "Pending", value: String(pendingPayments.length), detail: "Payment records still awaiting receipt." },
-        { label: "Overdue", value: String(overduePayments.length), detail: "Past due date and still not fully paid." },
         { label: "Balance Due", value: formatCurrency(paymentTotalBalance), detail: "Total outstanding amount across all active records." },
+        { label: "Pending Records", value: String(pendingPayments.length), detail: "Payment records still awaiting receipt." },
+        { label: "Overdue", value: String(overduePayments.length), detail: "Past due date and still not fully paid." },
       ],
       items: paymentItems,
       emptyMessage: "No payment records added yet. Use the Payments page to track client invoices.",
@@ -354,8 +374,8 @@ function buildExecutiveOverviewSections({
     {
       id: "workforce",
       badge: "People",
-      title: "Employee Pulse",
-      description: "Headcount, today's presence, and leave visibility across the active employee base.",
+      title: "Employee Management",
+      description: "Headcount, attendance, leave, and employee profile visibility for the active workforce.",
       metrics: [
         { label: "Total Employees", value: String(activeEmployees.length), detail: "Active employee accounts in the company." },
         { label: "Present Today", value: String(presentToday), detail: "Employees who marked attendance today." },
@@ -389,16 +409,21 @@ function buildExecutiveOverviewSections({
       id: "meetings",
       badge: "Schedule",
       title: "Today's Meetings",
-      description: "Meeting schedule visibility based on tasks that include 'meeting' and are due today.",
-      note: "Meeting stats are inferred from today's tasks with 'meeting' in the title or description.",
+      description: "Today's client meetings and internal meeting tasks in one schedule view.",
       metrics: [
-        { label: "Meetings Today", value: String(meetingTasks.length), detail: "Tasks tagged as meetings and scheduled for today." },
-        { label: "People In Meetings", value: String(todayMeetingUsers), detail: "Unique assigned users linked to today's meetings." },
+        { label: "Meetings Today", value: String(totalMeetingsToday), detail: "Client and internal meetings scheduled for today." },
+        { label: "Client Meetings", value: String(clientMeetings.length), detail: "Sales pipeline client meetings scheduled for today." },
+        { label: "People In Meetings", value: String(todayMeetingUsers), detail: "Unique team members linked to today's meetings." },
         { label: "Completed", value: String(completedMeetings), detail: "Meeting tasks marked complete." },
         { label: "Pending", value: String(pendingMeetings), detail: "Meeting tasks still not closed." },
       ],
+      meetingOwners: activeSalesUsers.map((user) => ({
+        id: user._id.toString(),
+        name: user.fullName,
+        email: user.email,
+      })),
       items: meetingItems,
-      emptyMessage: "No meeting tasks are scheduled for today.",
+      emptyMessage: "No client or internal meetings are scheduled for today.",
     },
   ];
 }

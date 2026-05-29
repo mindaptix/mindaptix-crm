@@ -486,9 +486,9 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
           color="#3b82f6"
         />
         <StatCard
-          label="Pending"
-          value={String(data.pendingCount)}
-          sub="Awaiting first payment"
+          label="Pending Amount"
+          value={formatCurrency(data.totalPending)}
+          sub={`${data.pendingCount} awaiting first payment`}
           color="#f59e0b"
         />
         <StatCard

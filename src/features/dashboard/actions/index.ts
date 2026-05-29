@@ -3,6 +3,7 @@ export * from "@/features/dashboard/actions/dsr";
 export * from "@/features/dashboard/actions/leaves";
 export * from "@/features/dashboard/actions/projects";
 export * from "@/features/dashboard/actions/sales-leads";
+export * from "@/features/dashboard/actions/client-meetings";
 export * from "@/features/dashboard/actions/settings";
 export * from "@/features/dashboard/actions/tasks";
 export * from "@/features/dashboard/actions/users";
