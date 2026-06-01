@@ -21,6 +21,8 @@ type SettingsState = {
     workingDays?: string;
     salaryDay?: string;
     lateGraceMinutes?: string;
+    officeName?: string;
+    officeAddress?: string;
     officeLatitude?: string;
     officeLongitude?: string;
     geoFenceRadiusMeters?: string;
@@ -45,9 +47,11 @@ export async function updateCompanySettings(
   const workingDays = parseInt(String(formData.get("workingDays") ?? "26"), 10);
   const salaryDay = parseInt(String(formData.get("salaryDay") ?? "1"), 10);
   const lateGraceMinutes = parseInt(String(formData.get("lateGraceMinutes") ?? "15"), 10);
+  const officeName = String(formData.get("officeName") ?? "").trim();
+  const officeAddress = String(formData.get("officeAddress") ?? "").trim();
   const officeLatitudeRaw = String(formData.get("officeLatitude") ?? "").trim();
   const officeLongitudeRaw = String(formData.get("officeLongitude") ?? "").trim();
-  const geoFenceRadiusMeters = parseInt(String(formData.get("geoFenceRadiusMeters") ?? "200"), 10);
+  const geoFenceRadiusMeters = parseInt(String(formData.get("geoFenceRadiusMeters") ?? "600"), 10);
   const geoFenceEnabled = formData.get("geoFenceEnabled") === "true";
   const officeLatitude = officeLatitudeRaw !== "" ? parseFloat(officeLatitudeRaw) : null;
   const officeLongitude = officeLongitudeRaw !== "" ? parseFloat(officeLongitudeRaw) : null;
@@ -78,9 +82,13 @@ export async function updateCompanySettings(
       workingDays: isNaN(workingDays) ? 26 : workingDays,
       salaryDay: isNaN(salaryDay) ? 1 : salaryDay,
       lateGraceMinutes: isNaN(lateGraceMinutes) ? 15 : lateGraceMinutes,
+      officeName: officeName || "Vista Business Tower",
+      officeAddress:
+        officeAddress ||
+        "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
       officeLatitude,
       officeLongitude,
-      geoFenceRadiusMeters: isNaN(geoFenceRadiusMeters) ? 200 : geoFenceRadiusMeters,
+      geoFenceRadiusMeters: isNaN(geoFenceRadiusMeters) ? 600 : geoFenceRadiusMeters,
       geoFenceEnabled,
     },
     { upsert: true, new: true },
@@ -109,9 +117,13 @@ export async function updateCompanySettings(
       workingDays: String(workingDays),
       salaryDay: String(salaryDay),
       lateGraceMinutes: String(lateGraceMinutes),
+      officeName: officeName || "Vista Business Tower",
+      officeAddress:
+        officeAddress ||
+        "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
       officeLatitude: officeLatitude !== null ? String(officeLatitude) : "",
       officeLongitude: officeLongitude !== null ? String(officeLongitude) : "",
-      geoFenceRadiusMeters: String(isNaN(geoFenceRadiusMeters) ? 200 : geoFenceRadiusMeters),
+      geoFenceRadiusMeters: String(isNaN(geoFenceRadiusMeters) ? 600 : geoFenceRadiusMeters),
       geoFenceEnabled: String(geoFenceEnabled),
     },
   };

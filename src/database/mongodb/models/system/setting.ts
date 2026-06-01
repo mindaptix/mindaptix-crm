@@ -31,17 +31,29 @@ const settingSchema = new mongoose.Schema(
       maxlength: 600,
       default: "Paid Leave and Sick Leave are available for approved requests.",
     },
+    officeName: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: "Vista Business Tower",
+    },
+    officeAddress: {
+      type: String,
+      trim: true,
+      maxlength: 400,
+      default: "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
+    },
     officeLatitude: {
       type: Number,
-      default: null,
+      default: 30.71033,
     },
     officeLongitude: {
       type: Number,
-      default: null,
+      default: 76.690894,
     },
     geoFenceRadiusMeters: {
       type: Number,
-      default: 500,
+      default: 600,
     },
     geoFenceEnabled: {
       type: Boolean,

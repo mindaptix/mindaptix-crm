@@ -20,6 +20,8 @@ const INITIAL_SETTINGS_STATE = {
     workingDays: "26",
     salaryDay: "1",
     lateGraceMinutes: "15",
+    officeName: "Vista Business Tower",
+    officeAddress: "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
   },
 };
 const INIT_HOLIDAY = { error: undefined, success: undefined };
@@ -117,9 +119,11 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       workingDays: String(data.workingDays ?? 26),
       salaryDay: String(data.salaryDay ?? 1),
       lateGraceMinutes: String(data.lateGraceMinutes ?? 15),
+      officeName: data.officeName,
+      officeAddress: data.officeAddress,
       officeLatitude: data.officeLatitude !== null ? String(data.officeLatitude) : "",
       officeLongitude: data.officeLongitude !== null ? String(data.officeLongitude) : "",
-      geoFenceRadiusMeters: String(data.geoFenceRadiusMeters ?? 200),
+      geoFenceRadiusMeters: String(data.geoFenceRadiusMeters ?? 600),
       geoFenceEnabled: String(data.geoFenceEnabled ?? false),
     },
   });
@@ -341,6 +345,21 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
                 name="geoFenceEnabled"
               />
 
+              <div className="grid gap-4 sm:grid-cols-2">
+                <OptionalInputField
+                  defaultValue={settingsState.values?.officeName ?? "Vista Business Tower"}
+                  label="Office Building"
+                  name="officeName"
+                  placeholder="Vista Business Tower"
+                />
+                <OptionalInputField
+                  defaultValue={settingsState.values?.officeAddress ?? ""}
+                  label="Office Address"
+                  name="officeAddress"
+                  placeholder="D270 Phase 8B, Sector 74, Mohali"
+                />
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-3">
                 <OptionalInputField
                   defaultValue={settingsState.values?.officeLatitude ?? ""}
@@ -355,10 +374,10 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
                   placeholder="e.g. 77.20900"
                 />
                 <OptionalInputField
-                  defaultValue={settingsState.values?.geoFenceRadiusMeters ?? "200"}
+                  defaultValue={settingsState.values?.geoFenceRadiusMeters ?? "600"}
                   label="Allowed Radius (meters)"
                   name="geoFenceRadiusMeters"
-                  placeholder="200"
+                  placeholder="600"
                   type="number"
                 />
               </div>
@@ -580,4 +599,3 @@ function HolidayRow({
     </div>
   );
 }
-

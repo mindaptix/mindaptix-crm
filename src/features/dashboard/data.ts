@@ -1475,10 +1475,14 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     workingDays: readNumberLike(toRecord(settings).workingDays) ?? 26,
     salaryDay: readNumberLike(toRecord(settings).salaryDay) ?? 1,
     lateGraceMinutes: readNumberLike(toRecord(settings).lateGraceMinutes) ?? 15,
+    officeName: readString(toRecord(settings).officeName) ?? "Vista Business Tower",
+    officeAddress:
+      readString(toRecord(settings).officeAddress) ??
+      "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
     officeLatitude: readNumberLike(toRecord(settings).officeLatitude) ?? null,
     officeLongitude: readNumberLike(toRecord(settings).officeLongitude) ?? null,
-    geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 200,
-    geoFenceEnabled: Boolean(toRecord(settings).geoFenceEnabled ?? false),
+    geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 600,
+    geoFenceEnabled: Boolean(toRecord(settings).geoFenceEnabled ?? true),
     holidays: holidays.map((h) => ({
       id: h._id.toString(),
       name: h.name,

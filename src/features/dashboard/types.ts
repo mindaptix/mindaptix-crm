@@ -557,6 +557,8 @@ export type SettingsPageData = {
   salaryDay: number;
   lateGraceMinutes: number;
   holidays: HolidayEntry[];
+  officeName: string;
+  officeAddress: string;
   officeLatitude: number | null;
   officeLongitude: number | null;
   geoFenceRadiusMeters: number;

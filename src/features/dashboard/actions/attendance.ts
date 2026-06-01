@@ -12,6 +12,9 @@ type WorkMode = (typeof VALID_WORK_MODES)[number];
 
 // Minutes within which a checkout can be undone
 const CHECKOUT_UNDO_WINDOW_MINUTES = 15;
+const DEFAULT_OFFICE_LATITUDE = 30.71033;
+const DEFAULT_OFFICE_LONGITUDE = 76.690894;
+const DEFAULT_GEO_FENCE_RADIUS_METERS = 600;
 
 type CompanySettings = {
   workStart?: string;
@@ -66,25 +69,19 @@ export async function checkInAttendance(formData: FormData) {
   const workStart: string = companySettings.workStart ?? "09:00";
   const lateGraceMinutes: number = Number(companySettings.lateGraceMinutes ?? 15);
   const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? true);
-  const officeLatitude = companySettings.officeLatitude ?? null;
-  const officeLongitude = companySettings.officeLongitude ?? null;
-  const geoFenceRadius = Number(companySettings.geoFenceRadiusMeters ?? 500);
+  const officeLatitude = companySettings.officeLatitude ?? DEFAULT_OFFICE_LATITUDE;
+  const officeLongitude = companySettings.officeLongitude ?? DEFAULT_OFFICE_LONGITUDE;
+  const geoFenceRadius = Number(companySettings.geoFenceRadiusMeters ?? DEFAULT_GEO_FENCE_RADIUS_METERS);
 
-  // Enforce location for OFFICE mode when:
-  // - geo-fence is explicitly enabled, OR
-  // - office coordinates are configured (auto-enforce even if toggle not yet set)
+  // Only enforce geo-fence when admin has explicitly enabled it AND configured office coordinates.
+  // Without both, skip the check — cannot verify distance without office coordinates.
   const officeCoordsDefined = officeLatitude !== null && officeLongitude !== null;
-  const shouldEnforceGeoFence = workMode === "OFFICE" && (geoFenceEnabled || officeCoordsDefined);
+  const shouldEnforceGeoFence = workMode === "OFFICE" && geoFenceEnabled && officeCoordsDefined;
 
   if (shouldEnforceGeoFence) {
     if (employeeLat === null || employeeLng === null || isNaN(employeeLat) || isNaN(employeeLng)) {
       throw new Error(
         "Office attendance ke liye location permission zaroori hai. Browser mein location enable karein aur dobara try karein.",
-      );
-    }
-    if (!officeCoordsDefined) {
-      throw new Error(
-        "Office location abhi settings mein configure nahi ki gayi hai. Admin se sampark karein.",
       );
     }
     const distance = Math.round(
