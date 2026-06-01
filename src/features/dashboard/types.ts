@@ -350,6 +350,7 @@ export type AttendanceMonthlyRow = {
 export type AttendancePageData = {
   canMarkAttendance: boolean;
   canViewLocation: boolean;
+  canManageOthers: boolean;
   summaryCards: SummaryCard[];
   todayRecord: AttendanceRecordView | null;
   todayRecords: AttendanceRecordView[];
@@ -896,6 +897,14 @@ export type AuditLogPageData = {
 
 // ─── Client Payments ────────────────────────────────────────────────────────
 
+export type PaymentTransaction = {
+  id: string;
+  txDate: string;
+  txAmount: number;
+  note: string;
+  createdAt: string;
+};
+
 export type ClientPaymentEntry = {
   id: string;
   clientName: string;
@@ -911,6 +920,7 @@ export type ClientPaymentEntry = {
   createdByUserId: string;
   createdByName: string;
   createdAt: string;
+  transactions: PaymentTransaction[];
 };
 
 export type PaymentsPageData = {

@@ -1,6 +1,7 @@
 import "server-only";
 import { notFound } from "next/navigation";
 import { AnnouncementsPanel } from "@/features/dashboard/components/announcements-panel";
+import { ClientPaymentsPanel } from "@/features/dashboard/components/client-payments-panel";
 import { AttendancePanel } from "@/features/dashboard/components/attendance-panel";
 import { DsrPanel } from "@/features/dashboard/components/dsr-panel";
 import { EmployeesManagementPanel } from "@/features/dashboard/components/employees-management-panel";
@@ -19,6 +20,7 @@ import {
   getEmployeesPageData,
   getExpensesPageData,
   getLeavesPageData,
+  getPaymentsPageData,
   getPayrollPageData,
   getProjectsPageData,
   getReportsPageData,
@@ -78,6 +80,10 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
     case "expenses": {
       const data = await getExpensesPageData(session);
       return <ExpensesPanel data={data} />;
+    }
+    case "payments": {
+      const data = await getPaymentsPageData(session);
+      return <ClientPaymentsPanel data={data} />;
     }
     case "announcements": {
       const data = await getAnnouncementsPageData(session);

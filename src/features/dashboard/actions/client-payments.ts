@@ -300,3 +300,71 @@ export async function markPaymentReceived(
 
   return { success: newStatus === "PAID" ? "Payment marked as fully paid." : "Partial payment recorded." };
 }
+
+// ─── Add installment transaction ────────────────────────────────────────────
+
+export async function addPaymentInstallment(
+  _previousState: { error?: string; success?: string },
+  formData: FormData,
+): Promise<{ error?: string; success?: string }> {
+  const session = await getCurrentSession();
+
+  try {
+    assertAdminOrManager(session);
+  } catch {
+    return { error: "Only admin or manager can record payments." };
+  }
+
+  const paymentId = String(formData.get("paymentId") ?? "").trim();
+  const txAmountStr = String(formData.get("txAmount") ?? "").trim();
+  const txDate = String(formData.get("txDate") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+
+  if (!paymentId) return { error: "Payment ID is required." };
+
+  const txAmount = Number(txAmountStr);
+  if (!txAmountStr || isNaN(txAmount) || txAmount <= 0) {
+    return { error: "Enter a valid amount greater than 0." };
+  }
+
+  await connectDb();
+
+  const payment = await SalesPaymentModel.findById(paymentId, { amount: 1, receivedAmount: 1, transactions: 1 }).lean();
+  if (!payment) return { error: "Payment record not found." };
+
+  const totalAmount = Number(payment.amount ?? 0);
+  const existingReceived = Number(payment.receivedAmount ?? 0);
+
+  // Sum existing transactions + new one
+  const existingTxTotal = ((payment as unknown as { transactions?: { txAmount?: number }[] }).transactions ?? [])
+    .reduce((sum, t) => sum + Number(t.txAmount ?? 0), 0);
+  const newTotal = Math.min(existingTxTotal + txAmount, totalAmount);
+  const newStatus: SalesPaymentStatus = newTotal >= totalAmount ? "PAID" : newTotal > 0 ? "PARTIAL" : "PENDING";
+  const today = new Date().toISOString().slice(0, 10);
+
+  await SalesPaymentModel.findByIdAndUpdate(paymentId, {
+    $push: {
+      transactions: {
+        txDate: txDate || today,
+        txAmount,
+        note,
+        createdAt: new Date(),
+      },
+    },
+    $set: {
+      receivedAmount: newTotal,
+      receivedDate: newTotal > 0 ? (txDate || today) : (existingReceived > 0 ? today : ""),
+      status: newStatus,
+    },
+  });
+
+  revalidatePath("/dashboard/payments");
+  revalidatePath("/dashboard");
+
+  const remaining = totalAmount - newTotal;
+  return {
+    success: newStatus === "PAID"
+      ? `Payment fully received! ₹${txAmount.toLocaleString("en-IN")} recorded. Project fully paid.`
+      : `₹${txAmount.toLocaleString("en-IN")} recorded. Balance remaining: ₹${remaining.toLocaleString("en-IN")}.`,
+  };
+}

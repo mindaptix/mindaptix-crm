@@ -30,19 +30,41 @@ async function getBrowserLocation() {
     throw new Error("Is browser mein location support nahi hai. Location-enabled browser se try karein.");
   }
 
-  const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 0,
-    }),
-  );
+  // Try network-based location first (fast on mobile), then GPS fallback
+  const tryGet = (highAccuracy: boolean, timeout: number) =>
+    new Promise<GeolocationPosition>((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: highAccuracy,
+        timeout,
+        maximumAge: highAccuracy ? 0 : 30000,
+      }),
+    );
+
+  let position: GeolocationPosition;
+  try {
+    // Fast attempt: network/cell tower (works indoors, quick on mobile)
+    position = await tryGet(false, 8000);
+  } catch {
+    // Fallback: GPS (more accurate but slower, mainly for outdoor)
+    position = await tryGet(true, 20000);
+  }
 
   return {
     accuracy: position.coords.accuracy,
     lat: position.coords.latitude,
     lng: position.coords.longitude,
   };
+}
+
+function getLocationErrorMessage(error: unknown, action: "check-in" | "check-out") {
+  const actionText = action === "check-in" ? "attendance" : "check-out";
+  const helpText = `Location access nahi mil pa rahi. Phone mein GPS/location on karein, browser permission Allow karein, aur app HTTPS/live domain par khol kar ${actionText} dobara try karein.`;
+
+  if (error instanceof Error && error.message) {
+    return `${helpText} (${error.message})`;
+  }
+
+  return helpText;
 }
 
 function formatWorkedHours(minutes: number): string {
@@ -193,6 +215,7 @@ function LocationCell({
 
 const UNDO_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in ms
 
+
 export function AttendancePanel({ data }: AttendancePanelProps) {
   const [workMode, setWorkMode] = useState<WorkMode>("OFFICE");
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
@@ -213,25 +236,28 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
   async function handleCheckIn() {
     setGeoError(null);
-    setGeoStatus("loading");
-
-    let location: Awaited<ReturnType<typeof getBrowserLocation>>;
-
-    try {
-      location = await getBrowserLocation();
-    } catch {
-      setGeoStatus("error");
-      setGeoError("Location access denied. Browser mein location permission allow karein aur dobara try karein.");
-      return;
-    }
-
-    setGeoStatus("idle");
 
     const fd = new FormData();
     fd.set("workMode", workMode);
-    fd.set("lat", String(location.lat));
-    fd.set("lng", String(location.lng));
-    fd.set("accuracy", String(location.accuracy));
+
+    if (workMode === "OFFICE") {
+      setGeoStatus("loading");
+
+      let location: Awaited<ReturnType<typeof getBrowserLocation>>;
+
+      try {
+        location = await getBrowserLocation();
+      } catch (error) {
+        setGeoStatus("error");
+        setGeoError(getLocationErrorMessage(error, "check-in"));
+        return;
+      }
+
+      setGeoStatus("idle");
+      fd.set("lat", String(location.lat));
+      fd.set("lng", String(location.lng));
+      fd.set("accuracy", String(location.accuracy));
+    }
 
     startCheckIn(async () => {
       try {
@@ -246,23 +272,27 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
   async function handleCheckOutConfirm() {
     setCheckOutError(null);
     setConfirmingCheckout(false);
-    setGeoStatus("loading");
-
-    let location: Awaited<ReturnType<typeof getBrowserLocation>>;
-    try {
-      location = await getBrowserLocation();
-    } catch {
-      setGeoStatus("error");
-      setCheckOutError("Location access denied. Browser mein location permission allow karein aur dobara try karein.");
-      return;
-    }
-
-    setGeoStatus("idle");
 
     const fd = new FormData();
-    fd.set("lat", String(location.lat));
-    fd.set("lng", String(location.lng));
-    fd.set("accuracy", String(location.accuracy));
+    const checkoutWorkMode = (data.todayRecord?.workMode ?? workMode) as WorkMode;
+
+    if (checkoutWorkMode === "OFFICE") {
+      setGeoStatus("loading");
+
+      let location: Awaited<ReturnType<typeof getBrowserLocation>>;
+      try {
+        location = await getBrowserLocation();
+      } catch (error) {
+        setGeoStatus("error");
+        setCheckOutError(getLocationErrorMessage(error, "check-out"));
+        return;
+      }
+
+      setGeoStatus("idle");
+      fd.set("lat", String(location.lat));
+      fd.set("lng", String(location.lng));
+      fd.set("accuracy", String(location.accuracy));
+    }
 
     startCheckOut(async () => {
       try {

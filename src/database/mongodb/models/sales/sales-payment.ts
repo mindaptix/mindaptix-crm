@@ -72,6 +72,17 @@ const salesPaymentSchema = new mongoose.Schema(
       maxlength: 1000,
       default: "",
     },
+    transactions: {
+      type: [
+        {
+          txDate: { type: String, trim: true, default: "" },
+          txAmount: { type: Number, default: 0, min: 0 },
+          note: { type: String, trim: true, maxlength: 400, default: "" },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   baseSchemaOptions,
 );

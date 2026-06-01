@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ClientPaymentsPanel } from "@/features/dashboard/components/client-payments-panel";
 import { useActionState, useState } from "react";
 import {
   Area,
@@ -30,6 +31,7 @@ import type {
   EmployeeProjectSummaryRow,
   ExecutiveOverviewSection,
   LeaveTrendPoint,
+  PaymentsPageData,
   PerformanceScoreRow,
   SummaryCard,
   UnreadAssignment,
@@ -39,6 +41,7 @@ import { AssignmentAlertBanner } from "@/features/dashboard/components/assignmen
 import { DashboardFilterBar } from "@/features/dashboard/components/dashboard-filter-bar";
 
 type AdminDashboardOverviewProps = {
+  paymentsData?: PaymentsPageData;
   attendanceBreakdown?: DashboardBreakdownSlice[];
   attendanceTrend?: AttendanceTrendPoint[];
   calendarItems?: CalendarEventItem[];
@@ -75,6 +78,7 @@ type AdminDashboardOverviewProps = {
 };
 
 export function AdminDashboardOverview({
+  paymentsData,
   attendanceBreakdown,
   attendanceTrend,
   calendarItems,
@@ -148,13 +152,13 @@ export function AdminDashboardOverview({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-4 flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {executiveSections.map((section) => {
               const isActive = section.id === activeExecutiveSection?.id;
               const leadMetric = section.metrics[0];
               const supportMetric = section.metrics[1];
               const accent = getExecutiveSectionAccent(section.id, isActive);
-              const cardClassName = `group relative overflow-hidden rounded-[1.3rem] border p-3 text-left transition duration-200 sm:rounded-[1.7rem] sm:p-4 ${accent.card}`;
+              const cardClassName = `group relative shrink-0 w-[220px] overflow-hidden rounded-[1.7rem] border p-4 text-left transition duration-200 ${accent.card}`;
               const cardContent = (
                 <>
                   <div className={`absolute inset-x-0 top-0 h-1.5 ${accent.bar}`} />
@@ -163,18 +167,13 @@ export function AdminDashboardOverview({
                   </div>
                   <h4 className={`mt-4 text-[1.15rem] font-semibold tracking-tight ${accent.title}`}>{section.title}</h4>
                   <div className="mt-2 grid gap-2 sm:mt-3">
-                    <div className={`rounded-[1rem] border px-3 py-2.5 sm:rounded-[1.2rem] sm:px-4 sm:py-3 ${accent.metricShell}`}>
-                      <div className="flex items-end justify-between gap-3">
-                        <div>
-                          <p className={`text-[0.65rem] font-semibold uppercase tracking-[0.2em] ${accent.metricLabel}`}>{leadMetric?.label ?? "Overview"}</p>
-                          <p className={`mt-2 text-[1.8rem] font-semibold leading-none ${accent.metricValue}`}>{leadMetric?.value ?? "-"}</p>
-                        </div>
-                        <span className={`text-xs font-semibold ${accent.metricHint}`}>{supportMetric?.label ?? "Details"}</span>
-                      </div>
+                    <div className={`rounded-[1.2rem] border px-4 py-3 ${accent.metricShell}`}>
+                      <p className={`text-[0.65rem] font-semibold uppercase tracking-[0.2em] ${accent.metricLabel}`}>{leadMetric?.label ?? "Overview"}</p>
+                      <p className={`mt-1.5 truncate text-[1.6rem] font-semibold leading-none ${accent.metricValue}`}>{leadMetric?.value ?? "-"}</p>
                       {supportMetric ? (
-                        <div className={`mt-3 flex items-center justify-between border-t pt-3 ${accent.metricDivider}`}>
-                          <span className={`text-xs uppercase tracking-[0.16em] ${accent.metricHint}`}>{supportMetric.label}</span>
-                          <span className={`text-sm font-semibold ${accent.metricValue}`}>{supportMetric.value}</span>
+                        <div className={`mt-3 border-t pt-2.5 ${accent.metricDivider}`}>
+                          <p className={`text-[0.6rem] uppercase tracking-[0.16em] ${accent.metricHint}`}>{supportMetric.label}</p>
+                          <p className={`mt-0.5 truncate text-[0.9rem] font-semibold ${accent.metricValue}`}>{supportMetric.value}</p>
                         </div>
                       ) : null}
                     </div>
@@ -198,7 +197,13 @@ export function AdminDashboardOverview({
           {activeExecutiveSection ? (
             <div className="mt-4">
               <FilterContextNote filterDate={filterDate} filterLabel={filterLabel} filterMonth={filterMonth} sectionTitle={activeExecutiveSection.title} />
-              <ExecutiveSectionPanel section={activeExecutiveSection} />
+              {activeExecutiveSection.id === "payments" && paymentsData ? (
+                <div className="-mx-5">
+                  <ClientPaymentsPanel data={paymentsData} inline />
+                </div>
+              ) : (
+                <ExecutiveSectionPanel section={activeExecutiveSection} />
+              )}
             </div>
           ) : null}
         </section>
@@ -441,6 +446,103 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
           ))}
         </div>
 
+        {section.id === "payments" ? (
+          <div className="mt-4 overflow-hidden rounded-[1.8rem] border border-amber-200/60"
+            style={{ background: "linear-gradient(135deg,#fffbeb 0%,#fff7ed 50%,#ffffff 100%)" }}>
+            <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3"
+              style={{ borderBottom: "1px solid rgba(245,158,11,0.15)" }}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ background: "linear-gradient(135deg,#92400e,#d97706)" }}>
+                  <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" strokeLinecap="round" strokeWidth="2.2" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[0.62rem] font-black uppercase tracking-[0.28em] text-amber-700">Finance Module</p>
+                  <h5 className="text-lg font-black tracking-tight text-slate-950">Payment Pipeline</h5>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-amber-700">
+                  {section.items.length} record{section.items.length !== 1 ? "s" : ""}
+                </span>
+                <Link
+                  className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white transition hover:opacity-90"
+                  href="/dashboard/payments"
+                  style={{ background: "linear-gradient(135deg,#92400e 0%,#d97706 60%,#f59e0b 100%)", boxShadow: "0 4px 14px rgba(245,158,11,0.3)" }}
+                >
+                  <svg fill="none" height="13" viewBox="0 0 24 24" width="13">
+                    <path d="M12 5v14M5 12h14" stroke="white" strokeLinecap="round" strokeWidth="2.5" />
+                  </svg>
+                  Add Payment
+                </Link>
+                <Link
+                  className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-white px-4 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50"
+                  href="/dashboard/payments"
+                >
+                  View All →
+                </Link>
+              </div>
+            </div>
+
+            <div className="p-5 grid gap-3 sm:grid-cols-2">
+              {section.items.length ? (
+                section.items.map((item) => (
+                  <Link
+                    className="group block rounded-[1.4rem] border border-amber-100 bg-white p-4 shadow-[0_4px_14px_rgba(245,158,11,0.06)] transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_8px_24px_rgba(245,158,11,0.12)]"
+                    href="/dashboard/payments"
+                    key={item.id}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide"
+                        style={
+                          item.meta?.includes("PAID") ? { background: "#ecfdf5", color: "#065f46", borderColor: "#6ee7b7" }
+                          : item.meta?.includes("OVERDUE") ? { background: "#fff1f2", color: "#be123c", borderColor: "#fca5a5" }
+                          : item.meta?.includes("PARTIAL") ? { background: "#fffbeb", color: "#92400e", borderColor: "#fde68a" }
+                          : { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
+                        }>
+                        {item.meta?.split("||")[0] ?? "PENDING"}
+                      </span>
+                      <svg className="text-slate-300 transition group-hover:text-amber-400" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                        <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                      </svg>
+                    </div>
+                    <p className="mt-3 font-bold text-slate-900">{item.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.description}</p>
+                    {(() => {
+                      const parts = item.meta?.split("||") ?? [];
+                      const total = parts[1], received = parts[2], balance = parts[3], due = parts[4];
+                      if (!total) return null;
+                      return (
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3">
+                          <span className="text-[0.65rem] font-bold text-slate-700">Total: {total}</span>
+                          {received && received !== "₹0" ? <span className="text-[0.65rem] font-semibold text-emerald-600">Rcvd: {received}</span> : null}
+                          {balance && balance !== "₹0" ? <span className="text-[0.65rem] font-semibold text-amber-600">Due: {balance}</span> : null}
+                          {due ? <span className="text-[0.65rem] text-slate-400">Due date: {due}</span> : null}
+                        </div>
+                      );
+                    })()}
+                  </Link>
+                ))
+              ) : (
+                <div className="sm:col-span-2 rounded-[1.4rem] border border-dashed border-amber-200 bg-amber-50/40 p-8 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100">
+                      <svg fill="none" height="22" viewBox="0 0 24 24" width="22">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#d97706" strokeLinecap="round" strokeWidth="2" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-semibold text-amber-800">No payment records yet</p>
+                    <Link className="mt-1 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600 transition" href="/dashboard/payments">
+                      Add First Payment →
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="mt-5 rounded-[1.7rem] border border-slate-100 bg-slate-50/70 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -492,6 +594,7 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
             )}
           </div>
         </div>
+        )}
       </div>
     </section>
   );

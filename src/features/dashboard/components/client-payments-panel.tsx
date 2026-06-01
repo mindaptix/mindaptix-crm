@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import type { ClientPaymentEntry, PaymentsPageData } from "@/features/dashboard/types";
 import {
+  addPaymentInstallment,
   createClientPayment,
   deleteClientPayment,
-  markPaymentReceived,
   updateClientPayment,
   type ClientPaymentFormState,
 } from "@/features/dashboard/actions/client-payments";
@@ -38,16 +39,6 @@ function StatusBadge({ status }: { status: string }) {
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: cfg.dot }} />
       {cfg.label}
     </span>
-  );
-}
-
-function ProgressBar({ total, received }: { total: number; received: number }) {
-  const pct = total > 0 ? Math.min(Math.round((received / total) * 100), 100) : 0;
-  const color = pct === 100 ? "#10b981" : pct > 0 ? "#f59e0b" : "#e2e8f0";
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
-    </div>
   );
 }
 
@@ -141,14 +132,15 @@ function ComboField({
 
   return (
     <div className="relative">
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}{required ? " *" : ""}</label>
-      {/* Hidden input carries the value into FormData */}
+      <label className="mb-1.5 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-slate-500">
+        {label}{required ? <span className="ml-0.5 text-amber-500">*</span> : ""}
+      </label>
       <input name={name} type="hidden" value={value} />
       <div className="relative">
         <input
           autoComplete="off"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 pr-9"
-          onBlur={() => { /* don't close on blur — let pointerdown handle it */ }}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-10 text-sm font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100"
+          onBlur={() => {}}
           onChange={(e) => handleInput(e.target.value)}
           onFocus={() => setOpen(true)}
           placeholder={placeholder}
@@ -156,41 +148,44 @@ function ComboField({
           required={required}
           value={search}
         />
-        {/* Chevron */}
         <button
-          className="absolute inset-y-0 right-2.5 flex items-center text-slate-400 hover:text-slate-600"
+          className="absolute inset-y-0 right-3 flex items-center text-slate-400 transition hover:text-amber-500"
           onClick={() => setOpen((v) => !v)}
           tabIndex={-1}
           type="button"
         >
-          <svg className={`transition-transform ${open ? "rotate-180" : ""}`} fill="none" height="14" viewBox="0 0 24 24" width="14">
-            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          <svg className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" height="15" viewBox="0 0 24 24" width="15">
+            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
           </svg>
         </button>
       </div>
-      {options.length > 0 ? (
-        <p className="mt-1 text-[0.65rem] text-slate-400">{options.length} option{options.length !== 1 ? "s" : ""} available · ya khud type karein</p>
+      {options.length > 0 && !search ? (
+        <p className="mt-1 text-[0.63rem] font-medium text-slate-400">{options.length} suggestion{options.length !== 1 ? "s" : ""} available</p>
       ) : null}
 
-      {/* Portal dropdown */}
       {open && typeof document !== "undefined" ? createPortal(
         <div
-          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_16px_48px_rgba(15,23,42,0.16)]"
+          className="overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
           ref={dropdownRef}
-          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 9999, maxHeight: "14rem", overflowY: "auto" }}
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 9999, maxHeight: "13rem", overflowY: "auto" }}
         >
+          <div className="border-b border-slate-100 bg-amber-50/60 px-4 py-2">
+            <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-amber-700">Select or type</p>
+          </div>
           {filtered.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-slate-400">No matches — type to use custom value</p>
+            <p className="px-4 py-3 text-sm text-slate-400 italic">No matches — using custom value</p>
           ) : (
             filtered.map((opt) => (
               <button
-                className={`w-full px-4 py-2.5 text-left text-sm transition-colors hover:bg-blue-50 hover:text-blue-800 ${opt === value ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-700"}`}
+                className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-amber-50 ${opt === value ? "bg-amber-50 font-semibold text-amber-800" : "text-slate-700"}`}
                 key={opt}
                 onPointerDown={(e) => { e.preventDefault(); handleSelect(opt); }}
                 type="button"
               >
                 {opt}
-                {opt === value ? <span className="ml-2 text-[0.6rem] font-bold text-blue-500">✓</span> : null}
+                {opt === value ? (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white text-[0.55rem] font-black">✓</span>
+                ) : null}
               </button>
             ))
           )}
@@ -201,17 +196,106 @@ function ComboField({
   );
 }
 
-// ─── Payment form (create / edit) ───────────────────────────────────────────
+// ─── Section label ───────────────────────────────────────────────────────────
 
-function PaymentForm({
+function SectionLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="flex items-center gap-2.5 pb-1">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl"
+        style={{ background: "linear-gradient(135deg,#92400e,#d97706)" }}>
+        <span className="text-white">{icon}</span>
+      </span>
+      <span className="text-[0.65rem] font-black uppercase tracking-[0.26em] text-amber-800">{label}</span>
+      <span className="h-px flex-1" style={{ background: "linear-gradient(90deg,#fcd34d,transparent)" }} />
+    </div>
+  );
+}
+
+// ─── Currency input ───────────────────────────────────────────────────────────
+
+function CurrencyInput({ label, name, defaultValue, placeholder, required }: {
+  label: string; name: string; defaultValue?: string; placeholder?: string; required?: boolean;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-slate-500">
+        {label}{required ? <span className="ml-0.5 text-amber-500">*</span> : ""}
+      </label>
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+          <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[0.7rem] font-black text-amber-700">₹</span>
+        </div>
+        <input
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-semibold text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100"
+          defaultValue={defaultValue ?? ""}
+          min="0"
+          name={name}
+          placeholder={placeholder ?? "0"}
+          required={required}
+          type="number"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Status picker (premium cards) ─────────────────────────────────────────
+
+const STATUS_OPTIONS: {
+  value: string; label: string; desc: string;
+  color: string; bg: string; border: string; dot: string; activeBg: string;
+}[] = [
+  { value: "PENDING",  label: "Pending",  desc: "Awaiting payment",   color: "#1e40af", bg: "#eff6ff", border: "#bfdbfe", dot: "#3b82f6", activeBg: "#dbeafe" },
+  { value: "PARTIAL",  label: "Partial",  desc: "Part received",      color: "#78350f", bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b", activeBg: "#fef3c7" },
+  { value: "PAID",     label: "Paid",     desc: "Fully collected",    color: "#064e3b", bg: "#ecfdf5", border: "#6ee7b7", dot: "#10b981", activeBg: "#d1fae5" },
+  { value: "OVERDUE",  label: "Overdue",  desc: "Past due date",      color: "#9f1239", bg: "#fff1f2", border: "#fca5a5", dot: "#ef4444", activeBg: "#fee2e2" },
+];
+
+function StatusPicker({ defaultValue }: { defaultValue?: string }) {
+  const [selected, setSelected] = useState(defaultValue ?? "PENDING");
+  return (
+    <div className="sm:col-span-2">
+      <label className="mb-2 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-slate-500">Payment Status</label>
+      <input name="status" type="hidden" value={selected} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {STATUS_OPTIONS.map((s) => {
+          const active = selected === s.value;
+          return (
+            <button
+              className="flex flex-col items-start rounded-xl border p-3 text-left transition-all"
+              key={s.value}
+              onClick={() => setSelected(s.value)}
+              style={active
+                ? { background: s.activeBg, borderColor: s.dot, boxShadow: `0 0 0 2px ${s.border}, 0 4px 12px ${s.dot}22`, color: s.color }
+                : { background: "#f8fafc", borderColor: "#e2e8f0", color: "#64748b" }
+              }
+              type="button"
+            >
+              <span className="mb-1.5 flex h-6 w-6 items-center justify-center rounded-lg"
+                style={{ background: active ? s.dot : "#e2e8f0" }}>
+                <span className="h-2 w-2 rounded-full bg-white" />
+              </span>
+              <span className="text-[0.72rem] font-black">{s.label}</span>
+              <span className="mt-0.5 text-[0.6rem] font-medium opacity-70">{s.desc}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Payment modal (premium) ──────────────────────────────────────────────────
+
+function PaymentModal({
   initial,
   onSuccess,
-  onCancel,
+  onClose,
   suggestions,
 }: {
   initial?: ClientPaymentEntry;
   onSuccess: () => void;
-  onCancel: () => void;
+  onClose: () => void;
   suggestions: { clientName: string; projectName: string }[];
 }) {
   const isEdit = Boolean(initial?.id);
@@ -234,208 +318,366 @@ function PaymentForm({
   });
 
   const v = state.values ?? {};
-
-  // Controlled state for both fields so they can auto-fill each other
   const [clientName, setClientName] = useState(v.clientName ?? initial?.clientName ?? "");
   const [projectName, setProjectName] = useState(v.projectName ?? initial?.projectName ?? "");
 
-  // Sync controlled state if server returns values after validation error
   useEffect(() => {
     if (v.clientName !== undefined) setClientName(v.clientName);
     if (v.projectName !== undefined) setProjectName(v.projectName);
   }, [v.clientName, v.projectName]);
 
-  useEffect(() => {
-    if (state.success) onSuccess();
-  }, [state.success, onSuccess]);
+  useEffect(() => { if (state.success) onSuccess(); }, [state.success, onSuccess]);
 
-  // Unique client names from all projects
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const clientNames = useMemo(
     () => Array.from(new Set(suggestions.map((s) => s.clientName).filter(Boolean))).sort(),
     [suggestions],
   );
-
-  // All project names (always show every project in dropdown)
   const allProjectNames = useMemo(
     () => Array.from(new Set(suggestions.map((s) => s.projectName).filter(Boolean))).sort(),
     [suggestions],
   );
 
-  // When project is selected from datalist → auto-fill client name if project has one
   function handleProjectChange(value: string) {
     setProjectName(value);
     const match = suggestions.find((s) => s.projectName === value);
-    if (match?.clientName) {
-      setClientName(match.clientName);
-    }
+    if (match?.clientName) setClientName(match.clientName);
   }
 
-  return (
-    <form action={formAction} className="space-y-4">
-      {isEdit && <input name="paymentId" type="hidden" value={v.id ?? initial?.id ?? ""} />}
+  if (typeof document === "undefined") return null;
 
-      {state.error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{state.error}</div>
-      ) : null}
-      {state.success ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{state.success}</div>
-      ) : null}
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      style={{ background: "rgba(2,6,23,0.62)", backdropFilter: "blur(6px)" }}
+    >
+      {/* Backdrop click to close */}
+      <div className="absolute inset-0" onClick={onClose} />
 
-      {/* Client name + project name — proper dropdown combobox */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <ComboField
-          label="Client Name"
-          name="clientName"
-          onChange={setClientName}
-          options={clientNames}
-          placeholder="Select or type client name"
-          required
-          value={clientName}
-        />
-        <ComboField
-          label="Project Name"
-          name="projectName"
-          onChange={handleProjectChange}
-          options={allProjectNames}
-          placeholder="Select project or type name"
-          required
-          value={projectName}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice Number</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.invoiceNumber ?? ""}
-            name="invoiceNumber"
-            placeholder="e.g. INV-2024-001"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
-          <select
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.status ?? "PENDING"}
-            name="status"
-          >
-            <option value="PENDING">Pending</option>
-            <option value="PARTIAL">Partial</option>
-            <option value="PAID">Paid</option>
-            <option value="OVERDUE">Overdue</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Total Amount (₹) *</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.amount ?? "0"}
-            min="0"
-            name="amount"
-            placeholder="e.g. 80000"
-            type="number"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Received Amount (₹)</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.receivedAmount ?? "0"}
-            min="0"
-            name="receivedAmount"
-            placeholder="e.g. 30000"
-            type="number"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Due Date</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.dueDate ?? ""}
-            name="dueDate"
-            type="date"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Received Date</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            defaultValue={v.receivedDate ?? ""}
-            name="receivedDate"
-            type="date"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Note</label>
-        <textarea
-          className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-          defaultValue={v.note ?? ""}
-          name="note"
-          placeholder="Add any relevant payment notes..."
-          rows={2}
-        />
-      </div>
-
-      <div className="flex justify-end gap-3 pt-2">
-        <button
-          className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition"
-          onClick={onCancel}
-          type="button"
+      {/* Modal card */}
+      <div
+        className="relative z-10 flex w-full max-w-[920px] flex-col overflow-hidden rounded-t-[2rem] sm:rounded-[2rem]"
+        style={{
+          background: "#fff",
+          boxShadow: "0 32px 80px rgba(2,6,23,0.28), 0 0 0 1px rgba(245,158,11,0.12)",
+          maxHeight: "96dvh",
+          minHeight: "min(700px, 96dvh)",
+        }}
+      >
+        {/* ── Modal header ── */}
+        <div
+          className="relative shrink-0 overflow-hidden px-7 pb-6 pt-7"
+          style={{
+            background: "linear-gradient(135deg,#78350f 0%,#b45309 40%,#d97706 72%,#fbbf24 100%)",
+          }}
         >
-          Cancel
-        </button>
-        <button
-          className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 transition"
-          disabled={pending}
-          type="submit"
-        >
-          {pending ? "Saving…" : isEdit ? "Update Record" : "Add Payment"}
-        </button>
+          {/* Decorative blobs */}
+          <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full opacity-20" style={{ background: "#fef3c7" }} />
+          <div className="pointer-events-none absolute -bottom-6 left-1/2 h-24 w-48 -translate-x-1/2 rounded-full opacity-10 blur-2xl" style={{ background: "#fbbf24" }} />
+
+          <div className="relative flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[0.62rem] font-black uppercase tracking-[0.32em] text-amber-200">
+                {isEdit ? "Edit Record" : "New Record"} · Payment Pipeline
+              </p>
+              <h2 className="mt-1.5 text-2xl font-black tracking-tight text-white">
+                {isEdit ? "Update Payment" : "Add Payment Record"}
+              </h2>
+              <p className="mt-1 text-sm text-amber-100/80">
+                {isEdit ? "Modify invoice details and payment status." : "Fill in client & invoice details to track this payment."}
+              </p>
+            </div>
+            <button
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+              onClick={onClose}
+              type="button"
+            >
+              <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Invoice icon strip */}
+          <div className="relative mt-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
+              <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="white" strokeWidth="2" />
+                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="white" strokeLinecap="round" strokeWidth="2" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white/90">Secure Finance Record</p>
+              <p className="text-[0.62rem] text-amber-200/70">All amounts in Indian Rupees (₹)</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Modal body (scrollable) ── */}
+        <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: "linear-gradient(180deg,#fafaf9 0%,#f8fafc 100%)" }}>
+          <form action={formAction} id="payment-modal-form" className="space-y-3 px-6 py-5">
+            {isEdit && <input name="paymentId" type="hidden" value={v.id ?? initial?.id ?? ""} />}
+
+            {state.error ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-red-100">
+                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14">
+                    <circle cx="12" cy="12" r="10" stroke="#ef4444" strokeWidth="2" />
+                    <path d="M12 8v4m0 4h.01" stroke="#ef4444" strokeLinecap="round" strokeWidth="2" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-red-700">{state.error}</p>
+              </div>
+            ) : null}
+
+            {/* Section 1 — Client Info */}
+            <div className="rounded-2xl border border-amber-100/80 bg-white p-4 shadow-[0_2px_12px_rgba(245,158,11,0.06)]">
+              <div className="mb-3">
+                <SectionLabel
+                  icon={<svg fill="none" height="12" viewBox="0 0 24 24" width="12"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" /><circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2.5" /></svg>}
+                  label="Client Information"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <ComboField
+                  label="Client Name"
+                  name="clientName"
+                  onChange={setClientName}
+                  options={clientNames}
+                  placeholder="Type or select client…"
+                  required
+                  value={clientName}
+                />
+                <ComboField
+                  label="Project Name"
+                  name="projectName"
+                  onChange={handleProjectChange}
+                  options={allProjectNames}
+                  placeholder="Type or select project…"
+                  required
+                  value={projectName}
+                />
+              </div>
+            </div>
+
+            {/* Section 2 — Invoice + Status */}
+            <div className="rounded-2xl border border-amber-100/80 bg-white p-4 shadow-[0_2px_12px_rgba(245,158,11,0.06)]">
+              <div className="mb-3">
+                <SectionLabel
+                  icon={<svg fill="none" height="12" viewBox="0 0 24 24" width="12"><rect height="18" rx="2" width="14" x="5" y="3" stroke="currentColor" strokeWidth="2.5" /><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>}
+                  label="Invoice Details"
+                />
+              </div>
+              <div className="mb-3">
+                <label className="mb-1.5 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-slate-500">Invoice Number</label>
+                <input
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                  defaultValue={v.invoiceNumber ?? ""}
+                  name="invoiceNumber"
+                  placeholder="e.g. INV-2025-001"
+                />
+              </div>
+              <StatusPicker defaultValue={v.status ?? initial?.status} />
+            </div>
+
+            {/* Section 3 — Financials */}
+            <div className="rounded-2xl border border-amber-100/80 bg-white p-4 shadow-[0_2px_12px_rgba(245,158,11,0.06)]">
+              <div className="mb-3">
+                <SectionLabel
+                  icon={<svg fill="none" height="12" viewBox="0 0 24 24" width="12"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" /></svg>}
+                  label="Financial Details"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <CurrencyInput
+                  defaultValue={v.amount && v.amount !== "0" ? v.amount : initial?.totalAmount ? String(initial.totalAmount) : ""}
+                  label="Total Invoice Amount"
+                  name="amount"
+                  placeholder="e.g. 1,50,000"
+                  required
+                />
+                <CurrencyInput
+                  defaultValue={v.receivedAmount && v.receivedAmount !== "0" ? v.receivedAmount : initial?.receivedAmount ? String(initial.receivedAmount) : ""}
+                  label="Amount Received"
+                  name="receivedAmount"
+                  placeholder="e.g. 75,000"
+                />
+              </div>
+            </div>
+
+            {/* Section 4 — Timeline */}
+            <div className="rounded-2xl border border-amber-100/80 bg-white p-4 shadow-[0_2px_12px_rgba(245,158,11,0.06)]">
+              <div className="mb-3">
+                <SectionLabel
+                  icon={<svg fill="none" height="12" viewBox="0 0 24 24" width="12"><rect height="18" rx="2" width="18" x="3" y="4" stroke="currentColor" strokeWidth="2.5" /><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>}
+                  label="Payment Timeline"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-slate-500">Due Date</label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                    defaultValue={v.dueDate ?? initial?.dueDate ?? ""}
+                    name="dueDate"
+                    type="date"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-slate-500">Date Received</label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                    defaultValue={v.receivedDate ?? initial?.receivedDate ?? ""}
+                    name="receivedDate"
+                    type="date"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Note */}
+            <div className="rounded-2xl border border-amber-100/80 bg-white p-4 shadow-[0_2px_12px_rgba(245,158,11,0.06)]">
+              <label className="mb-2 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-slate-500">Internal Note <span className="font-medium normal-case tracking-normal text-slate-400">(optional)</span></label>
+              <textarea
+                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                defaultValue={v.note ?? initial?.note ?? ""}
+                name="note"
+                placeholder="Any additional context, payment terms, or follow-up notes…"
+                rows={2}
+              />
+            </div>
+          </form>
+        </div>
+
+        {/* ── Modal footer ── */}
+        <div className="shrink-0 border-t border-slate-100 bg-slate-50/70 px-7 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[0.65rem] text-slate-400">
+              {isEdit ? "Changes will update the existing record." : "Record will be saved to Payment Pipeline."}
+            </p>
+            <div className="flex items-center gap-2.5">
+              <button
+                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                onClick={onClose}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="relative flex items-center gap-2 overflow-hidden rounded-xl px-6 py-2.5 text-sm font-bold text-white transition disabled:opacity-60"
+                disabled={pending}
+                form="payment-modal-form"
+                style={{
+                  background: pending
+                    ? "#d97706"
+                    : "linear-gradient(135deg,#b45309 0%,#d97706 60%,#f59e0b 100%)",
+                  boxShadow: pending ? "none" : "0 4px 16px rgba(245,158,11,0.35)",
+                }}
+                type="submit"
+              >
+                {pending ? (
+                  <>
+                    <svg className="animate-spin" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                      <path className="opacity-75" d="M4 12a8 8 0 018-8" stroke="white" strokeLinecap="round" strokeWidth="4" />
+                    </svg>
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <svg fill="none" height="14" viewBox="0 0 24 24" width="14">
+                      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="white" strokeWidth="2" />
+                      <path d="M17 21v-8H7v8M7 3v5h8" stroke="white" strokeLinecap="round" strokeWidth="2" />
+                    </svg>
+                    {isEdit ? "Update Record" : "Save Payment"}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </form>
+    </div>,
+    document.body,
   );
 }
 
-// ─── Quick "Mark Received" form ──────────────────────────────────────────────
+// ─── Record installment form ─────────────────────────────────────────────────
 
-function MarkReceivedForm({ payment, onClose }: { payment: ClientPaymentEntry; onClose: () => void }) {
-  const [state, formAction, pending] = useActionState(markPaymentReceived, {});
+function RecordInstallmentForm({ payment, onClose }: { payment: ClientPaymentEntry; onClose: () => void }) {
+  const [state, formAction, pending] = useActionState(addPaymentInstallment, {});
   useEffect(() => { if (state.success) onClose(); }, [state.success, onClose]);
+  const today = new Date().toISOString().slice(0, 10);
+  const remaining = payment.balanceDue;
 
   return (
-    <form action={formAction} className="mt-4 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-      <p className="text-sm font-bold text-emerald-900">Mark Payment Received</p>
+    <form action={formAction} className="mt-3 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500">
+          <svg fill="none" height="13" viewBox="0 0 24 24" width="13">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" strokeLinecap="round" strokeWidth="2.2" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-xs font-black text-emerald-900">Record Installment</p>
+          <p className="text-[0.62rem] text-emerald-600">Remaining: {formatCurrency(remaining)}</p>
+        </div>
+      </div>
       <input name="paymentId" type="hidden" value={payment.id} />
-      {state.error ? <p className="text-xs font-semibold text-red-600">{state.error}</p> : null}
-      <div className="flex items-end gap-3">
-        <div className="flex-1">
-          <label className="mb-1 block text-xs font-semibold text-emerald-700">Received Amount (₹)</label>
+      {state.error ? <p className="rounded-lg bg-red-100 px-3 py-2 text-xs font-semibold text-red-700">{state.error}</p> : null}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-[0.62rem] font-bold uppercase tracking-wide text-emerald-700">Amount (₹) *</label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-emerald-600">₹</span>
+            <input
+              className="w-full rounded-xl border border-emerald-200 bg-white py-2.5 pl-7 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              max={remaining}
+              min={1}
+              name="txAmount"
+              placeholder="e.g. 50000"
+              required
+              type="number"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[0.62rem] font-bold uppercase tracking-wide text-emerald-700">Date Received</label>
           <input
-            className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-            defaultValue={payment.totalAmount}
-            max={payment.totalAmount}
-            min={0}
-            name="receivedAmount"
-            type="number"
+            className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            defaultValue={today}
+            name="txDate"
+            type="date"
           />
         </div>
+      </div>
+      <div>
+        <label className="mb-1 block text-[0.62rem] font-bold uppercase tracking-wide text-emerald-700">Note / Reference</label>
+        <input
+          className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+          name="note"
+          placeholder="e.g. NEFT transfer, cheque no."
+        />
+      </div>
+      <div className="flex gap-2">
         <button
-          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60 transition"
+          className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
           disabled={pending}
           type="submit"
         >
-          {pending ? "Saving…" : "Confirm"}
+          {pending ? "Saving…" : "Save Installment"}
         </button>
-        <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition" onClick={onClose} type="button">
+        <button
+          className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          onClick={onClose}
+          type="button"
+        >
           Cancel
         </button>
       </div>
@@ -454,10 +696,15 @@ function PaymentCard({
   canManage: boolean;
   onEdit: (p: ClientPaymentEntry) => void;
 }) {
-  const [showMarkReceived, setShowMarkReceived] = useState(false);
+  const [showInstallment, setShowInstallment] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isOverdue = payment.status === "OVERDUE";
   const isPaid = payment.status === "PAID";
+  const pct = payment.totalAmount > 0
+    ? Math.min(Math.round((payment.receivedAmount / payment.totalAmount) * 100), 100)
+    : 0;
+  const txCount = payment.transactions?.length ?? 0;
 
   return (
     <article
@@ -468,7 +715,7 @@ function PaymentCard({
         boxShadow: isOverdue ? "0 4px 18px rgba(239,68,68,0.08)" : "0 4px 14px rgba(15,23,42,0.05)",
       }}
     >
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -482,33 +729,92 @@ function PaymentCard({
         ) : null}
       </div>
 
-      {/* Amounts */}
+      {/* ── Amount + Progress ── */}
       <div className="border-t border-slate-100 px-4 py-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-slate-500">Total</span>
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-[0.65rem] font-bold uppercase tracking-wide text-slate-400">Contract Value</span>
           <span className="text-sm font-black text-slate-900">{formatCurrency(payment.totalAmount)}</span>
         </div>
-        <ProgressBar received={payment.receivedAmount} total={payment.totalAmount} />
-        <div className="mt-1.5 flex items-center justify-between gap-2">
-          <span className="text-[0.65rem] text-emerald-600 font-semibold">Received: {formatCurrency(payment.receivedAmount)}</span>
-          {payment.balanceDue > 0 ? (
-            <span className={`text-[0.65rem] font-bold ${isOverdue ? "text-red-600" : "text-amber-600"}`}>
-              Balance: {formatCurrency(payment.balanceDue)}
-            </span>
-          ) : null}
+
+        {/* Progress bar with percentage */}
+        <div className="relative">
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${pct}%`,
+                background: isPaid ? "#10b981" : pct > 0 ? "linear-gradient(90deg,#f59e0b,#10b981)" : "#e2e8f0",
+              }}
+            />
+          </div>
+          <span className="absolute right-0 top-4 text-[0.58rem] font-bold text-slate-400">{pct}%</span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-emerald-50 px-3 py-2">
+            <p className="text-[0.6rem] font-bold uppercase tracking-wide text-emerald-600">Received</p>
+            <p className="mt-0.5 text-[0.88rem] font-black text-emerald-700">{formatCurrency(payment.receivedAmount)}</p>
+          </div>
+          <div className={`rounded-xl px-3 py-2 ${isOverdue ? "bg-red-50" : "bg-amber-50"}`}>
+            <p className={`text-[0.6rem] font-bold uppercase tracking-wide ${isOverdue ? "text-red-500" : "text-amber-600"}`}>Balance Due</p>
+            <p className={`mt-0.5 text-[0.88rem] font-black ${isOverdue ? "text-red-700" : "text-amber-700"}`}>
+              {payment.balanceDue > 0 ? formatCurrency(payment.balanceDue) : "—"}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Dates */}
-      {(payment.dueDate || payment.receivedDate) ? (
-        <div className="border-t border-slate-100 px-4 py-2.5 flex flex-wrap gap-x-4 gap-y-1">
-          {payment.dueDate ? (
-            <span className={`text-[0.62rem] font-semibold ${isOverdue ? "text-red-600" : "text-slate-400"}`}>
-              Due: {payment.dueDate}
+      {/* ── Installment history ── */}
+      {txCount > 0 ? (
+        <div className="border-t border-slate-100 px-4 py-3">
+          <button
+            className="flex w-full items-center justify-between text-left"
+            onClick={() => setShowHistory((v) => !v)}
+            type="button"
+          >
+            <span className="flex items-center gap-1.5 text-[0.68rem] font-bold text-slate-600">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[0.55rem] font-black text-slate-500">{txCount}</span>
+              Installment{txCount !== 1 ? "s" : ""} received
             </span>
+            <svg className={`transition-transform ${showHistory ? "rotate-180" : ""}`} fill="none" height="12" viewBox="0 0 24 24" width="12">
+              <path d="m6 9 6 6 6-6" stroke="#94a3b8" strokeLinecap="round" strokeWidth="2" />
+            </svg>
+          </button>
+
+          {showHistory ? (
+            <div className="mt-2 space-y-1.5">
+              {payment.transactions.slice().reverse().map((tx, i) => (
+                <div
+                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+                  key={tx.id || i}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                      <svg fill="none" height="9" viewBox="0 0 24 24" width="9">
+                        <path d="M20 12H4M12 4l8 8-8 8" stroke="#10b981" strokeLinecap="round" strokeWidth="2.5" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-[0.68rem] font-bold text-slate-800">{formatCurrency(tx.txAmount)}</p>
+                      {tx.note ? <p className="text-[0.6rem] text-slate-400">{tx.note}</p> : null}
+                    </div>
+                  </div>
+                  <span className="text-[0.6rem] font-semibold text-slate-400">{tx.txDate || tx.createdAt}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* ── Dates + note ── */}
+      {(payment.dueDate || payment.receivedDate) ? (
+        <div className="border-t border-slate-100 px-4 py-2 flex flex-wrap gap-x-4 gap-y-1">
+          {payment.dueDate ? (
+            <span className={`text-[0.62rem] font-semibold ${isOverdue ? "text-red-600" : "text-slate-400"}`}>Due: {payment.dueDate}</span>
           ) : null}
           {payment.receivedDate ? (
-            <span className="text-[0.62rem] font-semibold text-emerald-600">Paid on: {payment.receivedDate}</span>
+            <span className="text-[0.62rem] font-semibold text-emerald-600">Last payment: {payment.receivedDate}</span>
           ) : null}
         </div>
       ) : null}
@@ -519,23 +825,26 @@ function PaymentCard({
         </div>
       ) : null}
 
-      {/* Mark received quick form */}
-      {showMarkReceived && !isPaid ? (
+      {/* ── Installment form ── */}
+      {showInstallment && !isPaid ? (
         <div className="px-4 pb-3">
-          <MarkReceivedForm payment={payment} onClose={() => setShowMarkReceived(false)} />
+          <RecordInstallmentForm payment={payment} onClose={() => setShowInstallment(false)} />
         </div>
       ) : null}
 
-      {/* Actions */}
+      {/* ── Actions ── */}
       {canManage ? (
         <div className="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2">
-          {!isPaid && !showMarkReceived ? (
+          {!isPaid && !showInstallment ? (
             <button
-              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[0.68rem] font-bold text-emerald-700 hover:bg-emerald-100 transition"
-              onClick={() => setShowMarkReceived(true)}
+              className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[0.68rem] font-bold text-emerald-700 hover:bg-emerald-100 transition"
+              onClick={() => setShowInstallment(true)}
               type="button"
             >
-              Mark Received
+              <svg fill="none" height="10" viewBox="0 0 24 24" width="10">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+              </svg>
+              Record Payment
             </button>
           ) : null}
           <button
@@ -546,18 +855,10 @@ function PaymentCard({
             Edit
           </button>
           {confirmDelete ? (
-            <form
-              action={deleteClientPayment}
-              className="flex gap-2"
-              onSubmit={() => setConfirmDelete(false)}
-            >
+            <form action={deleteClientPayment} className="flex gap-2" onSubmit={() => setConfirmDelete(false)}>
               <input name="paymentId" type="hidden" value={payment.id} />
-              <button className="rounded-lg bg-red-600 px-3 py-1.5 text-[0.68rem] font-bold text-white hover:bg-red-700 transition" type="submit">
-                Confirm Delete
-              </button>
-              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[0.68rem] font-semibold text-slate-500 hover:bg-slate-50 transition" onClick={() => setConfirmDelete(false)} type="button">
-                Cancel
-              </button>
+              <button className="rounded-lg bg-red-600 px-3 py-1.5 text-[0.68rem] font-bold text-white hover:bg-red-700 transition" type="submit">Confirm Delete</button>
+              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[0.68rem] font-semibold text-slate-500 hover:bg-slate-50 transition" onClick={() => setConfirmDelete(false)} type="button">Cancel</button>
             </form>
           ) : (
             <button
@@ -581,7 +882,8 @@ type Filter = (typeof FILTERS)[number];
 
 // ─── Main panel ──────────────────────────────────────────────────────────────
 
-export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
+export function ClientPaymentsPanel({ data, inline }: { data: PaymentsPageData; inline?: boolean }) {
+  const router = useRouter();
   const suggestions = data.projectSuggestions ?? [];
   const [activeFilter, setActiveFilter] = useState<Filter>("ALL");
   const [editTarget, setEditTarget] = useState<ClientPaymentEntry | null>(null);
@@ -620,6 +922,20 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
         <div className="rounded-[1.8rem] border border-white/70 bg-white/75 px-5 py-4 backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
+              {!inline ? (
+                <button
+                  className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[0.72rem] font-semibold text-slate-500 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                  onClick={() => router.back()}
+                  type="button"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100">
+                    <svg fill="none" height="10" viewBox="0 0 24 24" width="10">
+                      <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+                    </svg>
+                  </span>
+                  Back
+                </button>
+              ) : null}
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-600">Finance Module</p>
               <h2 className="mt-1.5 text-[1.6rem] font-black tracking-tight text-slate-950">Payment Pipeline</h2>
               <p className="mt-1 text-sm text-slate-500">Track all client invoices, received amounts, and overdue payments.</p>
@@ -684,19 +1000,14 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
         </div>
       ) : null}
 
-      {/* ── Add / Edit form ── */}
+      {/* ── Payment modal ── */}
       {showForm && data.canManage ? (
-        <div className="rounded-[1.8rem] border border-slate-200 bg-white p-6 shadow-[0_10px_28px_rgba(15,23,42,0.07)]">
-          <h3 className="mb-4 text-base font-bold text-slate-900">
-            {editTarget ? "Edit Payment Record" : "Add New Payment Record"}
-          </h3>
-          <PaymentForm
-            initial={editTarget ?? undefined}
-            onCancel={() => { setShowForm(false); setEditTarget(null); }}
-            onSuccess={handleFormSuccess}
-            suggestions={suggestions}
-          />
-        </div>
+        <PaymentModal
+          initial={editTarget ?? undefined}
+          onClose={() => { setShowForm(false); setEditTarget(null); }}
+          onSuccess={handleFormSuccess}
+          suggestions={suggestions}
+        />
       ) : null}
 
       {/* ── Filter tabs ── */}

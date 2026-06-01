@@ -841,6 +841,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
   return {
     canMarkAttendance: session.user.role === "EMPLOYEE",
     canViewLocation,
+    canManageOthers: session.user.role === "SUPER_ADMIN",
     summaryCards: [
       { label: "Present Today", value: String(presentCount), detail: "Attendance entries marked for today." },
       { label: "Checked Out", value: String(completedCount), detail: "People who have completed checkout." },
@@ -1762,7 +1763,7 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
   // Fetch all payment records — admin sees all, no scope filter
   const rawPayments = await SalesPaymentModel.find(
     {},
-    { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1 },
+    { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1, transactions: 1 },
   )
     .sort({ dueDate: 1, createdAt: -1 })
     .lean();
@@ -1799,6 +1800,13 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
       createdByUserId: p.salesUserId,
       createdByName: creatorMap.get(p.salesUserId) ?? "Unknown",
       createdAt: formatDateTime(p.createdAt),
+      transactions: ((p as unknown as { transactions?: { _id?: { toString(): string }; txDate?: string; txAmount?: number; note?: string; createdAt?: Date | null }[] }).transactions ?? []).map((t) => ({
+        id: t._id?.toString() ?? "",
+        txDate: t.txDate ?? "",
+        txAmount: Number(t.txAmount ?? 0),
+        note: t.note ?? "",
+        createdAt: t.createdAt ? formatDateTime(t.createdAt) : "",
+      })),
     };
   });
 

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
+import { UserModel } from "@/database/mongodb/models/workforce/user";
+import { assertSuperAdmin } from "@/features/auth/lib/user-admin";
 import { SettingModel } from "@/database/mongodb/models/setting";
 import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time";
 
@@ -249,4 +251,75 @@ export async function cancelCheckout() {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/attendance");
   revalidatePath("/dashboard/reports");
+}
+
+// ─── Admin: manually set attendance for any employee ────────────────────────
+
+export async function adminManualAttendance(
+  _prev: { error?: string; success?: string },
+  formData: FormData,
+): Promise<{ error?: string; success?: string }> {
+  const session = await getCurrentSession();
+
+  try {
+    assertSuperAdmin(session);
+  } catch {
+    return { error: "Only Super Admin can manually update attendance." };
+  }
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const dateKey = String(formData.get("dateKey") ?? "").trim();
+  const checkInTime = String(formData.get("checkInTime") ?? "").trim();
+  const checkOutTime = String(formData.get("checkOutTime") ?? "").trim();
+  const workMode = String(formData.get("workMode") ?? "OFFICE").trim() as WorkMode;
+
+  if (!email) return { error: "Employee email required." };
+  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return { error: "Valid date required (YYYY-MM-DD)." };
+  if (!checkInTime) return { error: "Check-in time required." };
+
+  await connectDb();
+
+  const user = await UserModel.findOne({ email }, { _id: 1 }).lean();
+  if (!user) return { error: `No user found with email: ${email}` };
+
+  const userId = user._id.toString();
+
+  const [inH, inM] = checkInTime.split(":").map(Number);
+  const checkInAt = new Date(`${dateKey}T${String(inH).padStart(2, "0")}:${String(inM ?? 0).padStart(2, "0")}:00+05:30`);
+
+  let checkOutAt: Date | null = null;
+  let workedMinutes = 0;
+  let status = "PRESENT";
+
+  if (checkOutTime) {
+    const [outH, outM] = checkOutTime.split(":").map(Number);
+    checkOutAt = new Date(`${dateKey}T${String(outH).padStart(2, "0")}:${String(outM ?? 0).padStart(2, "0")}:00+05:30`);
+    workedMinutes = Math.max(0, Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60000));
+    status = "COMPLETED";
+  }
+
+  await AttendanceModel.findOneAndUpdate(
+    { userId, dateKey },
+    {
+      $set: {
+        userId,
+        dateKey,
+        workMode: VALID_WORK_MODES.includes(workMode) ? workMode : "OFFICE",
+        checkInAt,
+        ...(checkOutAt ? { checkOutAt, workedMinutes } : {}),
+        status,
+      },
+    },
+    { upsert: true },
+  );
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/reports");
+
+  const hrs = Math.floor(workedMinutes / 60);
+  const mins = workedMinutes % 60;
+  return {
+    success: `Attendance saved for ${email} on ${dateKey}. Check-in: ${checkInTime}${checkOutTime ? `, Check-out: ${checkOutTime} (${hrs}h ${mins}m worked)` : " (no checkout set)"}.`,
+  };
 }
