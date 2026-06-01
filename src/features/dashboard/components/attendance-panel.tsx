@@ -25,6 +25,26 @@ const MODE_BADGE: Record<WorkMode, string> = {
 
 type GeoStatus = "idle" | "loading" | "error";
 
+async function getBrowserLocation() {
+  if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+    throw new Error("Is browser mein location support nahi hai. Location-enabled browser se try karein.");
+  }
+
+  const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 0,
+    }),
+  );
+
+  return {
+    accuracy: position.coords.accuracy,
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+  };
+}
+
 function formatWorkedHours(minutes: number): string {
   if (!minutes || minutes <= 0) return "—";
   const h = Math.floor(minutes / 60);
@@ -195,36 +215,23 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     setGeoError(null);
     setGeoStatus("loading");
 
-    let lat: number | null = null;
-    let lng: number | null = null;
-    let accuracy: number | null = null;
+    let location: Awaited<ReturnType<typeof getBrowserLocation>>;
 
-    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 12000,
-            maximumAge: 0,
-          })
-        );
-        lat = position.coords.latitude;
-        lng = position.coords.longitude;
-        accuracy = position.coords.accuracy;
-      } catch {
-        setGeoStatus("error");
-        setGeoError("Location access denied. Browser mein location permission allow karein aur dobara try karein.");
-        return;
-      }
+    try {
+      location = await getBrowserLocation();
+    } catch {
+      setGeoStatus("error");
+      setGeoError("Location access denied. Browser mein location permission allow karein aur dobara try karein.");
+      return;
     }
 
     setGeoStatus("idle");
 
     const fd = new FormData();
     fd.set("workMode", workMode);
-    if (lat !== null) fd.set("lat", String(lat));
-    if (lng !== null) fd.set("lng", String(lng));
-    if (accuracy !== null) fd.set("accuracy", String(accuracy));
+    fd.set("lat", String(location.lat));
+    fd.set("lng", String(location.lng));
+    fd.set("accuracy", String(location.accuracy));
 
     startCheckIn(async () => {
       try {
@@ -236,12 +243,30 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     });
   }
 
-  function handleCheckOutConfirm() {
+  async function handleCheckOutConfirm() {
     setCheckOutError(null);
     setConfirmingCheckout(false);
+    setGeoStatus("loading");
+
+    let location: Awaited<ReturnType<typeof getBrowserLocation>>;
+    try {
+      location = await getBrowserLocation();
+    } catch {
+      setGeoStatus("error");
+      setCheckOutError("Location access denied. Browser mein location permission allow karein aur dobara try karein.");
+      return;
+    }
+
+    setGeoStatus("idle");
+
+    const fd = new FormData();
+    fd.set("lat", String(location.lat));
+    fd.set("lng", String(location.lng));
+    fd.set("accuracy", String(location.accuracy));
+
     startCheckOut(async () => {
       try {
-        await checkOutAttendance();
+        await checkOutAttendance(fd);
         // Show undo button for 15 minutes
         setUndoVisible(true);
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);

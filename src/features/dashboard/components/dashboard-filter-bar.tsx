@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 type DashboardFilterBarProps = {
+  contextLabel?: string;
   filterDate?: string;   // currently active YYYY-MM-DD
   filterLabel?: string;  // human-readable label from server ("Today" / "15 May 2026" / "May 2026")
   filterMonth?: string;  // currently active YYYY-MM
 };
 
-export function DashboardFilterBar({ filterDate, filterLabel, filterMonth }: DashboardFilterBarProps) {
+export function DashboardFilterBar({ contextLabel, filterDate, filterLabel, filterMonth }: DashboardFilterBarProps) {
   const router = useRouter();
   const dateRef = useRef<HTMLInputElement>(null);
   const monthRef = useRef<HTMLInputElement>(null);
@@ -41,23 +42,28 @@ export function DashboardFilterBar({ filterDate, filterLabel, filterMonth }: Das
       {/* Active filter badge */}
       <div className="flex items-center gap-2 min-w-0">
         <div className={`h-2 w-2 shrink-0 rounded-full ${isFiltered ? "bg-blue-500" : "bg-emerald-400"}`} />
-        <span className="text-xs font-semibold text-slate-700 truncate">
-          {loading ? "Loading..." : isFiltered ? `Filtered: ${filterLabel}` : `Showing: ${filterLabel ?? "Today"}`}
+        <span className="truncate text-xs font-semibold text-slate-700">
+          {loading
+            ? "Loading..."
+            : isFiltered
+              ? `${contextLabel ? `${contextLabel} | ` : ""}Filtered: ${filterLabel}`
+              : `${contextLabel ? `${contextLabel} | ` : ""}Showing: ${filterLabel ?? "Today"}`}
         </span>
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {/* Date picker */}
-        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer">
+        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50">
           <svg fill="none" height="13" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="13">
             <rect height="18" rx="2" ry="2" width="18" x="3" y="4" />
             <line x1="16" x2="16" y1="2" y2="6" />
             <line x1="8" x2="8" y1="2" y2="6" />
             <line x1="3" x2="21" y1="10" y2="10" />
           </svg>
-          By Date
+          <span>Date</span>
           <input
-            className="sr-only"
+            aria-label="Filter dashboard by date"
+            className="w-[8.6rem] bg-transparent text-xs font-bold text-slate-800 outline-none [color-scheme:light]"
             defaultValue={filterDate ?? ""}
             max={getTodayDate()}
             onChange={(e) => applyDate(e.target.value)}
@@ -67,7 +73,7 @@ export function DashboardFilterBar({ filterDate, filterLabel, filterMonth }: Das
         </label>
 
         {/* Month picker */}
-        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-violet-300 hover:bg-violet-50 transition-colors cursor-pointer">
+        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-violet-300 hover:bg-violet-50">
           <svg fill="none" height="13" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="13">
             <rect height="18" rx="2" ry="2" width="18" x="3" y="4" />
             <line x1="16" x2="16" y1="2" y2="6" />
@@ -75,9 +81,10 @@ export function DashboardFilterBar({ filterDate, filterLabel, filterMonth }: Das
             <line x1="3" x2="21" y1="10" y2="10" />
             <line x1="8" x2="16" y1="15" y2="15" />
           </svg>
-          By Month
+          <span>Month</span>
           <input
-            className="sr-only"
+            aria-label="Filter dashboard by month"
+            className="w-[7.4rem] bg-transparent text-xs font-bold text-slate-800 outline-none [color-scheme:light]"
             defaultValue={filterMonth ?? ""}
             max={getTodayMonth()}
             onChange={(e) => applyMonth(e.target.value)}

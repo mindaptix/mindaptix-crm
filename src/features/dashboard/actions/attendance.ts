@@ -126,12 +126,17 @@ export async function checkInAttendance(formData: FormData) {
   revalidatePath("/dashboard/reports");
 }
 
-export async function checkOutAttendance() {
+export async function checkOutAttendance(formData?: FormData) {
   const session = await getCurrentSession();
 
   if (!session) {
     throw new Error("Authentication required.");
   }
+
+  const latRaw = formData?.get("lat");
+  const lngRaw = formData?.get("lng");
+  const employeeLat = latRaw !== null && latRaw !== undefined && latRaw !== "" ? parseFloat(String(latRaw)) : null;
+  const employeeLng = lngRaw !== null && lngRaw !== undefined && lngRaw !== "" ? parseFloat(String(lngRaw)) : null;
 
   await connectDb();
 
@@ -146,6 +151,35 @@ export async function checkOutAttendance() {
 
   if (existingAttendance.status === "COMPLETED") {
     throw new Error("Aap already check-out kar chuke hain.");
+  }
+
+  const settings = await SettingModel.findOne({ key: "company" }).lean();
+  const companySettings = (settings ?? {}) as unknown as Partial<CompanySettings>;
+  const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? true);
+  const officeLatitude = companySettings.officeLatitude ?? DEFAULT_OFFICE_LATITUDE;
+  const officeLongitude = companySettings.officeLongitude ?? DEFAULT_OFFICE_LONGITUDE;
+  const geoFenceRadius = Number(companySettings.geoFenceRadiusMeters ?? DEFAULT_GEO_FENCE_RADIUS_METERS);
+  const shouldEnforceGeoFence =
+    existingAttendance.workMode === "OFFICE" &&
+    geoFenceEnabled &&
+    officeLatitude !== null &&
+    officeLongitude !== null;
+
+  if (shouldEnforceGeoFence) {
+    if (employeeLat === null || employeeLng === null || isNaN(employeeLat) || isNaN(employeeLng)) {
+      throw new Error(
+        "Office check-out ke liye location permission zaroori hai. Browser mein location enable karein aur dobara try karein.",
+      );
+    }
+
+    const distance = Math.round(
+      haversineDistanceMeters(employeeLat, employeeLng, officeLatitude, officeLongitude),
+    );
+    if (distance > geoFenceRadius) {
+      throw new Error(
+        `Aap office se ${distance} meter door hain. Office ke ${geoFenceRadius} meter andar aakr hi check-out kar sakte hain.`,
+      );
+    }
   }
 
   const checkInAt = existingAttendance.checkInAt;

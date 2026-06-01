@@ -56,8 +56,28 @@ export async function buildLeadershipDashboardOverview(
     TaskModel.find({ assignedUserId: scope }, { title: 1, dueDate: 1, status: 1, assignedUserId: 1, priority: 1, completedAt: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
     AttendanceModel.find({ userId: scope, dateKey: { $gte: rangeStart, $lte: anchor } }, { userId: 1, status: 1, dateKey: 1 }).lean(),
     DailyUpdateModel.find({ userId: scope, workDate: { $gte: rangeStart, $lte: anchor } }, { userId: 1, workDate: 1 }).lean(),
-    ProjectModel.find({}, { name: 1, summary: 1, status: 1, priority: 1, assignedUserIds: 1, dueDate: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1 }).sort({ createdAt: -1 }).lean(),
-    SalesLeadModel.find({ salesUserId: inScope(salesUserIds) }, { salesUserId: 1, clientName: 1, clientPhone: 1, clientEmail: 1, technologies: 1, meetingDate: 1, meetingTime: 1, budget: 1, pitchedPrice: 1, deliveryDate: 1, createdAt: 1 })
+    ProjectModel.find({}, { name: 1, summary: 1, status: 1, priority: 1, assignedUserIds: 1, dueDate: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
+    SalesLeadModel.find(
+      { salesUserId: inScope(salesUserIds) },
+      {
+        salesUserId: 1,
+        clientName: 1,
+        clientPhone: 1,
+        clientEmail: 1,
+        technologies: 1,
+        meetingDate: 1,
+        meetingTime: 1,
+        budget: 1,
+        pitchedPrice: 1,
+        deliveryDate: 1,
+        dateOfFirstCall: 1,
+        dateOfLastCall: 1,
+        nextFollowUpDate: 1,
+        callbackReminderDate: 1,
+        expectedCloseDate: 1,
+        createdAt: 1,
+      },
+    )
       .sort({ createdAt: -1 })
       .lean(),
     TaskModel.find(
@@ -68,25 +88,45 @@ export async function buildLeadershipDashboardOverview(
       .lean(),
     SalesPaymentModel.find(
       {},
-      { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, status: 1 },
+      { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, createdAt: 1 },
     ).lean(),
     getUnreadAssignmentsForUser(session.user.id),
   ]);
-  const presentTodayIds = new Set(todaysAttendance.map((row) => row.userId));
+  const filteredAttendanceIds =
+    filter?.type === "month"
+      ? new Set(weekAttendance.map((row) => row.userId))
+      : new Set(todaysAttendance.map((row) => row.userId));
   const onLeaveTodayIds = new Set(
     leaveRows
-      .filter((leave) => leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= anchor)
+      .filter((leave) =>
+        filter?.type === "month"
+          ? leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= rangeStart
+          : leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= anchor,
+      )
       .map((leave) => leave.userId),
   );
-  const presentToday = presentTodayIds.size;
-  const onLeaveToday = Array.from(onLeaveTodayIds).filter((userId) => !presentTodayIds.has(userId)).length;
+  const presentToday = filteredAttendanceIds.size;
+  const onLeaveToday = Array.from(onLeaveTodayIds).filter((userId) => !filteredAttendanceIds.has(userId)).length;
   const absentToday = Math.max(activeEmployees.length - presentToday - onLeaveToday, 0);
-  const todayLeaveRows = leaveRows.filter((leave) => leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= anchor);
+  const todayLeaveRows = leaveRows.filter((leave) =>
+    filter?.type === "month"
+      ? leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= rangeStart
+      : leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= anchor,
+  );
   const currentWindowLeaveRows = leaveRows.filter((leave) => leave.endDate >= rangeStart && leave.startDate <= anchor);
-  const currentWindowTaskRows = taskRows.filter((task) => !task.createdAt || formatDate(task.createdAt) >= rangeStart);
-  const pendingProjects = projects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
-  const inProgressProjects = projects.filter((project) => project.status === "IN_PROGRESS").length;
-  const completedProjects = projects.filter((project) => project.status === "COMPLETED").length;
+  const currentWindowTaskRows = taskRows.filter((task) => {
+    const createdDate = task.createdAt ? formatDate(task.createdAt) : "";
+    return !createdDate || isDateInRange(createdDate, rangeStart, anchor);
+  });
+  const filteredProjects = filter ? projects.filter((project) => isProjectInFilterWindow(project, rangeStart, anchor)) : projects;
+  const filteredSalesLeads = filter ? salesLeads.filter((lead) => isSalesLeadInFilterWindow(lead, rangeStart, anchor)) : salesLeads;
+  const filteredOperationalTasks = filter
+    ? operationalTasks.filter((task) => isDateInRange(task.dueDate, rangeStart, anchor) || isDateLikeInRange(task.createdAt, rangeStart, anchor))
+    : operationalTasks;
+  const filteredPayments = filter ? allPayments.filter((payment) => isPaymentInFilterWindow(payment, rangeStart, anchor)) : allPayments;
+  const pendingProjects = filteredProjects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
+  const inProgressProjects = filteredProjects.filter((project) => project.status === "IN_PROGRESS").length;
+  const completedProjects = filteredProjects.filter((project) => project.status === "COMPLETED").length;
   const attendanceBreakdown = [
     { label: "Present", value: presentToday, color: "#2563eb" },
     { label: "On Leave", value: onLeaveToday, color: "#f59e0b" },
@@ -121,12 +161,14 @@ export async function buildLeadershipDashboardOverview(
           onLeaveToday,
           absentToday,
           today: anchor,
-          projects,
+          filterLabel,
+          isFiltered: Boolean(filter),
+          projects: filteredProjects,
           leaveRows,
-          salesLeads,
-          allPayments,
+          salesLeads: filteredSalesLeads,
+          allPayments: filteredPayments,
           salesUserMap: new Map(activeSalesUsers.map((user) => [user._id.toString(), user])),
-          operationalTasks,
+          operationalTasks: filteredOperationalTasks,
         })
       : undefined;
 
@@ -207,6 +249,8 @@ function buildExecutiveOverviewSections({
   activeSalesUsers,
   absentToday,
   allPayments,
+  filterLabel,
+  isFiltered,
   leaveRows,
   onLeaveToday,
   operationalTasks,
@@ -219,12 +263,14 @@ function buildExecutiveOverviewSections({
   activeEmployees: Array<{ _id: { toString(): string }; fullName: string; email: string; phone?: string; joiningDate?: Date | null }>;
   activeSalesUsers: Array<{ _id: { toString(): string }; fullName: string; email: string }>;
   absentToday: number;
-  allPayments: Array<{ _id: { toString(): string }; salesUserId: string; clientName?: string; projectName?: string; invoiceNumber?: string; amount?: number; receivedAmount?: number; dueDate?: string; status?: string }>;
+  allPayments: Array<{ _id: { toString(): string }; salesUserId: string; clientName?: string; projectName?: string; invoiceNumber?: string; amount?: number; receivedAmount?: number; dueDate?: string; receivedDate?: string; status?: string; createdAt?: Date | null }>;
+  filterLabel: string;
+  isFiltered: boolean;
   leaveRows: Array<{ _id: { toString(): string }; userId: string; leaveType?: string; startDate: string; endDate: string; status?: string; reason?: string }>;
   onLeaveToday: number;
-  operationalTasks: Array<{ _id: { toString(): string }; title: string; description?: string; dueDate: string; status?: string; assignedUserId: string; labels?: string[] }>;
+  operationalTasks: Array<{ _id: { toString(): string }; title: string; description?: string; dueDate: string; status?: string; assignedUserId: string; labels?: string[]; createdAt?: Date | null }>;
   presentToday: number;
-  projects: Array<{ _id: { toString(): string }; name: string; summary: string; status?: string; priority?: string; assignedUserIds?: string[]; dueDate?: Date | null; closedByEmployeeId?: string | null; closedByEmployeeAt?: Date | null }>;
+  projects: Array<{ _id: { toString(): string }; name: string; summary: string; status?: string; priority?: string; assignedUserIds?: string[]; dueDate?: Date | null; closedByEmployeeId?: string | null; closedByEmployeeAt?: Date | null; createdAt?: Date | null }>;
   salesLeads: Array<{
     _id: { toString(): string };
     salesUserId: string;
@@ -237,6 +283,12 @@ function buildExecutiveOverviewSections({
     budget?: number;
     pitchedPrice?: number;
     deliveryDate?: string;
+    dateOfFirstCall?: string;
+    dateOfLastCall?: string;
+    nextFollowUpDate?: string;
+    callbackReminderDate?: string;
+    expectedCloseDate?: string;
+    createdAt?: Date | null;
   }>;
   salesUserMap: Map<string, { _id: { toString(): string }; fullName: string; email: string }>;
   today: string;
@@ -360,26 +412,28 @@ function buildExecutiveOverviewSections({
       id: "projects",
       badge: "Portfolio",
       title: "Project Portfolio",
-      description: "Total projects, closed work, and current execution pipeline for the company.",
+      description: isFiltered ? `Projects matching ${filterLabel} by created, due, or closed date.` : "Total projects, closed work, and current execution pipeline for the company.",
       metrics: [
-        { label: "Total Projects", value: String(totalProjects), detail: "All projects currently tracked in the company workspace." },
+        { label: "Total Projects", value: String(totalProjects), detail: isFiltered ? `Projects found for ${filterLabel}.` : "All projects currently tracked in the company workspace." },
         { label: "In Progress", value: String(ongoingProjects), detail: "Projects actively moving in execution." },
         { label: "Completed", value: String(closedProjects), detail: "Projects already marked as completed." },
         { label: "Planned / Hold", value: String(planningProjects), detail: "Projects waiting, planning, or on hold." },
         { label: "Closed by Employee", value: String(closedByEmployeeProjects), detail: "Projects self-reported as closed by assigned employees." },
       ],
       items: projectItems,
-      emptyMessage: "No projects are available yet.",
+      emptyMessage: isFiltered ? `No projects found for ${filterLabel}.` : "No projects are available yet.",
     },
     {
       id: "payments",
       badge: "Finance",
       title: "Payment Pipeline",
-      description: "Collected, pending, and partially received payment visibility for leadership review.",
+      description: isFiltered ? `Payment records matching ${filterLabel} by due, received, or created date.` : "Collected, pending, and partially received payment visibility for leadership review.",
       note: overduePayments.length > 0
         ? `⚠️ ${overduePayments.length} payment${overduePayments.length !== 1 ? "s are" : " is"} overdue. Review immediately from the Payments page.`
         : allPayments.length === 0
-          ? "No payment records added yet. Go to the Payments page to add client payment records."
+          ? isFiltered
+            ? `No payment records found for ${filterLabel}.`
+            : "No payment records added yet. Go to the Payments page to add client payment records."
           : undefined,
       metrics: [
         { label: "Total Collected", value: formatCurrency(paymentTotalCollected), detail: `${paidPayments.length} fully paid + ${partialPayments.length} partial payments received.` },
@@ -388,7 +442,7 @@ function buildExecutiveOverviewSections({
         { label: "Overdue", value: String(overduePayments.length), detail: "Past due date and still not fully paid." },
       ],
       items: paymentItems,
-      emptyMessage: "No payment records added yet. Use the Payments page to track client invoices.",
+      emptyMessage: isFiltered ? `No payment records found for ${filterLabel}.` : "No payment records added yet. Use the Payments page to track client invoices.",
     },
     {
       id: "workforce",
@@ -397,9 +451,9 @@ function buildExecutiveOverviewSections({
       description: "Headcount, attendance, leave, and employee profile visibility for the active workforce.",
       metrics: [
         { label: "Total Employees", value: String(activeEmployees.length), detail: "Active employee accounts in the company." },
-        { label: "Present Today", value: String(presentToday), detail: "Employees who marked attendance today." },
+        { label: isFiltered ? "Present" : "Present Today", value: String(presentToday), detail: isFiltered ? `Employees with attendance in ${filterLabel}.` : "Employees who marked attendance today." },
         { label: "On Leave", value: String(onLeaveToday), detail: "Employees currently on approved leave." },
-        { label: "Not Marked", value: String(absentToday), detail: "Employees who have not marked attendance yet." },
+        { label: "Not Marked", value: String(absentToday), detail: isFiltered ? `Active employees without attendance or approved leave in ${filterLabel}.` : "Employees who have not marked attendance yet." },
       ],
       items: employeeItems,
       emptyMessage: "No active employee records are available yet.",
@@ -408,12 +462,14 @@ function buildExecutiveOverviewSections({
       id: "leads",
       badge: "Sales",
       title: "Client Pitch Tracker",
-      description: "Sales pipeline with client records, budget discussion, quoted value, meeting plan, and expected delivery commitments.",
+      description: isFiltered ? `Client pitch records matching ${filterLabel} by call, follow-up, meeting, delivery, or created date.` : "Sales pipeline with client records, budget discussion, quoted value, meeting plan, and expected delivery commitments.",
       note:
         salesLeads.length > 0
           ? `Client pitch tracker entries are synced from the sales CRM register. Active sales team: ${activeSalesUsers.length}.`
           : activeSalesUsers.length > 0
-            ? "No client pitch entries yet. Add records from the Employees page sales pipeline section."
+            ? isFiltered
+              ? `No client pitch records found for ${filterLabel}.`
+              : "No client pitch entries yet. Add records from the Employees page sales pipeline section."
             : "No active sales users are available. Add a sales account first, then create client pitch records.",
       metrics: [
         { label: "Tracked Clients", value: String(salesLeads.length), detail: "Client records currently saved in the sales pipeline." },
@@ -422,17 +478,17 @@ function buildExecutiveOverviewSections({
         { label: "Quoted Value", value: formatCurrency(totalQuotedValue), detail: "Total pitched value already shared by the sales team." },
       ],
       items: leadItems,
-      emptyMessage: "No client pitch records are available right now.",
+      emptyMessage: isFiltered ? `No client pitch records found for ${filterLabel}.` : "No client pitch records are available right now.",
     },
     {
       id: "meetings",
       badge: "Schedule",
-      title: "Today's Meetings",
-      description: "Today's client meetings and internal meeting tasks in one schedule view.",
+      title: isFiltered ? "Meetings" : "Today's Meetings",
+      description: isFiltered ? `Client meetings and internal meeting tasks scheduled for ${filterLabel}.` : "Today's client meetings and internal meeting tasks in one schedule view.",
       metrics: [
-        { label: "Meetings Today", value: String(totalMeetingsToday), detail: "Client and internal meetings scheduled for today." },
-        { label: "Client Meetings", value: String(clientMeetings.length), detail: "Sales pipeline client meetings scheduled for today." },
-        { label: "People In Meetings", value: String(todayMeetingUsers), detail: "Unique team members linked to today's meetings." },
+        { label: isFiltered ? "Meetings" : "Meetings Today", value: String(totalMeetingsToday), detail: isFiltered ? `Client and internal meetings scheduled for ${filterLabel}.` : "Client and internal meetings scheduled for today." },
+        { label: "Client Meetings", value: String(clientMeetings.length), detail: isFiltered ? `Sales pipeline client meetings scheduled for ${filterLabel}.` : "Sales pipeline client meetings scheduled for today." },
+        { label: "People In Meetings", value: String(todayMeetingUsers), detail: isFiltered ? `Unique team members linked to meetings in ${filterLabel}.` : "Unique team members linked to today's meetings." },
         { label: "Completed", value: String(completedMeetings), detail: "Meeting tasks marked complete." },
         { label: "Pending", value: String(pendingMeetings), detail: "Meeting tasks still not closed." },
       ],
@@ -442,9 +498,67 @@ function buildExecutiveOverviewSections({
         email: user.email,
       })),
       items: meetingItems,
-      emptyMessage: "No client or internal meetings are scheduled for today.",
+      emptyMessage: isFiltered ? `No client or internal meetings are scheduled for ${filterLabel}.` : "No client or internal meetings are scheduled for today.",
     },
   ];
+}
+
+function isProjectInFilterWindow(
+  project: { dueDate?: Date | null; closedByEmployeeAt?: Date | null; createdAt?: Date | null },
+  start: string,
+  end: string,
+) {
+  return [
+    project.createdAt ? formatDate(project.createdAt) : "",
+    project.dueDate ? formatDate(project.dueDate) : "",
+    project.closedByEmployeeAt ? formatDate(project.closedByEmployeeAt) : "",
+  ].some((dateKey) => isDateInRange(dateKey, start, end));
+}
+
+function isSalesLeadInFilterWindow(
+  lead: {
+    callbackReminderDate?: string;
+    createdAt?: Date | null;
+    dateOfFirstCall?: string;
+    dateOfLastCall?: string;
+    deliveryDate?: string;
+    expectedCloseDate?: string;
+    meetingDate?: string;
+    nextFollowUpDate?: string;
+  },
+  start: string,
+  end: string,
+) {
+  return [
+    lead.meetingDate,
+    lead.dateOfFirstCall,
+    lead.dateOfLastCall,
+    lead.nextFollowUpDate,
+    lead.callbackReminderDate,
+    lead.expectedCloseDate,
+    lead.deliveryDate,
+    lead.createdAt ? formatDate(lead.createdAt) : "",
+  ].some((dateKey) => isDateInRange(dateKey, start, end));
+}
+
+function isPaymentInFilterWindow(
+  payment: { createdAt?: Date | null; dueDate?: string; receivedDate?: string },
+  start: string,
+  end: string,
+) {
+  return [
+    payment.dueDate,
+    payment.receivedDate,
+    payment.createdAt ? formatDate(payment.createdAt) : "",
+  ].some((dateKey) => isDateInRange(dateKey, start, end));
+}
+
+function isDateLikeInRange(date: Date | null | undefined, start: string, end: string) {
+  return date ? isDateInRange(formatDate(date), start, end) : false;
+}
+
+function isDateInRange(dateKey: string | null | undefined, start: string, end: string) {
+  return Boolean(dateKey && dateKey >= start && dateKey <= end);
 }
 
 function formatCurrency(value: number) {

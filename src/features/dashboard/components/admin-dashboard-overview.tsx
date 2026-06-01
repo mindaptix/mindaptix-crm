@@ -119,7 +119,12 @@ export function AdminDashboardOverview({
 
   return (
     <div className="space-y-4 px-3 pb-4 pt-1 sm:px-7 sm:pb-6 sm:pt-1">
-      <DashboardFilterBar filterDate={filterDate} filterLabel={filterLabel} filterMonth={filterMonth} />
+      <DashboardFilterBar
+        contextLabel={activeExecutiveSection?.title}
+        filterDate={filterDate}
+        filterLabel={filterLabel}
+        filterMonth={filterMonth}
+      />
 
       {/* Assignment notification banner — auto-opens when admin/super-admin has unread assignments */}
       {isAssignmentBannerOpen && unreadAssignments && unreadAssignments.length > 0 && (
@@ -177,11 +182,7 @@ export function AdminDashboardOverview({
                 </>
               );
 
-              return section.id === "payments" ? (
-                <Link className={cardClassName} href="/dashboard/payments" key={section.id}>
-                  {cardContent}
-                </Link>
-              ) : (
+              return (
                 <button
                   className={cardClassName}
                   key={section.id}
@@ -194,7 +195,12 @@ export function AdminDashboardOverview({
             })}
           </div>
 
-          {activeExecutiveSection ? <ExecutiveSectionPanel section={activeExecutiveSection} /> : null}
+          {activeExecutiveSection ? (
+            <div className="mt-4">
+              <FilterContextNote filterDate={filterDate} filterLabel={filterLabel} filterMonth={filterMonth} sectionTitle={activeExecutiveSection.title} />
+              <ExecutiveSectionPanel section={activeExecutiveSection} />
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -491,6 +497,37 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
   );
 }
 
+function FilterContextNote({
+  filterDate,
+  filterLabel,
+  filterMonth,
+  sectionTitle,
+}: {
+  filterDate?: string;
+  filterLabel?: string;
+  filterMonth?: string;
+  sectionTitle: string;
+}) {
+  const isFiltered = Boolean(filterDate || filterMonth);
+  const rawValue = filterDate ?? filterMonth;
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[1.1rem] border border-blue-100 bg-blue-50/80 px-4 py-3 text-xs text-blue-800">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${isFiltered ? "bg-blue-600" : "bg-emerald-500"}`} />
+        <span className="truncate font-semibold">
+          {sectionTitle} data {isFiltered ? `filtered by ${filterLabel ?? rawValue}` : "showing today's live view"}
+        </span>
+      </div>
+      {rawValue ? (
+        <span className="shrink-0 rounded-full border border-blue-200 bg-white px-3 py-1 font-bold text-blue-700">
+          {filterDate ? "Date" : "Month"}: {rawValue}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function parseEmployeeDescription(description: string) {
   const [email = "", phone = "", status = "Active today"] = description.split("|").map((part) => part.trim());
   return { email, phone, status };
@@ -511,7 +548,7 @@ function getMetricValue(metrics: SummaryCard[], label: string) {
 
 function WorkforcePulsePanel({ section }: { section: ExecutiveOverviewSection }) {
   const totalEmployees = getMetricValue(section.metrics, "Total Employees");
-  const presentToday = getMetricValue(section.metrics, "Present Today");
+  const presentToday = getMetricValue(section.metrics, "Present Today") || getMetricValue(section.metrics, "Present");
   const onLeave = getMetricValue(section.metrics, "On Leave");
   const notMarked = getMetricValue(section.metrics, "Not Marked");
   const attendanceRate = totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0;
