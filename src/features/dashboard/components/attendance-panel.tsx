@@ -17,6 +17,13 @@ const WORK_MODES = [
 
 type WorkMode = "OFFICE" | "WFH" | "FIELD";
 
+const OFFICE_LOCATION = {
+  label: "Vista Business Tower",
+  lat: 30.71033,
+  lng: 76.690894,
+  radiusMeters: 500,
+};
+
 const MODE_BADGE: Record<WorkMode, string> = {
   OFFICE: "bg-emerald-100 text-emerald-700 border-emerald-200",
   WFH:    "bg-violet-100  text-violet-700  border-violet-200",
@@ -25,9 +32,39 @@ const MODE_BADGE: Record<WorkMode, string> = {
 
 type GeoStatus = "idle" | "loading" | "error";
 
-async function getBrowserLocation() {
+type BrowserLocation = {
+  accuracy: number;
+  lat: number;
+  lng: number;
+};
+
+function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function validateOfficeLocation(location: BrowserLocation, action: "check-in" | "check-out") {
+  const distance = Math.round(
+    haversineDistanceMeters(location.lat, location.lng, OFFICE_LOCATION.lat, OFFICE_LOCATION.lng),
+  );
+
+  if (distance <= OFFICE_LOCATION.radiusMeters) {
+    return null;
+  }
+
+  const actionText = action === "check-in" ? "Attendance" : "Check-out";
+  return `${actionText} is allowed only within ${OFFICE_LOCATION.radiusMeters} meters of ${OFFICE_LOCATION.label}. Your current location is ${distance} meters away.`;
+}
+
+async function getBrowserLocation(): Promise<BrowserLocation> {
   if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-    throw new Error("Is browser mein location support nahi hai. Location-enabled browser se try karein.");
+    throw new Error("This browser does not support location access.");
   }
 
   // Try network-based location first (fast on mobile), then GPS fallback
@@ -58,7 +95,7 @@ async function getBrowserLocation() {
 
 function getLocationErrorMessage(error: unknown, action: "check-in" | "check-out") {
   const actionText = action === "check-in" ? "attendance" : "check-out";
-  const helpText = `Location access nahi mil pa rahi. Phone mein GPS/location on karein, browser permission Allow karein, aur app HTTPS/live domain par khol kar ${actionText} dobara try karein.`;
+  const helpText = `Location access is required for ${actionText}. Turn on GPS/location, allow browser location permission, and try again from the live HTTPS site.`;
 
   if (error instanceof Error && error.message) {
     return `${helpText} (${error.message})`;
@@ -233,6 +270,9 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
   const checkedIn  = !!data.todayRecord?.checkInAt  && data.todayRecord.checkInAt  !== "Not marked";
   const checkedOut = !!data.todayRecord?.checkOutAt && data.todayRecord.checkOutAt !== "Not marked";
+  const locating = geoStatus === "loading";
+  const checkInDisabled = checkInPending || locating || checkedIn || checkedOut;
+  const checkOutDisabled = checkOutPending || locating || !checkedIn || checkedOut;
 
   async function handleCheckIn() {
     setGeoError(null);
@@ -254,6 +294,12 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
       }
 
       setGeoStatus("idle");
+      const locationError = validateOfficeLocation(location, "check-in");
+      if (locationError) {
+        setGeoStatus("error");
+        setGeoError(locationError);
+        return;
+      }
       fd.set("lat", String(location.lat));
       fd.set("lng", String(location.lng));
       fd.set("accuracy", String(location.accuracy));
@@ -261,9 +307,12 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
     startCheckIn(async () => {
       try {
-        await checkInAttendance(fd);
+        const result = await checkInAttendance(fd);
+        if (result?.error) {
+          setGeoError(result.error);
+        }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Check-in fail ho gaya. Dobara try karein.";
+        const msg = err instanceof Error ? err.message : "Check-in failed. Please try again.";
         setGeoError(msg);
       }
     });
@@ -289,6 +338,12 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
       }
 
       setGeoStatus("idle");
+      const locationError = validateOfficeLocation(location, "check-out");
+      if (locationError) {
+        setGeoStatus("error");
+        setCheckOutError(locationError);
+        return;
+      }
       fd.set("lat", String(location.lat));
       fd.set("lng", String(location.lng));
       fd.set("accuracy", String(location.accuracy));
@@ -296,13 +351,17 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
     startCheckOut(async () => {
       try {
-        await checkOutAttendance(fd);
+        const result = await checkOutAttendance(fd);
+        if (result?.error) {
+          setCheckOutError(result.error);
+          return;
+        }
         // Show undo button for 15 minutes
         setUndoVisible(true);
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
         undoTimerRef.current = setTimeout(() => setUndoVisible(false), UNDO_WINDOW_MS);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Check-out fail ho gaya. Dobara try karein.";
+        const msg = err instanceof Error ? err.message : "Check-out failed. Please try again.";
         setCheckOutError(msg);
       }
     });
@@ -312,11 +371,15 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     setUndoError(null);
     startUndo(async () => {
       try {
-        await cancelCheckout();
+        const result = await cancelCheckout();
+        if (result?.error) {
+          setUndoError(result.error);
+          return;
+        }
         setUndoVisible(false);
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Undo fail ho gaya.";
+        const msg = err instanceof Error ? err.message : "Undo failed.";
         setUndoError(msg);
       }
     });
@@ -456,7 +519,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
               <div className="mx-6 mt-3 flex items-center gap-2.5 rounded-xl px-4 py-2.5"
                 style={{ background: "rgba(14,165,233,0.12)", border: "1px solid rgba(14,165,233,0.25)" }}>
                 <span className="h-2 w-2 animate-ping rounded-full bg-sky-400" />
-                <p className="text-[0.68rem] font-semibold text-sky-300">Location detect ho rahi hai…</p>
+                <p className="text-[0.68rem] font-semibold text-sky-300">Detecting location...</p>
               </div>
             )}
 
@@ -473,7 +536,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
             {undoVisible && (
               <div className="mx-6 mt-3 rounded-xl px-4 py-3"
                 style={{ background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.3)" }}>
-                <p className="text-[0.68rem] font-bold text-amber-300">Galti se check-out ho gaya?</p>
+                <p className="text-[0.68rem] font-bold text-amber-300">Checked out by mistake?</p>
                 {undoError && <p className="mt-1 text-[0.65rem] text-rose-300">{undoError}</p>}
                 <div className="mt-2 flex gap-2">
                   <button
@@ -483,7 +546,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                     className="rounded-lg px-3 py-1.5 text-[0.68rem] font-bold transition-all disabled:opacity-50"
                     style={{ background: "rgba(245,158,11,0.3)", color: "#fcd34d", border: "1px solid rgba(245,158,11,0.4)" }}
                   >
-                    {undoPending ? "Undo ho raha hai…" : "↩ Checkout Undo Karo"}
+                    {undoPending ? "Undoing..." : "Undo Check-out"}
                   </button>
                   <button
                     type="button"
@@ -493,7 +556,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                     Dismiss
                   </button>
                 </div>
-                <p className="mt-1.5 text-[0.6rem] text-white/30">Yeh option 15 minute tak available hai</p>
+                <p className="mt-1.5 text-[0.6rem] text-white/30">This option is available for 15 minutes.</p>
               </div>
             )}
 
@@ -502,39 +565,43 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
               {/* Check-in button — full width */}
               <button
                 type="button"
-                disabled={checkInPending || geoStatus === "loading"}
+                disabled={checkInDisabled}
                 onClick={handleCheckIn}
-                className="w-full rounded-xl py-3.5 text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.4)] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full rounded-xl py-3.5 text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.4)] transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ background: "linear-gradient(135deg,#10b981,#0d9488)", color: "#fff", border: "none" }}
               >
-                {checkInPending || geoStatus === "loading" ? "📍 Locating…" : "↗ Check In"}
+                {locating ? "Locating..." : checkedOut ? "Checked Out" : checkedIn ? "Checked In" : "Check In"}
               </button>
 
               {/* Check-out: 2-step confirmation */}
               {!confirmingCheckout ? (
                 <button
                   type="button"
-                  disabled={checkOutPending}
-                  onClick={() => { setCheckOutError(null); setConfirmingCheckout(true); }}
-                  className="w-full rounded-xl py-3.5 text-sm font-bold transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                  disabled={checkOutDisabled}
+                  onClick={() => {
+                    if (checkOutDisabled) return;
+                    setCheckOutError(null);
+                    setConfirmingCheckout(true);
+                  }}
+                  className="w-full rounded-xl py-3.5 text-sm font-bold transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ background: "linear-gradient(135deg,#3b82f6,#0ea5e9)", color: "#fff", border: "none", boxShadow: "0 8px 24px rgba(59,130,246,0.35)" }}
                 >
-                  ↙ Check Out
+                  {checkedOut ? "Checked Out" : !checkedIn ? "Check in first" : "Check Out"}
                 </button>
               ) : (
                 <div className="overflow-hidden rounded-xl" style={{ border: "1px solid rgba(245,158,11,0.35)", background: "rgba(245,158,11,0.1)" }}>
                   <p className="px-4 pt-3 text-[0.7rem] font-bold text-amber-300">
-                    ⚠️ Kya aap sure hain? Check out karna chahte hain?
+                    Are you sure you want to check out?
                   </p>
                   <div className="grid grid-cols-2 gap-2 p-3">
                     <button
                       type="button"
-                      disabled={checkOutPending}
+                      disabled={checkOutDisabled}
                       onClick={handleCheckOutConfirm}
                       className="rounded-lg py-2.5 text-xs font-bold transition-all disabled:opacity-50"
                       style={{ background: "linear-gradient(135deg,#3b82f6,#0ea5e9)", color: "#fff" }}
                     >
-                      {checkOutPending ? "Checking out…" : "✓ Haan, Check Out"}
+                      {checkOutPending ? "Checking out..." : "Yes, Check Out"}
                     </button>
                     <button
                       type="button"
@@ -542,7 +609,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                       className="rounded-lg py-2.5 text-xs font-bold text-white/60 hover:text-white/80 transition-colors"
                       style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
                     >
-                      ✕ Cancel
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -839,3 +906,4 @@ function StatusChip({ status }: { status: string }) {
     </span>
   );
 }
+
