@@ -90,7 +90,7 @@ export async function syncWorkflowNotifications(session: AuthenticatedSession) {
   const today = formatIndiaDateKey();
   const currentTime = formatIndiaTimeKey();
   const settings = await SettingModel.findOne({ key: "company" }, { workStart: 1 }).lean();
-  const workStart = settings?.workStart ?? "09:00";
+  const workStart = settings?.workStart ?? "10:00";
   const todaysMeetings = await SalesLeadModel.find(
     { meetingDate: today },
     { salesUserId: 1, clientName: 1, meetingTime: 1 },

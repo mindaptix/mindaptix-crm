@@ -14,8 +14,8 @@ type SettingsPanelProps = {
 const INITIAL_SETTINGS_STATE = {
   values: {
     companyName: "",
-    workStart: "09:00",
-    workEnd: "18:00",
+    workStart: "10:00",
+    workEnd: "19:00",
     leavePolicy: "",
     workingDays: "26",
     salaryDay: "1",
@@ -281,14 +281,14 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
                 defaultValue={settingsState.values?.workStart}
                 label="Work Start Time"
                 name="workStart"
-                placeholder="09:00"
+                placeholder="10:00"
                 type="time"
               />
               <InputField
                 defaultValue={settingsState.values?.workEnd}
                 label="Work End Time"
                 name="workEnd"
-                placeholder="18:00"
+                placeholder="19:00"
                 type="time"
               />
             </div>

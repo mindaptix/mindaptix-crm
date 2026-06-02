@@ -18,12 +18,24 @@ const settingSchema = new mongoose.Schema(
     workStart: {
       type: String,
       required: true,
-      default: "09:00",
+      default: "10:00",
     },
     workEnd: {
       type: String,
       required: true,
-      default: "18:00",
+      default: "19:00",
+    },
+    workingDays: {
+      type: Number,
+      default: 26,
+    },
+    salaryDay: {
+      type: Number,
+      default: 1,
+    },
+    lateGraceMinutes: {
+      type: Number,
+      default: 15,
     },
     leavePolicy: {
       type: String,

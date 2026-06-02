@@ -72,7 +72,7 @@ export async function checkInAttendance(formData: FormData): Promise<AttendanceA
 
   const settings = await SettingModel.findOne({ key: "company" }).lean();
   const companySettings = (settings ?? {}) as unknown as Partial<CompanySettings>;
-  const workStart: string = companySettings.workStart ?? "09:00";
+  const workStart: string = companySettings.workStart ?? "10:00";
   const lateGraceMinutes: number = Number(companySettings.lateGraceMinutes ?? 15);
   const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? true);
   const officeLatitude = OFFICE_LATITUDE;
