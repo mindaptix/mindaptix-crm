@@ -8,7 +8,7 @@ import { SalesLeadModel } from "@/database/mongodb/models/sales-lead";
 import { SalesPaymentModel } from "@/database/mongodb/models/sales-payment";
 import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
-import type { DashboardListItem, DashboardOverviewData, ExecutiveOverviewSection, UnreadAssignment } from "@/features/dashboard/types";
+import type { DashboardListItem, DashboardOverviewData, ExecutiveOverviewSection, SalesLeadEntry, UnreadAssignment } from "@/features/dashboard/types";
 import type { DashboardDateFilter } from "@/features/dashboard/types";
 import { getUnreadAssignmentsForUser } from "@/features/notifications/service";
 import {
@@ -46,7 +46,7 @@ export async function buildLeadershipDashboardOverview(
   ]);
   const activeStaffUsers = [...activeEmployees, ...activeSalesUsers];
   const employeeIds = activeStaffUsers.map((employee) => employee._id.toString());
-  const salesUserIds = activeSalesUsers.map((user) => user._id.toString());
+  const salesUserIds = [...new Set([session.user.id, ...activeSalesUsers.map((user) => user._id.toString())])];
   const employeeMap = new Map(
     activeStaffUsers.map((employee) => [employee._id.toString(), { fullName: employee.fullName, email: employee.email }]),
   );
@@ -62,20 +62,29 @@ export async function buildLeadershipDashboardOverview(
       { salesUserId: inScope(salesUserIds) },
       {
         salesUserId: 1,
+        companyName: 1,
         clientName: 1,
         clientPhone: 1,
         clientEmail: 1,
+        source: 1,
+        status: 1,
+        priority: 1,
         technologies: 1,
+        meetingLink: 1,
         meetingDate: 1,
         meetingTime: 1,
         budget: 1,
         pitchedPrice: 1,
         deliveryDate: 1,
+        notes: 1,
+        callStatus: 1,
         dateOfFirstCall: 1,
         dateOfLastCall: 1,
+        dateOfNextCall: 1,
         nextFollowUpDate: 1,
         callbackReminderDate: 1,
         expectedCloseDate: 1,
+        callNotes: 1,
         createdAt: 1,
       },
     )
@@ -176,7 +185,10 @@ export async function buildLeadershipDashboardOverview(
           leaveRows,
           salesLeads: filteredSalesLeads,
           allPayments: filteredPayments,
-          salesUserMap: new Map(activeSalesUsers.map((user) => [user._id.toString(), user])),
+          salesUserMap: new Map<string, { _id: { toString(): string }; fullName: string; email: string }>([
+            [session.user.id, { _id: { toString: () => session.user.id }, fullName: session.user.fullName, email: session.user.email }],
+            ...activeSalesUsers.map((user) => [user._id.toString(), { _id: user._id, fullName: user.fullName, email: user.email }] as [string, { _id: { toString(): string }; fullName: string; email: string }]),
+          ]),
           operationalTasks: filteredOperationalTasks,
         })
       : undefined;
@@ -287,20 +299,28 @@ function buildExecutiveOverviewSections({
   salesLeads: Array<{
     _id: { toString(): string };
     salesUserId: string;
+    companyName?: string;
     clientName: string;
     clientPhone?: string;
     clientEmail?: string;
+    source?: string;
+    status?: string;
+    priority?: string;
     technologies?: string[];
+    meetingLink?: string;
     meetingDate?: string;
     meetingTime?: string;
     budget?: number;
     pitchedPrice?: number;
     deliveryDate?: string;
+    notes?: string;
+    callStatus?: string;
     dateOfFirstCall?: string;
     dateOfLastCall?: string;
     nextFollowUpDate?: string;
     callbackReminderDate?: string;
     expectedCloseDate?: string;
+    callNotes?: string;
     createdAt?: Date | null;
   }>;
   salesUserMap: Map<string, { _id: { toString(): string }; fullName: string; email: string }>;
@@ -494,6 +514,35 @@ function buildExecutiveOverviewSections({
         { label: "Quoted Value", value: formatCurrency(totalQuotedValue), detail: "Total pitched value already shared by the sales team." },
       ],
       meetingOwners: pitchOwners,
+      salesLeads: salesLeads.map((lead): SalesLeadEntry => ({
+        id: lead._id.toString(),
+        salesUserId: lead.salesUserId,
+        salesUserName: salesUserMap.get(lead.salesUserId)?.fullName ?? "",
+        salesUserEmail: salesUserMap.get(lead.salesUserId)?.email ?? "",
+        companyName: lead.companyName ?? "",
+        clientName: lead.clientName,
+        clientPhone: lead.clientPhone ?? "",
+        clientEmail: lead.clientEmail ?? "",
+        source: lead.source ?? "Call",
+        status: lead.status ?? "CONTACTED",
+        priority: lead.priority ?? "WARM",
+        technologies: lead.technologies ?? [],
+        meetingLink: lead.meetingLink ?? "",
+        meetingDate: lead.meetingDate ?? "",
+        meetingTime: lead.meetingTime ?? "",
+        nextFollowUpDate: lead.nextFollowUpDate ?? "",
+        expectedCloseDate: lead.expectedCloseDate ?? "",
+        budget: lead.budget ?? 0,
+        pitchedPrice: lead.pitchedPrice ?? 0,
+        deliveryDate: lead.deliveryDate ?? "",
+        notes: lead.notes ?? "",
+        callStatus: lead.callStatus ?? "",
+        dateOfFirstCall: lead.dateOfFirstCall ?? "",
+        dateOfLastCall: lead.dateOfLastCall ?? "",
+        callbackReminderDate: lead.callbackReminderDate ?? "",
+        callNotes: lead.callNotes ?? "",
+        createdAt: lead.createdAt ? lead.createdAt.toISOString() : "",
+      })),
       items: leadItems,
       emptyMessage: isFiltered ? `No client pitch records found for ${filterLabel}.` : "No client pitch records are available right now.",
     },

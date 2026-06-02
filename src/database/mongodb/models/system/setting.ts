@@ -65,7 +65,7 @@ const settingSchema = new mongoose.Schema(
     },
     geoFenceRadiusMeters: {
       type: Number,
-      default: 500,
+      default: 1000,
     },
     geoFenceEnabled: {
       type: Boolean,

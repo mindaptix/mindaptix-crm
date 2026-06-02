@@ -17,7 +17,7 @@ type AttendanceActionResult = { ok?: true; error?: string };
 const CHECKOUT_UNDO_WINDOW_MINUTES = 15;
 const OFFICE_LATITUDE = 30.71033;
 const OFFICE_LONGITUDE = 76.690894;
-const OFFICE_GEO_FENCE_RADIUS_METERS = 500;
+const OFFICE_GEO_FENCE_RADIUS_METERS = 1000;
 const OFFICE_NAME = "Vista Business Tower";
 const OFFICE_ADDRESS = "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307";
 

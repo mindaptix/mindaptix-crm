@@ -3,7 +3,7 @@
 import React, { type ReactNode, useActionState, useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addTaskComment, createTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
+import { addTaskComment, createTask, deleteTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
 import { emitDashboardSync, subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
 import { FormActionButton } from "@/shared/ui/form-action-button";
@@ -166,6 +166,7 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
               {filteredTasks.map((task, i) => (
                 <TaskCard
                   key={task.id}
+                  canAssign={canAssign}
                   task={task}
                   readOnly={readOnly}
                   isLast={i === filteredTasks.length - 1}
@@ -344,17 +345,21 @@ function CreateTaskModal({
 
 /* ─── Task Card ─── */
 function TaskCard({
+  canAssign,
   task,
   readOnly,
   isLast,
   onTaskUpdated,
 }: {
+  canAssign: boolean;
   task: TaskEntry;
   readOnly: boolean;
   isLast: boolean;
   onTaskUpdated: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.PENDING;
   const pc = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.LOW;
 
@@ -456,7 +461,7 @@ function TaskCard({
               </div>
             )}
 
-            {/* Status update (employee only) + expand for comments */}
+            {/* Status update + comments + delete */}
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {!readOnly && (
                 <form
@@ -487,6 +492,7 @@ function TaskCard({
                   </FormActionButton>
                 </form>
               )}
+
               <button
                 className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.65rem] font-semibold transition-colors"
                 style={{ background: "rgba(99,102,241,0.07)", color: "#6366f1" }}
@@ -499,7 +505,62 @@ function TaskCard({
                 {task.comments.length} comment{task.comments.length !== 1 ? "s" : ""}
                 <span>{expanded ? "▲" : "▼"}</span>
               </button>
+
+              {/* Admin-only delete */}
+              {canAssign && (
+                confirmDelete ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[0.65rem] font-semibold text-rose-600">Delete this task?</span>
+                    <form
+                      action={async (formData) => {
+                        const result = await deleteTask(formData);
+                        if (result.error) {
+                          setDeleteError(result.error);
+                          setConfirmDelete(false);
+                        } else {
+                          emitDashboardSync("task-updated");
+                          onTaskUpdated();
+                        }
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <input name="taskId" type="hidden" value={task.id} />
+                      <FormActionButton
+                        className="rounded-full px-3 py-1 text-[0.62rem] font-bold"
+                        style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", border: "none", boxShadow: "0 3px 10px rgba(239,68,68,0.3)" } as React.CSSProperties}
+                        pendingLabel="Deleting…"
+                        type="submit"
+                      >
+                        Yes, Delete
+                      </FormActionButton>
+                    </form>
+                    <button
+                      className="rounded-full px-3 py-1 text-[0.62rem] font-semibold text-slate-500 transition hover:bg-slate-100"
+                      onClick={() => setConfirmDelete(false)}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.65rem] font-semibold transition-colors"
+                    style={{ background: "rgba(239,68,68,0.07)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.15)" }}
+                    onClick={() => setConfirmDelete(true)}
+                    type="button"
+                  >
+                    <svg fill="none" height="11" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="11">
+                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
+                    </svg>
+                    Delete
+                  </button>
+                )
+              )}
             </div>
+
+            {deleteError && (
+              <p className="mt-2 text-[0.7rem] font-semibold text-rose-600">{deleteError}</p>
+            )}
 
             {/* Comments section (expandable) */}
             {expanded && (

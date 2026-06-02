@@ -51,6 +51,11 @@ export type UpdateCallFormState = {
   success?: string;
 };
 
+export type DeleteLeadState = {
+  error?: string;
+  success?: string;
+};
+
 export async function createSalesLead(
   _previousState: SalesLeadFormState,
   formData: FormData,
@@ -362,6 +367,150 @@ export async function updateSalesLeadCall(
   revalidatePath("/dashboard");
 
   return { success: "Call log updated." };
+}
+
+export async function deleteSalesLead(
+  _prevState: DeleteLeadState,
+  formData: FormData,
+): Promise<DeleteLeadState> {
+  const session = await getCurrentSession();
+  if (!session) return { error: "Not authenticated." };
+
+  const isAdminOrManager = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  if (!isAdminOrManager) return { error: "Access denied." };
+
+  const leadId = String(formData.get("leadId") ?? "").trim();
+  if (!leadId) return { error: "Lead ID is required." };
+
+  await connectDb();
+
+  const lead = await SalesLeadModel.findById(leadId, { salesUserId: 1 }).lean();
+  if (!lead) return { error: "Lead not found." };
+
+  await Promise.all([
+    SalesLeadModel.findByIdAndDelete(leadId),
+    SalesFollowUpModel.deleteMany({ salesLeadId: leadId }),
+    SalesDealModel.deleteMany({ salesLeadId: leadId }),
+    UserModel.findByIdAndUpdate(lead.salesUserId, { $pull: { leadIds: leadId } }),
+  ]);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/employees");
+
+  return { success: "Client pitch deleted." };
+}
+
+export async function updateSalesLeadFull(
+  _previousState: SalesLeadFormState,
+  formData: FormData,
+): Promise<SalesLeadFormState> {
+  const session = await getCurrentSession();
+
+  const isAdminOrManager = session?.user.role === "SUPER_ADMIN" || session?.user.role === "MANAGER";
+  if (!session || !isAdminOrManager) return { error: "Access denied." };
+
+  const leadId = String(formData.get("leadId") ?? "").trim();
+  if (!leadId) return { error: "Lead ID is required." };
+
+  const salesUserId = String(formData.get("salesUserId") ?? "").trim();
+  const companyName = String(formData.get("companyName") ?? "").trim();
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  const clientPhone = String(formData.get("clientPhone") ?? "").trim();
+  const clientEmail = String(formData.get("clientEmail") ?? "").trim().toLowerCase();
+  const source = String(formData.get("source") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim();
+  const priority = String(formData.get("priority") ?? "").trim();
+  const technologies = formData
+    .getAll("technologies")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  const meetingDate = String(formData.get("meetingDate") ?? "").trim();
+  const meetingTime = String(formData.get("meetingTime") ?? "").trim();
+  const nextFollowUpDate = String(formData.get("nextFollowUpDate") ?? "").trim();
+  const budget = String(formData.get("budget") ?? "").trim();
+  const pitchedPrice = String(formData.get("pitchedPrice") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const callNotes = String(formData.get("callNotes") ?? "").trim();
+
+  const values = {
+    salesUserId,
+    companyName,
+    clientName,
+    clientPhone,
+    clientEmail,
+    source,
+    status,
+    priority,
+    technologies,
+    meetingDate,
+    meetingTime,
+    nextFollowUpDate,
+    budget,
+    pitchedPrice,
+    notes,
+    callNotes,
+  };
+
+  if (!salesUserId) return { error: "Select a sales employee first.", values };
+  if (clientName.length < 2 || clientName.length > 120) return { error: "Client name must be between 2 and 120 characters.", values };
+  if (clientPhone && !/^[0-9+\-()\s]{7,20}$/.test(clientPhone)) return { error: "Enter a valid client phone number.", values };
+  if (clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) return { error: "Enter a valid client email address.", values };
+  if (!SALES_LEAD_SOURCES.includes(source as (typeof SALES_LEAD_SOURCES)[number])) return { error: "Select a valid lead source.", values };
+  if (!SALES_LEAD_STATUSES.includes(status as (typeof SALES_LEAD_STATUSES)[number])) return { error: "Select a valid lead status.", values };
+  if (!SALES_LEAD_PRIORITIES.includes(priority as (typeof SALES_LEAD_PRIORITIES)[number])) return { error: "Select a valid lead priority.", values };
+  if (technologies.length === 0) return { error: "Select at least one service.", values };
+  if (technologies.some((item) => !SALES_TECH_OPTIONS.includes(item as (typeof SALES_TECH_OPTIONS)[number]))) return { error: "One or more selected services are invalid.", values };
+
+  const parsedBudget = Number(budget || "0");
+  const parsedPitchedPrice = Number(pitchedPrice || "0");
+  if (!Number.isFinite(parsedBudget) || parsedBudget < 0) return { error: "Budget must be a valid positive number.", values };
+  if (!Number.isFinite(parsedPitchedPrice) || parsedPitchedPrice < 0) return { error: "Quoted price must be a valid positive number.", values };
+  if (notes.length > 2000) return { error: "Notes must be 2000 characters or fewer.", values };
+  if (callNotes.length > 2000) return { error: "Call notes must be 2000 characters or fewer.", values };
+
+  await connectDb();
+
+  const lead = await SalesLeadModel.findById(leadId, { salesUserId: 1 }).lean();
+  if (!lead) return { error: "Lead not found.", values };
+
+  const targetUser = await UserModel.findById(salesUserId, { role: 1, status: 1 }).lean();
+  if (!targetUser) return { error: "Selected user not found.", values };
+  const isSelfPitch = salesUserId === session.user.id;
+  if (targetUser.role !== "SALES" && !isSelfPitch) return { error: "Select a valid sales employee or assign to yourself.", values };
+  if (targetUser.status !== "ACTIVE") return { error: "Selected user account is suspended.", values };
+
+  await SalesLeadModel.findByIdAndUpdate(leadId, {
+    $set: {
+      salesUserId,
+      companyName,
+      clientName,
+      clientPhone,
+      clientEmail,
+      source,
+      status,
+      priority,
+      technologies,
+      meetingDate,
+      meetingTime,
+      nextFollowUpDate,
+      budget: parsedBudget,
+      pitchedPrice: parsedPitchedPrice,
+      notes,
+      callNotes,
+    },
+  });
+
+  if (lead.salesUserId !== salesUserId) {
+    await Promise.all([
+      UserModel.findByIdAndUpdate(lead.salesUserId, { $pull: { leadIds: leadId } }),
+      UserModel.findByIdAndUpdate(salesUserId, { $addToSet: { leadIds: leadId } }),
+    ]);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/employees");
+
+  return { success: "Client pitch updated." };
 }
 
 function mapLeadStatusToDealStage(status: string) {

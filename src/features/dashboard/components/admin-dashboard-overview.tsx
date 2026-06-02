@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ClientPaymentsPanel } from "@/features/dashboard/components/client-payments-panel";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -37,7 +37,9 @@ import type {
   UnreadAssignment,
 } from "@/features/dashboard/types";
 import { createClientMeeting, type ClientMeetingFormState } from "@/features/dashboard/actions/client-meetings";
-import { createSalesLead, type SalesLeadFormState } from "@/features/dashboard/actions/sales-leads";
+import { createSalesLead, deleteSalesLead, updateSalesLeadFull, type DeleteLeadState, type SalesLeadFormState } from "@/features/dashboard/actions/sales-leads";
+import { SALES_TECH_OPTIONS } from "@/database/mongodb/models/sales-lead";
+import type { SalesLeadEntry } from "@/features/dashboard/types";
 import { AssignmentAlertBanner } from "@/features/dashboard/components/assignment-alert-banner";
 import { DashboardFilterBar } from "@/features/dashboard/components/dashboard-filter-bar";
 
@@ -443,7 +445,12 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
           <div className="mt-4 rounded-[1.2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">{section.note}</div>
         ) : null}
 
-        {section.id === "leads" ? <InlineClientPitchForm owners={section.meetingOwners ?? []} /> : null}
+        {section.id === "leads" ? (
+          <>
+            <ClientPitchList leads={section.salesLeads ?? []} owners={section.meetingOwners ?? []} />
+            <InlineClientPitchForm owners={section.meetingOwners ?? []} />
+          </>
+        ) : null}
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {section.metrics.map((metric) => (
@@ -455,7 +462,7 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
           ))}
         </div>
 
-        {section.id === "payments" ? (
+        {section.id === "leads" ? null : section.id === "payments" ? (
           <div className="mt-4 overflow-hidden rounded-[1.8rem] border border-amber-200/60"
             style={{ background: "linear-gradient(135deg,#fffbeb 0%,#fff7ed 50%,#ffffff 100%)" }}>
             <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3"
@@ -666,8 +673,8 @@ function InlineClientPitchForm({ owners }: { owners: Array<{ id: string; name: s
     <section className="mt-5 rounded-[1.5rem] border border-violet-200 bg-[linear-gradient(135deg,#faf5ff_0%,#ffffff_55%,#f8fbff_100%)] p-5 shadow-[0_14px_30px_rgba(124,58,237,0.08)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-violet-700">Add Client Pitch</p>
-          <h5 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Log a project conversation here</h5>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-violet-700">Add New Client Pitch</p>
+          <h5 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Log a new project conversation</h5>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
             Save what the client asked for, what you quoted, meeting/follow-up dates, and the next action.
           </p>
@@ -727,12 +734,14 @@ function InlineClientPitchForm({ owners }: { owners: Array<{ id: string; name: s
 }
 
 function PitchField({
+  defaultValue,
   label,
   name,
   placeholder = "",
   required = false,
   type = "text",
 }: {
+  defaultValue?: string;
   label: string;
   name: string;
   placeholder?: string;
@@ -742,7 +751,7 @@ function PitchField({
   return (
     <label className="block">
       <span className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
-      <input className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-50" name={name} placeholder={placeholder} required={required} type={type} />
+      <input className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-50" defaultValue={defaultValue} name={name} placeholder={placeholder} required={required} type={type} />
     </label>
   );
 }
@@ -762,12 +771,286 @@ function PitchSelect({ defaultValue, label, name, options }: { defaultValue?: st
   );
 }
 
-function PitchTextArea({ label, name, placeholder }: { label: string; name: string; placeholder: string }) {
+function PitchTextArea({ defaultValue, label, name, placeholder }: { defaultValue?: string; label: string; name: string; placeholder: string }) {
   return (
     <label className="block">
       <span className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
-      <textarea className="mt-1.5 min-h-28 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-50" name={name} placeholder={placeholder} />
+      <textarea className="mt-1.5 min-h-28 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-50" defaultValue={defaultValue} name={name} placeholder={placeholder} />
     </label>
+  );
+}
+
+function TechMultiSelect({ currentTechs }: { currentTechs: string[] }) {
+  const options = [...new Set([...currentTechs, ...INLINE_PITCH_SERVICES])];
+  return (
+    <label className="block">
+      <span className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">Services (hold Ctrl/Cmd to select multiple)</span>
+      <select
+        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-50"
+        defaultValue={currentTechs}
+        multiple
+        name="technologies"
+        size={4}
+      >
+        {options.map((item) => (
+          <option key={item} value={item}>{item}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ClientPitchList({ leads, owners }: { leads: SalesLeadEntry[]; owners: Array<{ id: string; name: string; email: string }> }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  return (
+    <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-[linear-gradient(135deg,#faf5ff_0%,#ffffff_100%)] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-violet-700">Saved Client Pitches</p>
+          <h6 className="mt-0.5 text-xl font-semibold tracking-tight text-slate-950">
+            {leads.length === 0 ? "No pitches saved yet" : `${leads.length} Pitch Record${leads.length !== 1 ? "s" : ""}`}
+          </h6>
+        </div>
+        <span className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700">
+          {leads.length} total
+        </span>
+      </div>
+
+      {leads.length === 0 ? (
+        <div className="rounded-[1.4rem] border border-dashed border-violet-200 bg-violet-50/40 p-8 text-center">
+          <p className="text-sm font-semibold text-violet-700">No client pitches saved yet.</p>
+          <p className="mt-1 text-xs text-slate-500">Fill the form below to log your first client conversation.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {leads.map((lead) =>
+            editingId === lead.id ? (
+              <EditPitchCard key={lead.id} lead={lead} owners={owners} onCancel={() => setEditingId(null)} />
+            ) : (
+              <PitchCard key={lead.id} lead={lead} onEdit={() => setEditingId(lead.id)} />
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PitchCard({ lead, onEdit }: { lead: SalesLeadEntry; onEdit: () => void }) {
+  const [deleteState, deleteAction, deletePending] = useActionState(deleteSalesLead, {} as DeleteLeadState);
+  const [confirming, setConfirming] = useState(false);
+
+  const priorityClass =
+    lead.priority === "HOT"
+      ? "bg-rose-50 text-rose-700 border-rose-200"
+      : lead.priority === "COLD"
+        ? "bg-blue-50 text-blue-700 border-blue-200"
+        : "bg-amber-50 text-amber-700 border-amber-200";
+
+  const statusClass =
+    lead.status === "WON"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : lead.status === "LOST"
+        ? "bg-slate-100 text-slate-500 border-slate-200"
+        : "bg-violet-50 text-violet-700 border-violet-200";
+
+  return (
+    <article className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide ${priorityClass}`}>
+              {lead.priority}
+            </span>
+            <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide ${statusClass}`}>
+              {lead.status?.replaceAll("_", " ")}
+            </span>
+            {lead.source ? (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-slate-500">
+                {lead.source}
+              </span>
+            ) : null}
+          </div>
+          <h6 className="text-base font-semibold text-slate-950 truncate">
+            {lead.clientName}
+            {lead.companyName ? <span className="ml-2 text-sm font-normal text-slate-500">— {lead.companyName}</span> : null}
+          </h6>
+          {lead.clientPhone || lead.clientEmail ? (
+            <p className="mt-0.5 text-xs text-slate-400">
+              {[lead.clientPhone, lead.clientEmail].filter(Boolean).join(" · ")}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            className="rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
+            onClick={onEdit}
+            type="button"
+          >
+            Edit
+          </button>
+          {confirming ? (
+            <form action={deleteAction} className="flex items-center gap-2">
+              <input name="leadId" type="hidden" value={lead.id} />
+              <button
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-50"
+                onClick={() => setConfirming(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
+                disabled={deletePending}
+                type="submit"
+              >
+                {deletePending ? "Deleting…" : "Confirm Delete"}
+              </button>
+            </form>
+          ) : (
+            <button
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
+              onClick={() => setConfirming(true)}
+              type="button"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+
+      {deleteState.error ? (
+        <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{deleteState.error}</p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500">
+        {lead.technologies.length > 0 ? (
+          <span><span className="font-semibold text-slate-700">Service:</span> {lead.technologies.slice(0, 3).join(", ")}</span>
+        ) : null}
+        {lead.budget > 0 ? (
+          <span><span className="font-semibold text-slate-700">Budget:</span> ₹{lead.budget.toLocaleString()}</span>
+        ) : null}
+        {lead.pitchedPrice > 0 ? (
+          <span><span className="font-semibold text-slate-700">Quoted:</span> ₹{lead.pitchedPrice.toLocaleString()}</span>
+        ) : null}
+        {lead.meetingDate ? (
+          <span><span className="font-semibold text-slate-700">Meeting:</span> {lead.meetingDate}</span>
+        ) : null}
+        {lead.nextFollowUpDate ? (
+          <span><span className="font-semibold text-slate-700">Follow-up:</span> {lead.nextFollowUpDate}</span>
+        ) : null}
+        {lead.salesUserName ? (
+          <span><span className="font-semibold text-slate-700">Owner:</span> {lead.salesUserName}</span>
+        ) : null}
+      </div>
+
+      {lead.callNotes || lead.notes ? (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {lead.callNotes ? (
+            <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+              <p className="text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Conversation Notes</p>
+              <p className="mt-1 text-xs leading-5 text-slate-600 line-clamp-2">{lead.callNotes}</p>
+            </div>
+          ) : null}
+          {lead.notes ? (
+            <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+              <p className="text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Proposal Notes</p>
+              <p className="mt-1 text-xs leading-5 text-slate-600 line-clamp-2">{lead.notes}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function EditPitchCard({
+  lead,
+  owners,
+  onCancel,
+}: {
+  lead: SalesLeadEntry;
+  owners: Array<{ id: string; name: string; email: string }>;
+  onCancel: () => void;
+}) {
+  const [state, action, pending] = useActionState(updateSalesLeadFull, {} as SalesLeadFormState);
+
+  useEffect(() => {
+    if (state.success) onCancel();
+  }, [state.success]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <section className="rounded-[1.5rem] border border-violet-300 bg-[linear-gradient(135deg,#faf5ff_0%,#ffffff_55%,#f8fbff_100%)] p-5 shadow-[0_14px_30px_rgba(124,58,237,0.10)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-violet-700">Edit Client Pitch</p>
+          <h6 className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950">{lead.clientName}{lead.companyName ? ` — ${lead.companyName}` : ""}</h6>
+        </div>
+        <button
+          className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </button>
+      </div>
+
+      {state.error ? <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{state.error}</div> : null}
+
+      <form action={action} className="grid gap-4">
+        <input name="leadId" type="hidden" value={lead.id} />
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <PitchField defaultValue={state.values?.clientName ?? lead.clientName} label="Client Name" name="clientName" placeholder="Client or contact name" required />
+          <PitchField defaultValue={state.values?.companyName ?? lead.companyName} label="Company" name="companyName" placeholder="Company name" />
+          <PitchSelect defaultValue={state.values?.salesUserId ?? lead.salesUserId} label="Owner" name="salesUserId" options={owners.map((o) => ({ label: `${o.name} (${o.email})`, value: o.id }))} />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <PitchField defaultValue={state.values?.clientPhone ?? lead.clientPhone} label="Phone" name="clientPhone" placeholder="+91 99999 00000" />
+          <PitchField defaultValue={state.values?.clientEmail ?? lead.clientEmail} label="Email" name="clientEmail" placeholder="client@example.com" type="email" />
+          <PitchSelect defaultValue={state.values?.source ?? lead.source} label="Source" name="source" options={INLINE_PITCH_SOURCES.map((item) => ({ label: item, value: item }))} />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <PitchSelect defaultValue={state.values?.status ?? lead.status} label="Pipeline Status" name="status" options={INLINE_PITCH_STATUSES.map((item) => ({ label: item.replaceAll("_", " "), value: item }))} />
+          <PitchSelect defaultValue={state.values?.priority ?? lead.priority} label="Priority" name="priority" options={INLINE_PITCH_PRIORITIES.map((item) => ({ label: item, value: item }))} />
+          <TechMultiSelect currentTechs={state.values?.technologies ?? lead.technologies} />
+          <PitchField defaultValue={state.values?.budget ?? String(lead.budget || "")} label="Client Budget" name="budget" placeholder="Amount" type="number" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <PitchField defaultValue={state.values?.pitchedPrice ?? String(lead.pitchedPrice || "")} label="Quoted Price" name="pitchedPrice" placeholder="Amount" type="number" />
+          <PitchField defaultValue={state.values?.meetingDate ?? lead.meetingDate} label="Meeting Date" name="meetingDate" type="date" />
+          <PitchField defaultValue={state.values?.meetingTime ?? lead.meetingTime} label="Meeting Time" name="meetingTime" type="time" />
+          <PitchField defaultValue={state.values?.nextFollowUpDate ?? lead.nextFollowUpDate} label="Next Follow-up" name="nextFollowUpDate" type="date" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PitchTextArea label="Conversation Notes" name="callNotes" placeholder="What was discussed, client response, objections, and next action..." defaultValue={state.values?.callNotes ?? lead.callNotes} />
+          <PitchTextArea label="Proposal / Project Notes" name="notes" placeholder="Scope, pricing, timeline, delivery commitment, or proposal details..." defaultValue={state.values?.notes ?? lead.notes} />
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            onClick={onCancel}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(124,58,237,0.24)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={pending}
+            type="submit"
+          >
+            {pending ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
 

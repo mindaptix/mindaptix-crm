@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
 import { createNotificationsForUsers } from "@/features/notifications/service";
+import { NotificationModel } from "@/database/mongodb/models/notification";
 import { TASK_LABELS, TASK_PRIORITIES, TASK_STATUSES, TaskModel, type TaskLabel, type TaskPriority, type TaskStatus } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
 import { saveTaskAttachments } from "@/shared/storage/uploads/work-attachments";
@@ -142,6 +143,33 @@ export async function updateTaskStatus(formData: FormData) {
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/reports");
   revalidatePath("/dashboard");
+}
+
+export async function deleteTask(formData: FormData): Promise<{ error?: string }> {
+  const session = await getCurrentSession();
+
+  if (!session || (session.user.role !== "MANAGER" && session.user.role !== "SUPER_ADMIN")) {
+    return { error: "Only admin can delete tasks." };
+  }
+
+  const taskId = String(formData.get("taskId") ?? "").trim();
+  if (!taskId) return { error: "Task ID is required." };
+
+  await connectDb();
+
+  const task = await TaskModel.findById(taskId, { _id: 1 }).lean();
+  if (!task) return { error: "Task not found." };
+
+  await Promise.all([
+    TaskModel.findByIdAndDelete(taskId),
+    NotificationModel.deleteMany({ sourceKey: { $regex: `^task-assigned:${taskId}` } }),
+  ]);
+
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/reports");
+  revalidatePath("/dashboard");
+
+  return {};
 }
 
 export async function addTaskComment(formData: FormData) {

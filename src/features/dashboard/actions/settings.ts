@@ -51,7 +51,7 @@ export async function updateCompanySettings(
   const officeAddress = String(formData.get("officeAddress") ?? "").trim();
   const officeLatitudeRaw = String(formData.get("officeLatitude") ?? "").trim();
   const officeLongitudeRaw = String(formData.get("officeLongitude") ?? "").trim();
-  const geoFenceRadiusMeters = parseInt(String(formData.get("geoFenceRadiusMeters") ?? "500"), 10);
+  const geoFenceRadiusMeters = parseInt(String(formData.get("geoFenceRadiusMeters") ?? "1000"), 10);
   const geoFenceEnabled = formData.get("geoFenceEnabled") === "true";
   const officeLatitude = officeLatitudeRaw !== "" ? parseFloat(officeLatitudeRaw) : null;
   const officeLongitude = officeLongitudeRaw !== "" ? parseFloat(officeLongitudeRaw) : null;
@@ -88,7 +88,7 @@ export async function updateCompanySettings(
         "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
       officeLatitude,
       officeLongitude,
-      geoFenceRadiusMeters: isNaN(geoFenceRadiusMeters) ? 500 : geoFenceRadiusMeters,
+      geoFenceRadiusMeters: isNaN(geoFenceRadiusMeters) ? 1000 : geoFenceRadiusMeters,
       geoFenceEnabled,
     },
     { upsert: true, new: true },
@@ -126,7 +126,7 @@ export async function updateCompanySettings(
         "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
       officeLatitude: officeLatitude !== null ? String(officeLatitude) : "",
       officeLongitude: officeLongitude !== null ? String(officeLongitude) : "",
-      geoFenceRadiusMeters: String(isNaN(geoFenceRadiusMeters) ? 500 : geoFenceRadiusMeters),
+      geoFenceRadiusMeters: String(isNaN(geoFenceRadiusMeters) ? 1000 : geoFenceRadiusMeters),
       geoFenceEnabled: String(geoFenceEnabled),
     },
   };

@@ -844,7 +844,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
       "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
     lat: readNumberLike(settingsRecord.officeLatitude) ?? 30.71033,
     lng: readNumberLike(settingsRecord.officeLongitude) ?? 76.690894,
-    radiusMeters: readNumberLike(settingsRecord.geoFenceRadiusMeters) ?? 500,
+    radiusMeters: readNumberLike(settingsRecord.geoFenceRadiusMeters) ?? 1000,
     geoFenceEnabled: Boolean(settingsRecord.geoFenceEnabled ?? true),
   };
 
@@ -1518,7 +1518,7 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
       "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
     officeLatitude: readNumberLike(toRecord(settings).officeLatitude) ?? null,
     officeLongitude: readNumberLike(toRecord(settings).officeLongitude) ?? null,
-    geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 500,
+    geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 1000,
     geoFenceEnabled: Boolean(toRecord(settings).geoFenceEnabled ?? true),
     holidays: holidays.map((h) => ({
       id: h._id.toString(),

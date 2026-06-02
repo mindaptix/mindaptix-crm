@@ -24,7 +24,7 @@ const INITIAL_SETTINGS_STATE = {
     officeAddress: "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
     officeLatitude: "30.71033",
     officeLongitude: "76.690894",
-    geoFenceRadiusMeters: "500",
+    geoFenceRadiusMeters: "1000",
     geoFenceEnabled: "true",
   },
 };
@@ -127,7 +127,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       officeAddress: data.officeAddress,
       officeLatitude: data.officeLatitude !== null ? String(data.officeLatitude) : "",
       officeLongitude: data.officeLongitude !== null ? String(data.officeLongitude) : "",
-      geoFenceRadiusMeters: String(data.geoFenceRadiusMeters ?? 500),
+      geoFenceRadiusMeters: String(data.geoFenceRadiusMeters ?? 1000),
       geoFenceEnabled: String(data.geoFenceEnabled ?? false),
     },
   });
@@ -378,10 +378,10 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
                   placeholder="e.g. 77.20900"
                 />
                 <OptionalInputField
-                  defaultValue={settingsState.values?.geoFenceRadiusMeters ?? "500"}
+                  defaultValue={settingsState.values?.geoFenceRadiusMeters ?? "1000"}
                   label="Allowed Radius (meters)"
                   name="geoFenceRadiusMeters"
-                  placeholder="500"
+                  placeholder="1000"
                   type="number"
                 />
               </div>
