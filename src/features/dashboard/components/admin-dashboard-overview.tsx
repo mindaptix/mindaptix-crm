@@ -934,7 +934,7 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
   const peopleInMeetings = getMetricValue(section.metrics, "People In Meetings");
   const pendingMeetings = getMetricValue(section.metrics, "Pending");
   const meetingCards = [
-    { label: "Aaj Meetings", value: String(totalMeetings), detail: "Total scheduled today", tone: "rose" },
+    { label: "Today's Meetings", value: String(totalMeetings), detail: "Total scheduled today", tone: "rose" },
     { label: "Client Meetings", value: String(clientMeetings), detail: "Sales client schedule", tone: "violet" },
     { label: "Team Linked", value: String(peopleInMeetings), detail: "People assigned", tone: "sky" },
     { label: "Pending", value: String(pendingMeetings), detail: "Still open", tone: "amber" },

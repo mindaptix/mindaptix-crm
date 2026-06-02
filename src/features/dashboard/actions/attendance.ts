@@ -18,11 +18,18 @@ const CHECKOUT_UNDO_WINDOW_MINUTES = 15;
 const OFFICE_LATITUDE = 30.71033;
 const OFFICE_LONGITUDE = 76.690894;
 const OFFICE_GEO_FENCE_RADIUS_METERS = 500;
+const OFFICE_NAME = "Vista Business Tower";
+const OFFICE_ADDRESS = "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307";
 
 type CompanySettings = {
   workStart?: string;
   lateGraceMinutes?: number;
   geoFenceEnabled?: boolean;
+  geoFenceRadiusMeters?: number;
+  officeName?: string;
+  officeAddress?: string;
+  officeLatitude?: number;
+  officeLongitude?: number;
 };
 
 function parseTimeToMinutes(hhmm: string): number {
@@ -46,6 +53,64 @@ function getUnexpectedAttendanceError(error: unknown): AttendanceActionResult {
   return { error: "Attendance could not be saved right now. Please refresh and try again." };
 }
 
+function readValidNumber(value: unknown, fallback: number): number {
+  const numberValue = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function getOfficeGeoFence(settings: Partial<CompanySettings>) {
+  return {
+    label: settings.officeName?.trim() || OFFICE_NAME,
+    address: settings.officeAddress?.trim() || OFFICE_ADDRESS,
+    lat: readValidNumber(settings.officeLatitude, OFFICE_LATITUDE),
+    lng: readValidNumber(settings.officeLongitude, OFFICE_LONGITUDE),
+    radiusMeters: Math.max(1, Math.round(readValidNumber(settings.geoFenceRadiusMeters, OFFICE_GEO_FENCE_RADIUS_METERS))),
+    enabled: Boolean(settings.geoFenceEnabled ?? true),
+  };
+}
+
+function readLocationFromForm(formData: FormData | undefined) {
+  const latRaw = formData?.get("lat");
+  const lngRaw = formData?.get("lng");
+  const accuracyRaw = formData?.get("accuracy");
+  const lat = latRaw !== null && latRaw !== undefined && latRaw !== "" ? Number(latRaw) : null;
+  const lng = lngRaw !== null && lngRaw !== undefined && lngRaw !== "" ? Number(lngRaw) : null;
+  const accuracy = accuracyRaw !== null && accuracyRaw !== undefined && accuracyRaw !== "" ? Number(accuracyRaw) : null;
+
+  return {
+    lat: lat !== null && Number.isFinite(lat) ? lat : null,
+    lng: lng !== null && Number.isFinite(lng) ? lng : null,
+    accuracy: accuracy !== null && Number.isFinite(accuracy) ? accuracy : null,
+  };
+}
+
+function validateOfficeLocation({
+  action,
+  lat,
+  lng,
+  office,
+}: {
+  action: "attendance" | "check-out";
+  lat: number | null;
+  lng: number | null;
+  office: ReturnType<typeof getOfficeGeoFence>;
+}): AttendanceActionResult | null {
+  if (lat === null || lng === null) {
+    return {
+      error: `Location permission is required for office ${action}. Please enable location access on your phone or laptop and try again.`,
+    };
+  }
+
+  const distance = Math.round(haversineDistanceMeters(lat, lng, office.lat, office.lng));
+  if (distance <= office.radiusMeters) {
+    return null;
+  }
+
+  return {
+    error: `You are outside the allowed office location. You are ${distance} meters away from ${office.label}; office ${action} is allowed only within ${office.radiusMeters} meters.`,
+  };
+}
+
 export async function checkInAttendance(formData: FormData): Promise<AttendanceActionResult> {
   try {
   const session = await getCurrentSession();
@@ -57,12 +122,7 @@ export async function checkInAttendance(formData: FormData): Promise<AttendanceA
   const rawMode = String(formData.get("workMode") ?? "OFFICE");
   const workMode: WorkMode = VALID_WORK_MODES.includes(rawMode as WorkMode) ? (rawMode as WorkMode) : "OFFICE";
 
-  const latRaw = formData.get("lat");
-  const lngRaw = formData.get("lng");
-  const accuracyRaw = formData.get("accuracy");
-  const employeeLat = latRaw !== null && latRaw !== "" ? parseFloat(String(latRaw)) : null;
-  const employeeLng = lngRaw !== null && lngRaw !== "" ? parseFloat(String(lngRaw)) : null;
-  const employeeAccuracy = accuracyRaw !== null && accuracyRaw !== "" ? parseFloat(String(accuracyRaw)) : null;
+  const employeeLocation = readLocationFromForm(formData);
 
   await connectDb();
 
@@ -74,23 +134,20 @@ export async function checkInAttendance(formData: FormData): Promise<AttendanceA
   const companySettings = (settings ?? {}) as unknown as Partial<CompanySettings>;
   const workStart: string = companySettings.workStart ?? "10:00";
   const lateGraceMinutes: number = Number(companySettings.lateGraceMinutes ?? 15);
-  const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? true);
-  const officeLatitude = OFFICE_LATITUDE;
-  const officeLongitude = OFFICE_LONGITUDE;
-  const geoFenceRadius = OFFICE_GEO_FENCE_RADIUS_METERS;
+  const office = getOfficeGeoFence(companySettings);
 
-  // Office attendance is pinned to Vista Business Tower within a 500m radius.
-  const shouldEnforceGeoFence = workMode === "OFFICE" && geoFenceEnabled;
+  // Office attendance is pinned to the configured office location and radius.
+  const shouldEnforceGeoFence = workMode === "OFFICE" && office.enabled;
 
   if (shouldEnforceGeoFence) {
-    if (employeeLat === null || employeeLng === null || isNaN(employeeLat) || isNaN(employeeLng)) {
-      return { error: "Location permission is required for office attendance. Please enable browser location access and try again." };
-    }
-    const distance = Math.round(
-      haversineDistanceMeters(employeeLat, employeeLng, officeLatitude!, officeLongitude!),
-    );
-    if (distance > geoFenceRadius) {
-      return { error: `You are ${distance} meters away from the office. Attendance can only be marked within ${geoFenceRadius} meters of Vista Business Tower.` };
+    const locationError = validateOfficeLocation({
+      action: "attendance",
+      lat: employeeLocation.lat,
+      lng: employeeLocation.lng,
+      office,
+    });
+    if (locationError) {
+      return locationError;
     }
   }
 
@@ -100,8 +157,8 @@ export async function checkInAttendance(formData: FormData): Promise<AttendanceA
   const lateByMinutes = isLate ? currentMinutes - parseTimeToMinutes(workStart) : 0;
 
   const checkInLocation =
-    employeeLat !== null && employeeLng !== null
-      ? { lat: employeeLat, lng: employeeLng, accuracy: employeeAccuracy }
+    employeeLocation.lat !== null && employeeLocation.lng !== null
+      ? { lat: employeeLocation.lat, lng: employeeLocation.lng, accuracy: employeeLocation.accuracy }
       : undefined;
 
   await AttendanceModel.findOneAndUpdate(
@@ -138,10 +195,7 @@ export async function checkOutAttendance(formData?: FormData): Promise<Attendanc
     return { error: "Authentication required." };
   }
 
-  const latRaw = formData?.get("lat");
-  const lngRaw = formData?.get("lng");
-  const employeeLat = latRaw !== null && latRaw !== undefined && latRaw !== "" ? parseFloat(String(latRaw)) : null;
-  const employeeLng = lngRaw !== null && lngRaw !== undefined && lngRaw !== "" ? parseFloat(String(lngRaw)) : null;
+  const employeeLocation = readLocationFromForm(formData);
 
   await connectDb();
 
@@ -163,24 +217,20 @@ export async function checkOutAttendance(formData?: FormData): Promise<Attendanc
 
   const settings = await SettingModel.findOne({ key: "company" }).lean();
   const companySettings = (settings ?? {}) as unknown as Partial<CompanySettings>;
-  const geoFenceEnabled = Boolean(companySettings.geoFenceEnabled ?? true);
-  const officeLatitude = OFFICE_LATITUDE;
-  const officeLongitude = OFFICE_LONGITUDE;
-  const geoFenceRadius = OFFICE_GEO_FENCE_RADIUS_METERS;
+  const office = getOfficeGeoFence(companySettings);
   const shouldEnforceGeoFence =
     existingAttendance.workMode === "OFFICE" &&
-    geoFenceEnabled;
+    office.enabled;
 
   if (shouldEnforceGeoFence) {
-    if (employeeLat === null || employeeLng === null || isNaN(employeeLat) || isNaN(employeeLng)) {
-      return { error: "Location permission is required for office check-out. Please enable browser location access and try again." };
-    }
-
-    const distance = Math.round(
-      haversineDistanceMeters(employeeLat, employeeLng, officeLatitude, officeLongitude),
-    );
-    if (distance > geoFenceRadius) {
-      return { error: `You are ${distance} meters away from the office. Check-out can only be marked within ${geoFenceRadius} meters of Vista Business Tower.` };
+    const locationError = validateOfficeLocation({
+      action: "check-out",
+      lat: employeeLocation.lat,
+      lng: employeeLocation.lng,
+      office,
+    });
+    if (locationError) {
+      return locationError;
     }
   }
 

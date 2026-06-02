@@ -34,7 +34,7 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
       !dsrCount && currentTime >= "19:00"
         ? {
             title: "DSR pending after 7 PM",
-            detail: "Aaj ka DSR abhi submit nahi hua hai. Day close se pehle isse complete karo.",
+            detail: "Your DSR for today has not been submitted yet. Please complete it before day close.",
             actionLabel: "Open DSR",
             actionUrl: "/dashboard/dsr",
           }

@@ -351,6 +351,15 @@ export type AttendancePageData = {
   canMarkAttendance: boolean;
   canViewLocation: boolean;
   canManageOthers: boolean;
+  monthlyWorkingDays: number;
+  officeLocation: {
+    label: string;
+    address: string;
+    lat: number;
+    lng: number;
+    radiusMeters: number;
+    geoFenceEnabled: boolean;
+  };
   summaryCards: SummaryCard[];
   todayRecord: AttendanceRecordView | null;
   todayRecords: AttendanceRecordView[];

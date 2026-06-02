@@ -17,11 +17,15 @@ const WORK_MODES = [
 
 type WorkMode = "OFFICE" | "WFH" | "FIELD";
 
+type OfficeLocation = AttendancePageData["officeLocation"];
+
 const OFFICE_LOCATION = {
   label: "Vista Business Tower",
+  address: "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
   lat: 30.71033,
   lng: 76.690894,
   radiusMeters: 500,
+  geoFenceEnabled: true,
 };
 
 const MODE_BADGE: Record<WorkMode, string> = {
@@ -49,17 +53,17 @@ function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2:
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function validateOfficeLocation(location: BrowserLocation, action: "check-in" | "check-out") {
+function validateOfficeLocation(location: BrowserLocation, office: OfficeLocation, action: "check-in" | "check-out") {
   const distance = Math.round(
-    haversineDistanceMeters(location.lat, location.lng, OFFICE_LOCATION.lat, OFFICE_LOCATION.lng),
+    haversineDistanceMeters(location.lat, location.lng, office.lat, office.lng),
   );
 
-  if (distance <= OFFICE_LOCATION.radiusMeters) {
+  if (distance <= office.radiusMeters) {
     return null;
   }
 
   const actionText = action === "check-in" ? "Attendance" : "Check-out";
-  return `${actionText} is allowed only within ${OFFICE_LOCATION.radiusMeters} meters of ${OFFICE_LOCATION.label}. Your current location is ${distance} meters away.`;
+  return `${actionText} is allowed only within ${office.radiusMeters} meters of ${office.label}. You are currently ${distance} meters away from the office location.`;
 }
 
 async function getBrowserLocation(): Promise<BrowserLocation> {
@@ -95,7 +99,19 @@ async function getBrowserLocation(): Promise<BrowserLocation> {
 
 function getLocationErrorMessage(error: unknown, action: "check-in" | "check-out") {
   const actionText = action === "check-in" ? "attendance" : "check-out";
-  const helpText = `Location access is required for ${actionText}. Turn on GPS/location, allow browser location permission, and try again from the live HTTPS site.`;
+  const helpText = `Location access is required for office ${actionText}. Turn on GPS/location, allow browser location permission, and try again from your phone or laptop.`;
+
+  if (typeof GeolocationPositionError !== "undefined" && error instanceof GeolocationPositionError) {
+    if (error.code === error.PERMISSION_DENIED) {
+      return `${helpText} Your browser denied location access.`;
+    }
+    if (error.code === error.POSITION_UNAVAILABLE) {
+      return `${helpText} Your current location could not be detected.`;
+    }
+    if (error.code === error.TIMEOUT) {
+      return `${helpText} Location detection timed out.`;
+    }
+  }
 
   if (error instanceof Error && error.message) {
     return `${helpText} (${error.message})`;
@@ -254,6 +270,7 @@ const UNDO_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in ms
 
 
 export function AttendancePanel({ data }: AttendancePanelProps) {
+  const officeLocation = data.officeLocation ?? OFFICE_LOCATION;
   const [workMode, setWorkMode] = useState<WorkMode>("OFFICE");
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -280,7 +297,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     const fd = new FormData();
     fd.set("workMode", workMode);
 
-    if (workMode === "OFFICE") {
+    if (workMode === "OFFICE" && officeLocation.geoFenceEnabled) {
       setGeoStatus("loading");
 
       let location: Awaited<ReturnType<typeof getBrowserLocation>>;
@@ -294,7 +311,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
       }
 
       setGeoStatus("idle");
-      const locationError = validateOfficeLocation(location, "check-in");
+      const locationError = validateOfficeLocation(location, officeLocation, "check-in");
       if (locationError) {
         setGeoStatus("error");
         setGeoError(locationError);
@@ -325,7 +342,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     const fd = new FormData();
     const checkoutWorkMode = (data.todayRecord?.workMode ?? workMode) as WorkMode;
 
-    if (checkoutWorkMode === "OFFICE") {
+    if (checkoutWorkMode === "OFFICE" && officeLocation.geoFenceEnabled) {
       setGeoStatus("loading");
 
       let location: Awaited<ReturnType<typeof getBrowserLocation>>;
@@ -338,7 +355,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
       }
 
       setGeoStatus("idle");
-      const locationError = validateOfficeLocation(location, "check-out");
+      const locationError = validateOfficeLocation(location, officeLocation, "check-out");
       if (locationError) {
         setGeoStatus("error");
         setCheckOutError(locationError);
@@ -755,8 +772,8 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
           hasRows={data.monthlyRows.length > 0}
         >
           {data.monthlyRows.map((row, i) => {
-            const totalWorkingDays = 26;
-            const pct = Math.round((row.daysMarked / totalWorkingDays) * 100);
+            const totalWorkingDays = Math.max(data.monthlyWorkingDays, 1);
+            const pct = Math.round((row.completedDays / totalWorkingDays) * 100);
             const barColor = pct >= 90 ? "#10b981" : pct >= 70 ? "#f59e0b" : "#ef4444";
             return (
               <tr key={row.id} style={{ background: i % 2 === 0 ? "#fff" : "rgba(248,250,255,0.5)", borderBottom: "1px solid #f1f5f9" }}>
@@ -773,7 +790,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                 </DashboardTableCell>
                 <DashboardTableCell>
                   <span className="text-base font-bold text-slate-800">{row.daysMarked}</span>
-                  <span className="ml-1 text-xs text-slate-400">/ 26 days</span>
+                  <span className="ml-1 text-xs text-slate-400">/ {totalWorkingDays} working days</span>
                 </DashboardTableCell>
                 <DashboardTableCell>
                   <span className="text-base font-bold text-slate-800">{row.completedDays}</span>

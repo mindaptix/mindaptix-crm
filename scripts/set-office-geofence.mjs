@@ -7,7 +7,7 @@ const OFFICE_SETTINGS = {
   officeAddress: "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
   officeLatitude: 30.71033,
   officeLongitude: 76.690894,
-  geoFenceRadiusMeters: 600,
+  geoFenceRadiusMeters: 500,
   geoFenceEnabled: true,
 };
 

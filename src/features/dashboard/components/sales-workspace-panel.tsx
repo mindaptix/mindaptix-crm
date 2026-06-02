@@ -189,7 +189,7 @@ export function SalesWorkspacePanel({
           <div className="grid gap-6 xl:grid-cols-2">
             <PipelineCard
               columns={["Client", "Follow-up", "Status"]}
-              description="Aaj aur upcoming call commitments."
+              description="Today and upcoming call commitments."
               empty="No follow-up queue available yet."
               eyebrow="Follow-up Queue"
               hasRows={salesWorkspace.followUps.length > 0}

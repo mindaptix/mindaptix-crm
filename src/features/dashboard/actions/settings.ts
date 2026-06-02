@@ -51,7 +51,7 @@ export async function updateCompanySettings(
   const officeAddress = String(formData.get("officeAddress") ?? "").trim();
   const officeLatitudeRaw = String(formData.get("officeLatitude") ?? "").trim();
   const officeLongitudeRaw = String(formData.get("officeLongitude") ?? "").trim();
-  const geoFenceRadiusMeters = parseInt(String(formData.get("geoFenceRadiusMeters") ?? "600"), 10);
+  const geoFenceRadiusMeters = parseInt(String(formData.get("geoFenceRadiusMeters") ?? "500"), 10);
   const geoFenceEnabled = formData.get("geoFenceEnabled") === "true";
   const officeLatitude = officeLatitudeRaw !== "" ? parseFloat(officeLatitudeRaw) : null;
   const officeLongitude = officeLongitudeRaw !== "" ? parseFloat(officeLongitudeRaw) : null;
@@ -65,7 +65,7 @@ export async function updateCompanySettings(
 
   if (geoFenceEnabled && (officeLatitude === null || officeLongitude === null || isNaN(officeLatitude) || isNaN(officeLongitude))) {
     return {
-      error: "Geo-fence enable karne ke liye office ka latitude aur longitude dena zaroori hai.",
+      error: "Office latitude and longitude are required when location-based attendance is enabled.",
       values: { companyName, workStart, workEnd, leavePolicy, officeLatitude: officeLatitudeRaw, officeLongitude: officeLongitudeRaw, geoFenceEnabled: "true" },
     };
   }
@@ -88,7 +88,7 @@ export async function updateCompanySettings(
         "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
       officeLatitude,
       officeLongitude,
-      geoFenceRadiusMeters: isNaN(geoFenceRadiusMeters) ? 600 : geoFenceRadiusMeters,
+      geoFenceRadiusMeters: isNaN(geoFenceRadiusMeters) ? 500 : geoFenceRadiusMeters,
       geoFenceEnabled,
     },
     { upsert: true, new: true },
@@ -106,6 +106,9 @@ export async function updateCompanySettings(
   });
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/reports");
 
   return {
     success: "Settings updated successfully.",
@@ -123,7 +126,7 @@ export async function updateCompanySettings(
         "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
       officeLatitude: officeLatitude !== null ? String(officeLatitude) : "",
       officeLongitude: officeLongitude !== null ? String(officeLongitude) : "",
-      geoFenceRadiusMeters: String(isNaN(geoFenceRadiusMeters) ? 600 : geoFenceRadiusMeters),
+      geoFenceRadiusMeters: String(isNaN(geoFenceRadiusMeters) ? 500 : geoFenceRadiusMeters),
       geoFenceEnabled: String(geoFenceEnabled),
     },
   };

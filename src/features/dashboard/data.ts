@@ -806,6 +806,8 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
 
   const today = getTodayDate();
   const monthPrefix = today.slice(0, 7);
+  const monthStart = `${monthPrefix}-01`;
+  const monthlyWorkingDays = getWorkingDaysInDateRange(monthStart, today);
   const scopeIds =
     session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER"
       ? await getAllActiveEmployeeIds()
@@ -813,12 +815,38 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
   const attendanceIds = session.user.role === "EMPLOYEE" || session.user.role === "SALES" ? [session.user.id] : scopeIds;
   const attendanceScope = inScope(attendanceIds);
 
-  const [todayRecord, todayRecords, monthlyRecords, users] = await Promise.all([
+  const [todayRecord, todayRecords, monthlyRecords, users, settings] = await Promise.all([
     AttendanceModel.findOne({ userId: session.user.id, dateKey: today }).lean(),
     AttendanceModel.find({ userId: attendanceScope, dateKey: today }).sort({ checkInAt: 1 }).lean(),
     AttendanceModel.find({ userId: attendanceScope, dateKey: { $regex: `^${monthPrefix}` } }).lean(),
     UserModel.find({ _id: attendanceScope }, { fullName: 1, email: 1, role: 1, status: 1 }).lean(),
+    SettingModel.findOne(
+      { key: "company" },
+      {
+        workStart: 1,
+        lateGraceMinutes: 1,
+        officeName: 1,
+        officeAddress: 1,
+        officeLatitude: 1,
+        officeLongitude: 1,
+        geoFenceRadiusMeters: 1,
+        geoFenceEnabled: 1,
+      },
+    ).lean(),
   ]);
+  const settingsRecord = toRecord(settings);
+  const workStart = readString(settingsRecord.workStart) ?? "10:00";
+  const lateGraceMinutes = readNumberLike(settingsRecord.lateGraceMinutes) ?? 15;
+  const officeLocation = {
+    label: readString(settingsRecord.officeName) ?? "Vista Business Tower",
+    address:
+      readString(settingsRecord.officeAddress) ??
+      "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
+    lat: readNumberLike(settingsRecord.officeLatitude) ?? 30.71033,
+    lng: readNumberLike(settingsRecord.officeLongitude) ?? 76.690894,
+    radiusMeters: readNumberLike(settingsRecord.geoFenceRadiusMeters) ?? 500,
+    geoFenceEnabled: Boolean(settingsRecord.geoFenceEnabled ?? true),
+  };
 
   const activeUsers = users.filter((user) => user.status === "ACTIVE");
   const userMap = new Map(users.map((user) => [user._id.toString(), user]));
@@ -848,6 +876,8 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
     canMarkAttendance: session.user.role === "EMPLOYEE" || session.user.role === "SALES",
     canViewLocation,
     canManageOthers: session.user.role === "SUPER_ADMIN",
+    monthlyWorkingDays,
+    officeLocation,
     summaryCards: [
       { label: "Present Today", value: String(presentCount), detail: "Attendance entries marked for today." },
       { label: "Checked Out", value: String(completedCount), detail: "People who have completed checkout." },
@@ -865,8 +895,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           status: todayRecord.status,
           workMode: readString(toRecord(todayRecord).workMode) ?? "OFFICE",
           isHalfDay: readBoolean(toRecord(todayRecord).isHalfDay) ?? false,
-          isLate: readBoolean(toRecord(todayRecord).isLate) ?? false,
-          lateByMinutes: readNumberLike(toRecord(todayRecord).lateByMinutes) ?? 0,
+          ...getDisplayLateState(todayRecord.checkInAt, workStart, lateGraceMinutes),
           overtimeMinutes: readNumberLike(toRecord(todayRecord).overtimeMinutes) ?? 0,
           workedMinutes: readNumberLike(toRecord(todayRecord).workedMinutes) ?? 0,
           checkInLocation: null,
@@ -914,8 +943,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           status: record.status,
           workMode: readString(toRecord(record).workMode) ?? "OFFICE",
           isHalfDay: readBoolean(toRecord(record).isHalfDay) ?? false,
-          isLate: readBoolean(toRecord(record).isLate) ?? false,
-          lateByMinutes: readNumberLike(toRecord(record).lateByMinutes) ?? 0,
+          ...getDisplayLateState(record.checkInAt, workStart, lateGraceMinutes),
           overtimeMinutes: readNumberLike(toRecord(record).overtimeMinutes) ?? 0,
           workedMinutes: readNumberLike(toRecord(record).workedMinutes) ?? 0,
           checkInLocation,
@@ -1490,7 +1518,7 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
       "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
     officeLatitude: readNumberLike(toRecord(settings).officeLatitude) ?? null,
     officeLongitude: readNumberLike(toRecord(settings).officeLongitude) ?? null,
-    geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 600,
+    geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 500,
     geoFenceEnabled: Boolean(toRecord(settings).geoFenceEnabled ?? true),
     holidays: holidays.map((h) => ({
       id: h._id.toString(),
@@ -2079,7 +2107,7 @@ export async function getEmployeeDetailData(
     daysCompleted: monthlyAttendance.filter((a) => a.status === "COMPLETED").length,
     daysOnLeave: leaveDaysThisMonth,
     lateCount: monthlyAttendance.filter((a) => a.isLate).length,
-    totalWorkingDays: getDateRangeDays(monthStart, today),
+    totalWorkingDays: getWorkingDaysInDateRange(monthStart, today),
   };
 
   const leaveHistoryEntries: EmployeeDetailLeaveEntry[] = leaveHistory.map((leave) => ({
@@ -2542,6 +2570,26 @@ async function getAllActiveEmployeeIds() {
   return users.map((user) => user._id.toString());
 }
 
+function getDisplayLateState(checkInAt: Date | null | undefined, workStart: string, lateGraceMinutes: number) {
+  if (!checkInAt) {
+    return { isLate: false, lateByMinutes: 0 };
+  }
+
+  const checkInMinutes = parseTimeKeyToMinutes(formatIndiaTimeKey(checkInAt));
+  const workStartMinutes = parseTimeKeyToMinutes(workStart);
+  const isLate = checkInMinutes > workStartMinutes + lateGraceMinutes;
+
+  return {
+    isLate,
+    lateByMinutes: isLate ? Math.max(0, checkInMinutes - workStartMinutes) : 0,
+  };
+}
+
+function parseTimeKeyToMinutes(timeKey: string) {
+  const [hours = 0, minutes = 0] = timeKey.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
 function inScope(userIds: string[]) {
   return userIds.length ? { $in: userIds } : { $in: [] as string[] };
 }
@@ -2572,6 +2620,21 @@ function getDateRangeDays(startDate: string, endDate: string) {
   const end = new Date(`${endDate}T00:00:00.000Z`);
   const differenceInDays = Math.floor((end.getTime() - start.getTime()) / 86_400_000);
   return differenceInDays >= 0 ? differenceInDays + 1 : 0;
+}
+
+function getWorkingDaysInDateRange(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00.000Z`);
+  const end = new Date(`${endDate}T00:00:00.000Z`);
+  let workingDays = 0;
+
+  for (const current = new Date(start); current <= end; current.setUTCDate(current.getUTCDate() + 1)) {
+    const day = current.getUTCDay();
+    if (day !== 0 && day !== 6) {
+      workingDays += 1;
+    }
+  }
+
+  return workingDays;
 }
 
 function getDateRangeOverlapDays({

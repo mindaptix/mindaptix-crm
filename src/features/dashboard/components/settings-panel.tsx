@@ -22,6 +22,10 @@ const INITIAL_SETTINGS_STATE = {
     lateGraceMinutes: "15",
     officeName: "Vista Business Tower",
     officeAddress: "D270 Phase, 8B, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab 140307",
+    officeLatitude: "30.71033",
+    officeLongitude: "76.690894",
+    geoFenceRadiusMeters: "500",
+    geoFenceEnabled: "true",
   },
 };
 const INIT_HOLIDAY = { error: undefined, success: undefined };
@@ -79,11 +83,11 @@ function GeoFenceToggle({
   return (
     <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-white px-4 py-3">
       <div>
-        <p className="text-sm font-semibold text-slate-800">Geo-fence Enable karein</p>
+        <p className="text-sm font-semibold text-slate-800">Enable Location-Based Attendance</p>
         <p className="text-xs text-slate-500">
           {enabled
-            ? "OFFICE mode mein attendance sirf office ke andar hi lagegi"
-            : "Abhi location verification band hai"}
+            ? "Office mode attendance is allowed only inside the configured office radius."
+            : "Location verification is currently disabled."}
         </p>
       </div>
       <div className="flex items-center gap-3">
@@ -123,7 +127,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       officeAddress: data.officeAddress,
       officeLatitude: data.officeLatitude !== null ? String(data.officeLatitude) : "",
       officeLongitude: data.officeLongitude !== null ? String(data.officeLongitude) : "",
-      geoFenceRadiusMeters: String(data.geoFenceRadiusMeters ?? 600),
+      geoFenceRadiusMeters: String(data.geoFenceRadiusMeters ?? 500),
       geoFenceEnabled: String(data.geoFenceEnabled ?? false),
     },
   });
@@ -335,7 +339,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
                 </div>
                 <div>
                   <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-emerald-700">Location Attendance</p>
-                  <p className="text-xs text-emerald-600">Office ki GPS location set karein aur geo-fence enable karein</p>
+                  <p className="text-xs text-emerald-600">Set the office GPS location and enable the geo-fence rule.</p>
                 </div>
               </div>
 
@@ -374,15 +378,15 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
                   placeholder="e.g. 77.20900"
                 />
                 <OptionalInputField
-                  defaultValue={settingsState.values?.geoFenceRadiusMeters ?? "600"}
+                  defaultValue={settingsState.values?.geoFenceRadiusMeters ?? "500"}
                   label="Allowed Radius (meters)"
                   name="geoFenceRadiusMeters"
-                  placeholder="600"
+                  placeholder="500"
                   type="number"
                 />
               </div>
               <p className="text-[0.68rem] text-emerald-700/70">
-                💡 Tip: Google Maps mein apne office par right-click karein → &quot;What&apos;s here&quot; → latitude/longitude copy karein.
+                Tip: In Google Maps, right-click your office location, choose &quot;What&apos;s here&quot;, then copy the latitude and longitude.
               </p>
             </div>
 
