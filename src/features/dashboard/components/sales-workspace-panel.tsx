@@ -126,8 +126,8 @@ export function SalesWorkspacePanel({
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
               {salesOnly
-                ? "Apne leads track karo, call status update karo aur follow-ups manage karo."
-                : "Full sales pipeline — lead intake, follow-ups, deals, payments aur target tracking."}
+                ? "Track your leads, update call status, and manage follow-ups."
+                : "Full sales pipeline: lead intake, follow-ups, deals, payments, and target tracking."}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2">
@@ -623,7 +623,7 @@ function SalesLeadForm({
 
         {/* Call Comments */}
         <FormSection label="Call Comments">
-          <FormTextArea defaultValue={leadState.values?.callNotes} label="" name="callNotes" placeholder="Kya baat hui, client ki response, objections, next action kya hai..." />
+          <FormTextArea defaultValue={leadState.values?.callNotes} label="" name="callNotes" placeholder="What was discussed, client response, objections, and next action..." />
         </FormSection>
 
         {/* Tech & Priority */}
@@ -632,7 +632,7 @@ function SalesLeadForm({
             <FormSelect defaultValue={leadState.values?.priority ?? "WARM"} label="Priority" name="priority" options={priorityOptions} />
             <FormField defaultValue={leadState.values?.budget} label="Client Budget (optional)" name="budget" placeholder="₹ Amount" required={false} type="number" />
           </div>
-          <FormMultiSelect defaultValue={leadState.values?.technologies ?? []} helperText="Ctrl/Cmd daba ke multiple select karo." label="Tech Stack / Services Discussed" name="technologies" options={techOptions} />
+          <FormMultiSelect defaultValue={leadState.values?.technologies ?? []} helperText="Use Ctrl/Cmd to select multiple services." label="Tech Stack / Services Discussed" name="technologies" options={techOptions} />
           <FormTextArea defaultValue={leadState.values?.notes} label="Additional Notes (optional)" name="notes" placeholder="Proposal, pricing, timeline details..." />
         </FormSection>
 
@@ -739,12 +739,12 @@ function AdminLeadForm({
         </FormSection>
 
         <FormSection label="Call & Sales Notes">
-          <FormTextArea defaultValue={leadState.values?.callNotes} label="Call Comments" name="callNotes" placeholder="Kya baat hui, client ki response, objections..." />
+          <FormTextArea defaultValue={leadState.values?.callNotes} label="Call Comments" name="callNotes" placeholder="What was discussed, client response, objections..." />
           <FormTextArea defaultValue={leadState.values?.notes} label="Sales Notes" name="notes" placeholder="Proposal details, timeline, pricing notes..." />
         </FormSection>
 
         <FormSection label="Pipeline Details">
-          <FormMultiSelect defaultValue={leadState.values?.technologies ?? []} helperText="Ctrl/Cmd daba ke multiple select karo." label="Tech Stack" name="technologies" options={techOptions} />
+          <FormMultiSelect defaultValue={leadState.values?.technologies ?? []} helperText="Use Ctrl/Cmd to select multiple services." label="Tech Stack" name="technologies" options={techOptions} />
           <FormField defaultValue={leadState.values?.meetingLink} label="Meeting Link" name="meetingLink" placeholder="https://meet.google.com/..." required={false} />
           <div className="grid gap-4 sm:grid-cols-3">
             <FormField defaultValue={leadState.values?.meetingDate} fallbackTodayForDate label="Meeting Date" name="meetingDate" placeholder="Select date" required={false} type="date" />

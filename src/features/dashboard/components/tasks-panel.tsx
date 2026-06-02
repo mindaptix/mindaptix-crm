@@ -81,6 +81,7 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
 
   const pending_count  = data.tasks.filter((t) => t.status === "PENDING").length;
   const inprogress_count = data.tasks.filter((t) => t.status === "IN_PROGRESS").length;
+  const completed_count = data.tasks.filter((t) => t.status === "COMPLETED").length;
   const overdue_count  = data.tasks.filter((t) => t.isOverdue).length;
   const high_count     = data.tasks.filter((t) => t.priority === "HIGH").length;
 
@@ -88,9 +89,10 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <StatCard gradient="linear-gradient(135deg,#f59e0b,#fbbf24)" shadow="rgba(245,158,11,0.3)" icon={<ClockIcon />} label="Pending"       value={pending_count} />
         <StatCard gradient="linear-gradient(135deg,#6366f1,#818cf8)" shadow="rgba(99,102,241,0.3)"  icon={<PlayIcon />}  label="In Progress"   value={inprogress_count} />
+        <StatCard gradient="linear-gradient(135deg,#10b981,#34d399)" shadow="rgba(16,185,129,0.3)"  icon={<CheckIcon />} label="Completed"     value={completed_count} />
         <StatCard gradient="linear-gradient(135deg,#ef4444,#f87171)" shadow="rgba(239,68,68,0.3)"   icon={<AlertIcon />} label="Overdue"        value={overdue_count} />
         <StatCard gradient="linear-gradient(135deg,#ec4899,#f43f5e)" shadow="rgba(236,72,153,0.3)"  icon={<FireIcon />}  label="High Priority"  value={high_count} />
       </div>
@@ -167,6 +169,7 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
                   task={task}
                   readOnly={readOnly}
                   isLast={i === filteredTasks.length - 1}
+                  onTaskUpdated={refreshView}
                 />
               ))}
             </div>
@@ -259,7 +262,7 @@ function CreateTaskModal({
             <div>
               <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em] text-white/70">Assign Task</p>
               <h4 className="mt-0.5 text-xl font-bold text-white">Create Task</h4>
-              <p className="mt-0.5 text-sm text-white/60">Assign a task to an employee with priority and due date.</p>
+              <p className="mt-0.5 text-sm text-white/60">Assign a task to yourself, an admin, or a team member with priority and due date.</p>
             </div>
           </div>
         </div>
@@ -340,7 +343,17 @@ function CreateTaskModal({
 }
 
 /* ─── Task Card ─── */
-function TaskCard({ task, readOnly, isLast }: { task: TaskEntry; readOnly: boolean; isLast: boolean }) {
+function TaskCard({
+  task,
+  readOnly,
+  isLast,
+  onTaskUpdated,
+}: {
+  task: TaskEntry;
+  readOnly: boolean;
+  isLast: boolean;
+  onTaskUpdated: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.PENDING;
   const pc = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.LOW;
@@ -446,7 +459,14 @@ function TaskCard({ task, readOnly, isLast }: { task: TaskEntry; readOnly: boole
             {/* Status update (employee only) + expand for comments */}
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {!readOnly && (
-                <form action={updateTaskStatus} className="flex items-center gap-2">
+                <form
+                  action={async (formData) => {
+                    await updateTaskStatus(formData);
+                    emitDashboardSync("task-updated");
+                    onTaskUpdated();
+                  }}
+                  className="flex items-center gap-2"
+                >
                   <input name="taskId" type="hidden" value={task.id} />
                   <select
                     className="rounded-xl border border-slate-200 bg-white py-1.5 pl-3 pr-7 text-xs font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-50"
@@ -483,13 +503,14 @@ function TaskCard({ task, readOnly, isLast }: { task: TaskEntry; readOnly: boole
 
             {/* Comments section (expandable) */}
             {expanded && (
-              <div className="mt-4 space-y-3 rounded-xl p-3" style={{ background: "rgba(241,245,249,0.6)" }}>
+              <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 {task.comments.length === 0 ? (
-                  <p className="text-xs text-slate-400">No comments yet.</p>
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-500">
+                    No comments yet.
+                  </div>
                 ) : (
                   task.comments.map((c) => (
-                    <div key={c.id} className="rounded-xl bg-white p-3 shadow-sm"
-                      style={{ border: "1px solid rgba(226,232,240,0.8)" }}>
+                    <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex h-6 w-6 items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
                           style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)" }}>
@@ -505,22 +526,31 @@ function TaskCard({ task, readOnly, isLast }: { task: TaskEntry; readOnly: boole
                   ))
                 )}
                 {!readOnly && (
-                  <form action={addTaskComment} className="flex gap-2 pt-1">
+                  <form
+                    action={async (formData) => {
+                      await addTaskComment(formData);
+                      emitDashboardSync("task-comment-added");
+                      onTaskUpdated();
+                    }}
+                    className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                  >
                     <input name="taskId" type="hidden" value={task.id} />
-                    <input
-                      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-50 placeholder:text-slate-400"
+                    <textarea
+                      className="min-h-20 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
                       name="message"
-                      placeholder="Add a comment or update…"
+                      placeholder="Add a comment or update..."
                       required
                     />
-                    <FormActionButton
-                      className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold"
-                      style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", color: "#fff", border: "none" } as React.CSSProperties}
-                      pendingLabel="…"
-                      type="submit"
-                    >
-                      Send
-                    </FormActionButton>
+                    <div className="flex justify-end">
+                      <FormActionButton
+                        className="h-11 w-full rounded-xl px-6 text-sm font-bold sm:w-auto"
+                        style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", color: "#fff", border: "none" } as React.CSSProperties}
+                        pendingLabel="Sending..."
+                        type="submit"
+                      >
+                        Send
+                      </FormActionButton>
+                    </div>
                   </form>
                 )}
               </div>
@@ -638,7 +668,7 @@ function FormSelect({ icon, label, name, defaultValue, includePlaceholder = fals
           id={name}
           name={name}
         >
-          {includePlaceholder && <option disabled value="">Select employee</option>}
+          {includePlaceholder && <option disabled value="">Select assignee</option>}
           {options.map((o) => (
             <option key={o} value={o}>{labels?.[o] ?? o}</option>
           ))}
@@ -657,6 +687,9 @@ function ClockIcon() {
 }
 function PlayIcon() {
   return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><polygon points="5 3 19 12 5 21 5 3" /></svg>;
+}
+function CheckIcon() {
+  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24" width="18"><polyline points="20 6 9 17 4 12" /></svg>;
 }
 function AlertIcon() {
   return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>;

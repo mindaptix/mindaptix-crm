@@ -37,8 +37,15 @@ import type {
   UnreadAssignment,
 } from "@/features/dashboard/types";
 import { createClientMeeting, type ClientMeetingFormState } from "@/features/dashboard/actions/client-meetings";
+import { createSalesLead, type SalesLeadFormState } from "@/features/dashboard/actions/sales-leads";
 import { AssignmentAlertBanner } from "@/features/dashboard/components/assignment-alert-banner";
 import { DashboardFilterBar } from "@/features/dashboard/components/dashboard-filter-bar";
+
+const INLINE_PITCH_INITIAL_STATE: SalesLeadFormState = {};
+const INLINE_PITCH_SOURCES = ["Website", "Referral", "Facebook", "Instagram", "LinkedIn", "WhatsApp", "Call", "Walk-in", "Campaign", "Other"];
+const INLINE_PITCH_STATUSES = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST"];
+const INLINE_PITCH_PRIORITIES = ["HOT", "WARM", "COLD"];
+const INLINE_PITCH_SERVICES = ["Custom Website", "WordPress", "Shopify", "SEO", "Google Ads", "Meta Ads", "AI Chatbot", "Custom CRM", "React Native", "UI/UX Design"];
 
 type AdminDashboardOverviewProps = {
   paymentsData?: PaymentsPageData;
@@ -436,6 +443,8 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
           <div className="mt-4 rounded-[1.2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">{section.note}</div>
         ) : null}
 
+        {section.id === "leads" ? <InlineClientPitchForm owners={section.meetingOwners ?? []} /> : null}
+
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {section.metrics.map((metric) => (
             <article className="rounded-[1.5rem] border border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_10px_20px_rgba(15,23,42,0.04)]" key={metric.label}>
@@ -649,6 +658,119 @@ function getMetricValue(metrics: SummaryCard[], label: string) {
   return Number(metrics.find((metric) => metric.label === label)?.value.replace(/[^\d.-]/g, "") ?? "0") || 0;
 }
 
+function InlineClientPitchForm({ owners }: { owners: Array<{ id: string; name: string; email: string }> }) {
+  const [state, action, pending] = useActionState(createSalesLead, INLINE_PITCH_INITIAL_STATE);
+  const defaultOwnerId = state.values?.salesUserId ?? owners[0]?.id ?? "";
+
+  return (
+    <section className="mt-5 rounded-[1.5rem] border border-violet-200 bg-[linear-gradient(135deg,#faf5ff_0%,#ffffff_55%,#f8fbff_100%)] p-5 shadow-[0_14px_30px_rgba(124,58,237,0.08)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-violet-700">Add Client Pitch</p>
+          <h5 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Log a project conversation here</h5>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+            Save what the client asked for, what you quoted, meeting/follow-up dates, and the next action.
+          </p>
+        </div>
+        <span className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700">
+          Dashboard Entry
+        </span>
+      </div>
+
+      {state.error ? <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{state.error}</div> : null}
+      {state.success ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{state.success}</div> : null}
+
+      <form action={action} className="mt-5 grid gap-4">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <PitchField label="Client Name" name="clientName" placeholder="Client or contact name" required />
+          <PitchField label="Company" name="companyName" placeholder="Company name" />
+          <PitchSelect defaultValue={defaultOwnerId} label="Owner" name="salesUserId" options={owners.map((owner) => ({ label: `${owner.name} (${owner.email})`, value: owner.id }))} />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <PitchField label="Phone" name="clientPhone" placeholder="+91 99999 00000" />
+          <PitchField label="Email" name="clientEmail" placeholder="client@example.com" type="email" />
+          <PitchSelect defaultValue={state.values?.source ?? "Call"} label="Source" name="source" options={INLINE_PITCH_SOURCES.map((item) => ({ label: item, value: item }))} />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <PitchSelect defaultValue={state.values?.status ?? "CONTACTED"} label="Pipeline Status" name="status" options={INLINE_PITCH_STATUSES.map((item) => ({ label: item.replaceAll("_", " "), value: item }))} />
+          <PitchSelect defaultValue={state.values?.priority ?? "WARM"} label="Priority" name="priority" options={INLINE_PITCH_PRIORITIES.map((item) => ({ label: item, value: item }))} />
+          <PitchSelect defaultValue={state.values?.technologies?.[0] ?? "Custom Website"} label="Service Discussed" name="technologies" options={INLINE_PITCH_SERVICES.map((item) => ({ label: item, value: item }))} />
+          <PitchField label="Client Budget" name="budget" placeholder="Amount" type="number" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <PitchField label="Quoted Price" name="pitchedPrice" placeholder="Amount" type="number" />
+          <PitchField label="Meeting Date" name="meetingDate" type="date" />
+          <PitchField label="Meeting Time" name="meetingTime" type="time" />
+          <PitchField label="Next Follow-up" name="nextFollowUpDate" type="date" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PitchTextArea label="Conversation Notes" name="callNotes" placeholder="What was discussed, client response, objections, and next action..." />
+          <PitchTextArea label="Proposal / Project Notes" name="notes" placeholder="Scope, pricing, timeline, delivery commitment, or proposal details..." />
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(124,58,237,0.24)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={pending || owners.length === 0}
+            type="submit"
+          >
+            {pending ? "Saving..." : "Save Client Pitch"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function PitchField({
+  label,
+  name,
+  placeholder = "",
+  required = false,
+  type = "text",
+}: {
+  label: string;
+  name: string;
+  placeholder?: string;
+  required?: boolean;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
+      <input className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-50" name={name} placeholder={placeholder} required={required} type={type} />
+    </label>
+  );
+}
+
+function PitchSelect({ defaultValue, label, name, options }: { defaultValue?: string; label: string; name: string; options: Array<{ label: string; value: string }> }) {
+  return (
+    <label className="block">
+      <span className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
+      <select className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-50" defaultValue={defaultValue ?? options[0]?.value ?? ""} name={name} required>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function PitchTextArea({ label, name, placeholder }: { label: string; name: string; placeholder: string }) {
+  return (
+    <label className="block">
+      <span className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
+      <textarea className="mt-1.5 min-h-28 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-50" name={name} placeholder={placeholder} />
+    </label>
+  );
+}
+
 function WorkforcePulsePanel({ section }: { section: ExecutiveOverviewSection }) {
   const totalEmployees = getMetricValue(section.metrics, "Total Employees");
   const presentToday = getMetricValue(section.metrics, "Present Today") || getMetricValue(section.metrics, "Present");
@@ -657,8 +779,8 @@ function WorkforcePulsePanel({ section }: { section: ExecutiveOverviewSection })
   const attendanceRate = totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0;
   const todayCards = [
     { label: "Total Employees", value: String(totalEmployees), detail: "Active team strength", tone: "slate" },
-    { label: "Aaye Aaj", value: String(presentToday), detail: "Attendance marked today", tone: "emerald" },
-    { label: "Chhutti / Leave", value: String(onLeave), detail: "Approved leave today", tone: "amber" },
+    { label: "Present Today", value: String(presentToday), detail: "Attendance marked today", tone: "emerald" },
+    { label: "On Leave", value: String(onLeave), detail: "Approved leave today", tone: "amber" },
     { label: "Not Marked", value: String(notMarked), detail: "Attendance pending", tone: "rose" },
   ];
 
@@ -732,6 +854,7 @@ function WorkforcePulsePanel({ section }: { section: ExecutiveOverviewSection })
                   {section.items.map((item) => {
                     const employee = parseEmployeeDescription(item.description);
                     const isOnLeave = /leave/i.test(item.meta) || /leave/i.test(employee.status);
+                    const isNotMarked = /not marked/i.test(employee.status);
                     return (
                       <tr className="transition hover:bg-emerald-50/40" key={item.id}>
                         <td className="px-5 py-4">
@@ -750,8 +873,8 @@ function WorkforcePulsePanel({ section }: { section: ExecutiveOverviewSection })
                           <p className="mt-1 text-xs text-slate-500">{employee.phone || "Phone not added"}</p>
                         </td>
                         <td className="px-5 py-4">
-                          <span className={`rounded-full border px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] ${isOnLeave ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
-                            {isOnLeave ? "On Leave" : "Present / Active"}
+                          <span className={`rounded-full border px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] ${isOnLeave ? "border-amber-200 bg-amber-50 text-amber-800" : isNotMarked ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                            {isOnLeave ? "On Leave" : isNotMarked ? "Not Marked" : "Present"}
                           </span>
                         </td>
                         <td className="px-5 py-4 text-slate-600">{item.meta.replace("Joined ", "") || "Not added"}</td>

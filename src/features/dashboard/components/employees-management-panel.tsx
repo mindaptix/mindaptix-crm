@@ -876,17 +876,19 @@ export function EmployeesManagementPanel({
       ) : null}
 
       {shouldShowSalesTracker ? (
-        <SalesWorkspacePanel
-          canManageWorkspace={canManageWorkspace}
-          salesLeadPriorityOptions={salesLeadPriorityOptions}
-          salesLeadRows={salesLeadRows}
-          salesLeadSourceOptions={salesLeadSourceOptions}
-          salesLeadStatusOptions={salesLeadStatusOptions}
-          salesOnly={salesOnly}
-          salesOptions={salesOptions}
-          salesTechnologyOptions={salesTechnologyOptions}
-          salesWorkspace={salesWorkspace}
-        />
+        <div id="client-pitch-form">
+          <SalesWorkspacePanel
+            canManageWorkspace={canManageWorkspace}
+            salesLeadPriorityOptions={salesLeadPriorityOptions}
+            salesLeadRows={salesLeadRows}
+            salesLeadSourceOptions={salesLeadSourceOptions}
+            salesLeadStatusOptions={salesLeadStatusOptions}
+            salesOnly={salesOnly}
+            salesOptions={salesOptions}
+            salesTechnologyOptions={salesTechnologyOptions}
+            salesWorkspace={salesWorkspace}
+          />
+        </div>
       ) : null}
 
 

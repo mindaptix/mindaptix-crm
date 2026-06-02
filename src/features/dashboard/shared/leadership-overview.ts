@@ -41,13 +41,14 @@ export async function buildLeadershipDashboardOverview(
       .sort({ fullName: 1 })
       .lean(),
     isLeadership
-      ? UserModel.find({ role: "SALES", status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean()
+      ? UserModel.find({ role: "SALES", status: "ACTIVE" }, { fullName: 1, email: 1, phone: 1, joiningDate: 1 }).sort({ fullName: 1 }).lean()
       : Promise.resolve([]),
   ]);
-  const employeeIds = activeEmployees.map((employee) => employee._id.toString());
+  const activeStaffUsers = [...activeEmployees, ...activeSalesUsers];
+  const employeeIds = activeStaffUsers.map((employee) => employee._id.toString());
   const salesUserIds = activeSalesUsers.map((user) => user._id.toString());
   const employeeMap = new Map(
-    activeEmployees.map((employee) => [employee._id.toString(), { fullName: employee.fullName, email: employee.email }]),
+    activeStaffUsers.map((employee) => [employee._id.toString(), { fullName: employee.fullName, email: employee.email }]),
   );
   const scope = inScope(employeeIds);
   const [todaysAttendance, leaveRows, taskRows, weekAttendance, weekUpdates, projects, salesLeads, operationalTasks, allPayments, rawUnreadAssignments] = await Promise.all([
@@ -107,7 +108,7 @@ export async function buildLeadershipDashboardOverview(
   );
   const presentToday = filteredAttendanceIds.size;
   const onLeaveToday = Array.from(onLeaveTodayIds).filter((userId) => !filteredAttendanceIds.has(userId)).length;
-  const absentToday = Math.max(activeEmployees.length - presentToday - onLeaveToday, 0);
+  const absentToday = Math.max(activeStaffUsers.length - presentToday - onLeaveToday, 0);
   const todayLeaveRows = leaveRows.filter((leave) =>
     filter?.type === "month"
       ? leave.status === "APPROVED" && leave.startDate <= anchor && leave.endDate >= rangeStart
@@ -145,6 +146,12 @@ export async function buildLeadershipDashboardOverview(
   const attendanceTrend = buildOverviewAttendanceTrend({ activeEmployeeIds: employeeIds, attendanceRows: weekAttendance, leaveRows, today: anchor, weekStart: rangeStart });
   const leaveTrend = buildOverviewLeaveTrend(leaveRows, anchor, 6);
   const dsrTrend = buildOverviewDsrTrend({ activeEmployeeIds: employeeIds, dsrRows: weekUpdates, today: anchor, weekStart: rangeStart });
+  const pitchOwners = [
+    { id: session.user.id, name: `${session.user.fullName} (Me)`, email: session.user.email },
+    ...activeSalesUsers
+      .filter((user) => user._id.toString() !== session.user.id)
+      .map((user) => ({ id: user._id.toString(), name: user.fullName, email: user.email })),
+  ];
   const employeeProjectRows = buildOverviewEmployeeProjectSummaryRows({
     activeEmployees,
     projects: projects.map((project) => ({
@@ -155,11 +162,13 @@ export async function buildLeadershipDashboardOverview(
   const executiveSections =
     session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER"
       ? buildExecutiveOverviewSections({
-          activeEmployees,
+          activeEmployees: activeStaffUsers,
           activeSalesUsers,
           presentToday,
+          presentUserIds: filteredAttendanceIds,
           onLeaveToday,
           absentToday,
+          pitchOwners,
           today: anchor,
           filterLabel,
           isFiltered: Boolean(filter),
@@ -203,7 +212,7 @@ export async function buildLeadershipDashboardOverview(
       dsrRows: weekUpdates,
       leaveRows: currentWindowLeaveRows,
       taskRows: currentWindowTaskRows,
-      activePeopleCount: activeEmployees.length,
+      activePeopleCount: activeStaffUsers.length,
     }),
     calendarTitle: "Upcoming Calendar",
     calendarItems: buildOverviewCalendarItems({ leaves: leaveRows, tasks: taskRows, userMap: employeeMap }),
@@ -211,7 +220,7 @@ export async function buildLeadershipDashboardOverview(
     performanceRows: (await buildOverviewPerformanceRows(employeeIds)).slice(0, 5),
     directoryTitle: "Employee Directory",
     directoryEmptyMessage: "No active employees available right now.",
-    directoryItems: activeEmployees.map((employee) => ({
+    directoryItems: activeStaffUsers.map((employee) => ({
       id: employee._id.toString(),
       title: employee.fullName,
       meta: employee.joiningDate ? `Joined ${formatDate(employee.joiningDate)}` : "Joining date not added",
@@ -254,7 +263,9 @@ function buildExecutiveOverviewSections({
   leaveRows,
   onLeaveToday,
   operationalTasks,
+  pitchOwners,
   presentToday,
+  presentUserIds,
   projects,
   salesLeads,
   salesUserMap,
@@ -269,7 +280,9 @@ function buildExecutiveOverviewSections({
   leaveRows: Array<{ _id: { toString(): string }; userId: string; leaveType?: string; startDate: string; endDate: string; status?: string; reason?: string }>;
   onLeaveToday: number;
   operationalTasks: Array<{ _id: { toString(): string }; title: string; description?: string; dueDate: string; status?: string; assignedUserId: string; labels?: string[]; createdAt?: Date | null }>;
+  pitchOwners: Array<{ id: string; name: string; email: string }>;
   presentToday: number;
+  presentUserIds: Set<string>;
   projects: Array<{ _id: { toString(): string }; name: string; summary: string; status?: string; priority?: string; assignedUserIds?: string[]; dueDate?: Date | null; closedByEmployeeId?: string | null; closedByEmployeeAt?: Date | null; createdAt?: Date | null }>;
   salesLeads: Array<{
     _id: { toString(): string };
@@ -345,13 +358,16 @@ function buildExecutiveOverviewSections({
 
   const employeeItems: DashboardListItem[] = [
     ...activeEmployees.slice(0, 6).map((employee) => {
-      const isOnLeave = leaveRows.some((leave) => leave.userId === employee._id.toString() && leave.status === "APPROVED" && leave.startDate <= today && leave.endDate >= today);
+      const employeeId = employee._id.toString();
+      const isPresent = presentUserIds.has(employeeId);
+      const isOnLeave = leaveRows.some((leave) => leave.userId === employeeId && leave.status === "APPROVED" && leave.startDate <= today && leave.endDate >= today);
+      const todayStatus = isPresent ? "Present" : isOnLeave ? "On leave today" : "Not marked";
 
       return {
-        id: employee._id.toString(),
+        id: employeeId,
         title: employee.fullName,
         meta: employee.joiningDate ? `Joined ${formatDate(employee.joiningDate)}` : isOnLeave ? "On Leave Today" : "Active Employee",
-        description: [employee.email, employee.phone || "Phone not added", isOnLeave ? "On leave today" : "Active today"].join(" | "),
+        description: [employee.email, employee.phone || "Phone not added", todayStatus].join(" | "),
       };
     }),
   ];
@@ -462,14 +478,14 @@ function buildExecutiveOverviewSections({
       id: "leads",
       badge: "Sales",
       title: "Client Pitch Tracker",
-      description: isFiltered ? `Client pitch records matching ${filterLabel} by call, follow-up, meeting, delivery, or created date.` : "Sales pipeline with client records, budget discussion, quoted value, meeting plan, and expected delivery commitments.",
+      description: isFiltered ? `Client pitch records matching ${filterLabel} by call, follow-up, meeting, delivery, or created date.` : "Track every client conversation for project pitches: what was discussed, budget, quoted price, follow-up date, meeting plan, and next action.",
       note:
         salesLeads.length > 0
           ? `Client pitch tracker entries are synced from the sales CRM register. Active sales team: ${activeSalesUsers.length}.`
           : activeSalesUsers.length > 0
             ? isFiltered
               ? `No client pitch records found for ${filterLabel}.`
-              : "No client pitch entries yet. Add records from the Employees page sales pipeline section."
+              : "No client pitch entries yet. Add the client, discussion notes, budget, quote, follow-up, and meeting details from the sales pipeline form."
             : "No active sales users are available. Add a sales account first, then create client pitch records.",
       metrics: [
         { label: "Tracked Clients", value: String(salesLeads.length), detail: "Client records currently saved in the sales pipeline." },
@@ -477,6 +493,7 @@ function buildExecutiveOverviewSections({
         { label: "Client Budget", value: formatCurrency(totalBudgetValue), detail: "Total client budget captured across the tracker." },
         { label: "Quoted Value", value: formatCurrency(totalQuotedValue), detail: "Total pitched value already shared by the sales team." },
       ],
+      meetingOwners: pitchOwners,
       items: leadItems,
       emptyMessage: isFiltered ? `No client pitch records found for ${filterLabel}.` : "No client pitch records are available right now.",
     },

@@ -58,9 +58,9 @@ export async function createTask(_previousState: TaskState, formData: FormData):
 
   const employee = await UserModel.findById(assignedUserId, { role: 1, fullName: 1 }).lean();
 
-  const TASK_ASSIGNABLE_ROLES = ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"] as const;
+  const TASK_ASSIGNABLE_ROLES = ["EMPLOYEE", "SALES", "MANAGER", "SUPER_ADMIN"] as const;
   if (!employee || !TASK_ASSIGNABLE_ROLES.includes(employee.role as (typeof TASK_ASSIGNABLE_ROLES)[number])) {
-    return { error: "Please select a valid employee, admin, or super admin to assign this task.", values: { title, description, assignedUserId, dueDate } };
+    return { error: "Please select a valid employee, sales user, admin, or super admin to assign this task.", values: { title, description, assignedUserId, dueDate } };
   }
 
   const attachments = await saveTaskAttachments(attachmentFiles);
@@ -114,10 +114,12 @@ export async function updateTaskStatus(formData: FormData) {
     throw new Error("Task not found.");
   }
 
-  if (
-    session.user.role !== "MANAGER" &&
-    task.assignedUserId !== session.user.id
-  ) {
+  const canUpdateTask =
+    session.user.role === "SUPER_ADMIN" ||
+    session.user.role === "MANAGER" ||
+    task.assignedUserId === session.user.id;
+
+  if (!canUpdateTask) {
     throw new Error("You cannot update this task.");
   }
 
@@ -133,6 +135,7 @@ export async function updateTaskStatus(formData: FormData) {
       title: "Task status updated",
       message: `${task.title} is now ${status.replaceAll("_", " ").toLowerCase()}.`,
       actionUrl: "/dashboard/tasks",
+      sourceKey: `task-status:${taskId}:${status}:${Date.now()}`,
     });
   }
 
@@ -164,6 +167,7 @@ export async function addTaskComment(formData: FormData) {
   }
 
   const canAccess =
+    session.user.role === "SUPER_ADMIN" ||
     session.user.role === "MANAGER" ||
     task.assignedUserId === session.user.id ||
     task.assignedByUserId === session.user.id;

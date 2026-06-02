@@ -1,7 +1,7 @@
 import "server-only";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
-import { getVisibleUserIdsForSession } from "@/features/dashboard/team-scope";
+import { STAFF_ATTENDANCE_ROLES, getVisibleUserIdsForSession } from "@/features/dashboard/team-scope";
 import { syncWorkflowNotifications, getNotificationsForUser, getUnreadAssignmentsForUser } from "@/features/notifications/service";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
 import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
@@ -154,7 +154,7 @@ export async function getDashboardOverviewData(session: AuthenticatedSession): P
   const notifications = mapNotifications(await getNotificationsForUser(session.user.id, 8));
 
   if (session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER") {
-    const activeEmployees = await UserModel.find({ role: "EMPLOYEE", status: "ACTIVE" }, { fullName: 1, email: 1, phone: 1, joiningDate: 1 })
+    const activeEmployees = await UserModel.find({ role: { $in: STAFF_ATTENDANCE_ROLES }, status: "ACTIVE" }, { fullName: 1, email: 1, phone: 1, joiningDate: 1 })
       .sort({ fullName: 1 })
       .lean();
     const employeeIds = activeEmployees.map((employee) => employee._id.toString());
@@ -416,7 +416,12 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
   const updatesFilter = hasAdminLikeAccess ? {} : { userId: { $in: [] } };
   const salesScopeFilter = hasAdminLikeAccess ? {} : isSalesSelfView ? { salesUserId: session.user.id } : { _id: { $in: [] } };
   const today = getTodayDate();
-  const employeeIds = users.filter((user) => user.role === "EMPLOYEE" && user.status === "ACTIVE").map((user) => user._id.toString());
+  const attendanceStaffUsers = users.filter((user) =>
+    STAFF_ATTENDANCE_ROLES.includes(user.role as (typeof STAFF_ATTENDANCE_ROLES)[number]),
+  );
+  const attendanceStaffIds = users
+    .filter((user) => STAFF_ATTENDANCE_ROLES.includes(user.role as (typeof STAFF_ATTENDANCE_ROLES)[number]))
+    .map((user) => user._id.toString());
 
   const [
     projects,
@@ -449,9 +454,9 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
     SalesDealModel.find(salesScopeFilter).sort({ updatedAt: -1 }).limit(12).lean(),
     SalesPaymentModel.find(salesScopeFilter).sort({ dueDate: 1, updatedAt: -1 }).limit(12).lean(),
     SalesTargetModel.find(salesScopeFilter).sort({ monthKey: -1, createdAt: -1 }).limit(6).lean(),
-    AttendanceModel.find({ userId: inScope(employeeIds), dateKey: today }, { userId: 1 }).lean(),
+    AttendanceModel.find({ userId: inScope(attendanceStaffIds), dateKey: today }, { userId: 1 }).lean(),
     LeaveRequestModel.find(
-      { userId: inScope(employeeIds), status: "APPROVED", startDate: { $lte: today }, endDate: { $gte: today } },
+      { userId: inScope(attendanceStaffIds), status: "APPROVED", startDate: { $lte: today }, endDate: { $gte: today } },
       { userId: 1 },
     ).lean(),
     buildUserMap(users.map((user) => user._id.toString())),
@@ -463,6 +468,7 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
   const managerCount = users.filter((user) => user.role === "MANAGER").length;
   const employeeCount = users.filter((user) => user.role === "EMPLOYEE").length;
   const salesCount = users.filter((user) => user.role === "SALES").length;
+  const attendanceStaffCount = attendanceStaffUsers.length;
   // Extend map with admin/super-admin who may have personal pitches assigned to themselves
   const salesUserMap = new Map<string, { fullName: string; email: string }>(
     salesUsers.map((user) => [user._id.toString(), { fullName: user.fullName, email: user.email }]),
@@ -474,7 +480,7 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
   const onLeaveTodayIds = new Set(todayLeaves.map((row) => row.userId));
   const presentTodayCount = presentTodayIds.size;
   const onLeaveTodayCount = Array.from(onLeaveTodayIds).filter((userId) => !presentTodayIds.has(userId)).length;
-  const notMarkedTodayCount = Math.max(employeeCount - presentTodayCount - onLeaveTodayCount, 0);
+  const notMarkedTodayCount = Math.max(attendanceStaffCount - presentTodayCount - onLeaveTodayCount, 0);
   const assignedManagerCount = users.filter((user) => (user.role === "EMPLOYEE" || user.role === "SALES") && user.managerId).length;
   const salesLeadRows: SalesLeadEntry[] = salesLeads.map((lead) => ({
     id: lead._id.toString(),
@@ -586,7 +592,7 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
       ? salesWorkspace.summaryCards
       : session?.user.role === "SUPER_ADMIN"
       ? [
-          { label: "Total Employees", value: String(employeeCount), detail: "Active employee accounts currently available in the company." },
+          { label: "Total Employees", value: String(attendanceStaffCount), detail: "Active employee and sales accounts currently available in the company." },
           { label: "Present Today", value: String(presentTodayCount), detail: "Employees who have already marked attendance today." },
           { label: "On Leave Today", value: String(onLeaveTodayCount), detail: "Employees currently on approved leave." },
           { label: "Not Marked", value: String(notMarkedTodayCount), detail: "Employees who have not marked attendance yet today." },
@@ -630,10 +636,10 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
       managerName: user.managerId ? managerMap.get(user.managerId)?.fullName ?? "Unknown admin" : "",
       techStack: user.techStack ?? [],
       todayStatus:
-        user.role !== "EMPLOYEE"
+        !STAFF_ATTENDANCE_ROLES.includes(user.role as (typeof STAFF_ATTENDANCE_ROLES)[number])
           ? user.role === "MANAGER"
             ? "Admin"
-            : "Sales"
+            : formatLabel(user.role)
           : presentTodayIds.has(user._id.toString())
             ? "Present"
             : onLeaveTodayIds.has(user._id.toString())
@@ -804,7 +810,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
     session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER"
       ? await getAllActiveEmployeeIds()
       : await getVisibleUserIdsForSession(session, { employeesOnly: true });
-  const attendanceIds = session.user.role === "EMPLOYEE" ? [session.user.id] : scopeIds;
+  const attendanceIds = session.user.role === "EMPLOYEE" || session.user.role === "SALES" ? [session.user.id] : scopeIds;
   const attendanceScope = inScope(attendanceIds);
 
   const [todayRecord, todayRecords, monthlyRecords, users] = await Promise.all([
@@ -839,7 +845,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
   const canViewLocation = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
 
   return {
-    canMarkAttendance: session.user.role === "EMPLOYEE",
+    canMarkAttendance: session.user.role === "EMPLOYEE" || session.user.role === "SALES",
     canViewLocation,
     canManageOthers: session.user.role === "SUPER_ADMIN",
     summaryCards: [
@@ -1006,8 +1012,8 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
     hasAdminLikeAccess
       ? {}
       : { $or: [{ assignedUserId: session.user.id }, { assignedByUserId: session.user.id }] };
-  // Tasks can be assigned to employees, managers, and super admins (self-assign supported)
-  const assignableRoleFilter = { role: { $in: ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"] }, status: "ACTIVE" };
+  // Tasks can be assigned to staff, managers, and super admins (self-assign supported).
+  const assignableRoleFilter = { role: { $in: ["EMPLOYEE", "SALES", "MANAGER", "SUPER_ADMIN"] }, status: "ACTIVE" };
 
   const [tasks, employees, users, assignedProjects] = await Promise.all([
     TaskModel.find(taskFilter).sort({ createdAt: -1 }).lean(),
@@ -1023,11 +1029,13 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
   const userMap = new Map(users.map((user) => [user._id.toString(), user.fullName]));
   const overdueCount = tasks.filter((task) => task.status !== "COMPLETED" && task.dueDate < getTodayDate()).length;
   const highPriorityCount = tasks.filter((task) => task.priority === "HIGH").length;
+  const completedCount = tasks.filter((task) => task.status === "COMPLETED").length;
 
   return {
     summaryCards: [
       { label: "Pending", value: String(tasks.filter((task) => task.status === "PENDING").length), detail: "Tasks waiting to start." },
       { label: "In Progress", value: String(tasks.filter((task) => task.status === "IN_PROGRESS").length), detail: "Tasks currently being worked on." },
+      { label: "Completed", value: String(completedCount), detail: "Tasks completed and ready for admin review." },
       { label: "Overdue", value: String(overdueCount), detail: "Tasks that crossed their due date." },
       { label: "High Priority", value: String(highPriorityCount), detail: "Important tasks requiring closer follow-up." },
     ],
@@ -1044,7 +1052,7 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
     employeeOptions: employees.map((employee) => {
       const isSelf = employee._id.toString() === session.user.id;
       const role = (employee as unknown as { role?: string }).role ?? "EMPLOYEE";
-      const roleSuffix = role === "SUPER_ADMIN" ? "Super Admin" : role === "MANAGER" ? "Admin" : "";
+      const roleSuffix = role === "SUPER_ADMIN" ? "Super Admin" : role === "MANAGER" ? "Admin" : role === "SALES" ? "Sales" : "";
       const label = isSelf
         ? `${employee.fullName} — Me (${roleSuffix || "Employee"})`
         : roleSuffix
@@ -1166,7 +1174,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
   const scopedIds =
         session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER"
           ? await getAllActiveEmployeeIds()
-          : session.user.role === "EMPLOYEE"
+        : session.user.role === "EMPLOYEE" || session.user.role === "SALES"
         ? [session.user.id]
         : visibleEmployeeIds;
   const scope = inScope(scopedIds);
@@ -2530,7 +2538,7 @@ function mapAttachments(attachments: Array<{ name?: string; url?: string }> | un
 }
 
 async function getAllActiveEmployeeIds() {
-  const users = await UserModel.find({ role: "EMPLOYEE", status: "ACTIVE" }, { _id: 1 }).lean();
+  const users = await UserModel.find({ role: { $in: STAFF_ATTENDANCE_ROLES }, status: "ACTIVE" }, { _id: 1 }).lean();
   return users.map((user) => user._id.toString());
 }
 

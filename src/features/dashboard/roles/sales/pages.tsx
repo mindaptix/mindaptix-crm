@@ -1,11 +1,13 @@
 import "server-only";
 import { notFound } from "next/navigation";
 import { AnnouncementsPanel } from "@/features/dashboard/components/announcements-panel";
+import { AttendancePanel } from "@/features/dashboard/components/attendance-panel";
 import { EmployeesManagementPanel } from "@/features/dashboard/components/employees-management-panel";
 import { ExpensesPanel } from "@/features/dashboard/components/expenses-panel";
 import { SettingsPanel } from "@/features/dashboard/components/settings-panel";
+import { TasksPanel } from "@/features/dashboard/components/tasks-panel";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
-import { getAnnouncementsPageData, getEmployeesPageData, getExpensesPageData, getSettingsPageData } from "@/features/dashboard/server/page-data";
+import { getAnnouncementsPageData, getAttendancePageData, getEmployeesPageData, getExpensesPageData, getSettingsPageData, getTasksPageData } from "@/features/dashboard/server/page-data";
 import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
 export async function renderSalesDashboardPage(page: DashboardPageKey, session: AuthenticatedSession) {
@@ -27,9 +29,17 @@ export async function renderSalesDashboardPage(page: DashboardPageKey, session: 
         />
       );
     }
+    case "attendance": {
+      const data = await getAttendancePageData(session);
+      return <AttendancePanel data={data} />;
+    }
     case "expenses": {
       const data = await getExpensesPageData(session);
       return <ExpensesPanel data={data} />;
+    }
+    case "tasks": {
+      const data = await getTasksPageData(session);
+      return <TasksPanel canAssign={false} data={data} readOnly={false} />;
     }
     case "announcements": {
       const data = await getAnnouncementsPageData(session);
