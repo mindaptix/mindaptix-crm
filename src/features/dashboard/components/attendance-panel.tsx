@@ -297,29 +297,39 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     const fd = new FormData();
     fd.set("workMode", workMode);
 
-    if (workMode === "OFFICE" && officeLocation.geoFenceEnabled) {
+    if (workMode === "OFFICE") {
       setGeoStatus("loading");
 
-      let location: Awaited<ReturnType<typeof getBrowserLocation>>;
+      let location: Awaited<ReturnType<typeof getBrowserLocation>> | null = null;
 
       try {
         location = await getBrowserLocation();
       } catch (error) {
         setGeoStatus("error");
-        setGeoError(getLocationErrorMessage(error, "check-in"));
-        return;
+        if (officeLocation.geoFenceEnabled) {
+          // Geofence is on — location is required, block check-in
+          setGeoError(getLocationErrorMessage(error, "check-in"));
+          return;
+        }
+        // Geofence off — proceed without location (it just won't be recorded)
+        setGeoStatus("idle");
       }
 
-      setGeoStatus("idle");
-      const locationError = validateOfficeLocation(location, officeLocation, "check-in");
-      if (locationError) {
-        setGeoStatus("error");
-        setGeoError(locationError);
-        return;
+      if (location) {
+        setGeoStatus("idle");
+        if (officeLocation.geoFenceEnabled) {
+          const locationError = validateOfficeLocation(location, officeLocation, "check-in");
+          if (locationError) {
+            setGeoStatus("error");
+            setGeoError(locationError);
+            return;
+          }
+        }
+        // Always save location for OFFICE mode so admin can see it
+        fd.set("lat", String(location.lat));
+        fd.set("lng", String(location.lng));
+        fd.set("accuracy", String(location.accuracy));
       }
-      fd.set("lat", String(location.lat));
-      fd.set("lng", String(location.lng));
-      fd.set("accuracy", String(location.accuracy));
     }
 
     startCheckIn(async () => {
@@ -342,28 +352,35 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     const fd = new FormData();
     const checkoutWorkMode = (data.todayRecord?.workMode ?? workMode) as WorkMode;
 
-    if (checkoutWorkMode === "OFFICE" && officeLocation.geoFenceEnabled) {
+    if (checkoutWorkMode === "OFFICE") {
       setGeoStatus("loading");
 
-      let location: Awaited<ReturnType<typeof getBrowserLocation>>;
+      let location: Awaited<ReturnType<typeof getBrowserLocation>> | null = null;
       try {
         location = await getBrowserLocation();
       } catch (error) {
         setGeoStatus("error");
-        setCheckOutError(getLocationErrorMessage(error, "check-out"));
-        return;
+        if (officeLocation.geoFenceEnabled) {
+          setCheckOutError(getLocationErrorMessage(error, "check-out"));
+          return;
+        }
+        setGeoStatus("idle");
       }
 
-      setGeoStatus("idle");
-      const locationError = validateOfficeLocation(location, officeLocation, "check-out");
-      if (locationError) {
-        setGeoStatus("error");
-        setCheckOutError(locationError);
-        return;
+      if (location) {
+        setGeoStatus("idle");
+        if (officeLocation.geoFenceEnabled) {
+          const locationError = validateOfficeLocation(location, officeLocation, "check-out");
+          if (locationError) {
+            setGeoStatus("error");
+            setCheckOutError(locationError);
+            return;
+          }
+        }
+        fd.set("lat", String(location.lat));
+        fd.set("lng", String(location.lng));
+        fd.set("accuracy", String(location.accuracy));
       }
-      fd.set("lat", String(location.lat));
-      fd.set("lng", String(location.lng));
-      fd.set("accuracy", String(location.accuracy));
     }
 
     startCheckOut(async () => {

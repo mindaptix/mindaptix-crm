@@ -38,7 +38,6 @@ import type {
 } from "@/features/dashboard/types";
 import { createClientMeeting, type ClientMeetingFormState } from "@/features/dashboard/actions/client-meetings";
 import { createSalesLead, deleteSalesLead, updateSalesLeadFull, type DeleteLeadState, type SalesLeadFormState } from "@/features/dashboard/actions/sales-leads";
-import { SALES_TECH_OPTIONS } from "@/database/mongodb/models/sales-lead";
 import type { SalesLeadEntry } from "@/features/dashboard/types";
 import { AssignmentAlertBanner } from "@/features/dashboard/components/assignment-alert-banner";
 import { DashboardFilterBar } from "@/features/dashboard/components/dashboard-filter-bar";
