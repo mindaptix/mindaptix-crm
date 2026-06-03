@@ -5,9 +5,11 @@ import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
 import { createNotificationsForUsers } from "@/features/notifications/service";
 import { NotificationModel } from "@/database/mongodb/models/notification";
-import { TASK_LABELS, TASK_PRIORITIES, TASK_STATUSES, TaskModel, type TaskLabel, type TaskPriority, type TaskStatus } from "@/database/mongodb/models/task";
+import { TASK_LABELS, TASK_PRIORITIES, TaskModel, type TaskLabel, type TaskPriority } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
 import { saveTaskAttachments } from "@/shared/storage/uploads/work-attachments";
+
+const EMPLOYEE_ALLOWED_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED"] as const;
 
 type TaskState = {
   error?: string;
@@ -103,7 +105,7 @@ export async function updateTaskStatus(formData: FormData) {
   const taskId = String(formData.get("taskId") ?? "");
   const status = String(formData.get("status") ?? "");
 
-  if (!taskId || !TASK_STATUSES.includes(status as TaskStatus)) {
+  if (!taskId || !EMPLOYEE_ALLOWED_STATUSES.includes(status as (typeof EMPLOYEE_ALLOWED_STATUSES)[number])) {
     throw new Error("Invalid task update.");
   }
 
@@ -115,13 +117,8 @@ export async function updateTaskStatus(formData: FormData) {
     throw new Error("Task not found.");
   }
 
-  const canUpdateTask =
-    session.user.role === "SUPER_ADMIN" ||
-    session.user.role === "MANAGER" ||
-    task.assignedUserId === session.user.id;
-
-  if (!canUpdateTask) {
-    throw new Error("You cannot update this task.");
+  if (task.assignedUserId !== session.user.id) {
+    throw new Error("Only the assigned employee can update this task's status.");
   }
 
   await TaskModel.findByIdAndUpdate(taskId, {
@@ -129,16 +126,70 @@ export async function updateTaskStatus(formData: FormData) {
     completedAt: status === "COMPLETED" ? new Date() : null,
   });
 
-  if (session.user.id !== task.assignedByUserId) {
+  // When employee submits for review, notify the assigner (admin)
+  if (status === "COMPLETED" && session.user.id !== task.assignedByUserId) {
     await createNotificationsForUsers([task.assignedByUserId], {
       actorUserId: session.user.id,
       type: "TASK_COMMENT",
-      title: "Task status updated",
-      message: `${task.title} is now ${status.replaceAll("_", " ").toLowerCase()}.`,
+      title: "Task submitted for review",
+      message: `${task.title} has been marked complete and is awaiting your review.`,
       actionUrl: "/dashboard/tasks",
       sourceKey: `task-status:${taskId}:${status}:${Date.now()}`,
     });
   }
+
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/reports");
+  revalidatePath("/dashboard");
+}
+
+export async function reviewTask(formData: FormData) {
+  const session = await getCurrentSession();
+
+  if (!session || (session.user.role !== "SUPER_ADMIN" && session.user.role !== "MANAGER")) {
+    throw new Error("Only admins can review tasks.");
+  }
+
+  const taskId = String(formData.get("taskId") ?? "");
+  const action = String(formData.get("action") ?? "");
+
+  if (!taskId || (action !== "ACCEPT" && action !== "REJECT")) {
+    throw new Error("Invalid review action.");
+  }
+
+  await connectDb();
+
+  const task = await TaskModel.findById(taskId).lean();
+
+  if (!task) {
+    throw new Error("Task not found.");
+  }
+
+  if (task.status !== "COMPLETED") {
+    throw new Error("Only completed tasks can be reviewed.");
+  }
+
+  const newStatus = action === "ACCEPT" ? "CLOSED" : "REJECTED";
+
+  await TaskModel.findByIdAndUpdate(taskId, {
+    status: newStatus,
+    reviewedAt: new Date(),
+  });
+
+  const notifTitle = action === "ACCEPT" ? "Task accepted" : "Task rejected";
+  const notifMessage =
+    action === "ACCEPT"
+      ? `Your task "${task.title}" has been accepted and closed.`
+      : `Your task "${task.title}" was rejected. Please review and resubmit.`;
+
+  await createNotificationsForUsers([task.assignedUserId], {
+    actorUserId: session.user.id,
+    type: "TASK_COMMENT",
+    title: notifTitle,
+    message: notifMessage,
+    actionUrl: "/dashboard/tasks",
+    sourceKey: `task-review:${taskId}:${newStatus}:${Date.now()}`,
+  });
 
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/reports");

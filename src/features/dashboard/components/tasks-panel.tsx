@@ -3,7 +3,7 @@
 import React, { type ReactNode, useActionState, useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addTaskComment, createTask, deleteTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
+import { addTaskComment, createTask, reviewTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
 import { emitDashboardSync, subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
 import { FormActionButton } from "@/shared/ui/form-action-button";
@@ -28,9 +28,11 @@ const INITIAL_TASK_STATE = {
 };
 
 const STATUS_CONFIG: Record<string, { gradient: string; chip: string; chipText: string; dot: string; label: string }> = {
-  PENDING:     { gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", chip: "rgba(245,158,11,0.12)", chipText: "#d97706", dot: "#f59e0b", label: "Pending" },
-  IN_PROGRESS: { gradient: "linear-gradient(135deg,#3b82f6,#6366f1)", chip: "rgba(99,102,241,0.12)", chipText: "#4f46e5", dot: "#6366f1", label: "In Progress" },
-  COMPLETED:   { gradient: "linear-gradient(135deg,#10b981,#34d399)", chip: "rgba(16,185,129,0.12)", chipText: "#059669", dot: "#10b981", label: "Completed" },
+  PENDING:        { gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", chip: "rgba(245,158,11,0.12)",  chipText: "#d97706", dot: "#f59e0b", label: "Pending" },
+  IN_PROGRESS:    { gradient: "linear-gradient(135deg,#3b82f6,#6366f1)", chip: "rgba(99,102,241,0.12)",  chipText: "#4f46e5", dot: "#6366f1", label: "In Progress" },
+  COMPLETED:      { gradient: "linear-gradient(135deg,#f97316,#fb923c)", chip: "rgba(249,115,22,0.12)",  chipText: "#ea580c", dot: "#f97316", label: "Awaiting Review" },
+  CLOSED:         { gradient: "linear-gradient(135deg,#10b981,#34d399)", chip: "rgba(16,185,129,0.12)",  chipText: "#059669", dot: "#10b981", label: "Closed" },
+  REJECTED:       { gradient: "linear-gradient(135deg,#ef4444,#f87171)", chip: "rgba(239,68,68,0.12)",   chipText: "#dc2626", dot: "#ef4444", label: "Rejected" },
 };
 
 const PRIORITY_CONFIG: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -79,22 +81,22 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
     });
   }, [data.tasks, labelFilter, priorityFilter, searchTerm, statusFilter]);
 
-  const pending_count  = data.tasks.filter((t) => t.status === "PENDING").length;
-  const inprogress_count = data.tasks.filter((t) => t.status === "IN_PROGRESS").length;
-  const completed_count = data.tasks.filter((t) => t.status === "COMPLETED").length;
-  const overdue_count  = data.tasks.filter((t) => t.isOverdue).length;
-  const high_count     = data.tasks.filter((t) => t.priority === "HIGH").length;
+  const pending_count        = data.tasks.filter((t) => t.status === "PENDING").length;
+  const inprogress_count     = data.tasks.filter((t) => t.status === "IN_PROGRESS").length;
+  const awaiting_review_count = data.tasks.filter((t) => t.status === "COMPLETED").length;
+  const closed_count         = data.tasks.filter((t) => t.status === "CLOSED").length;
+  const rejected_count       = data.tasks.filter((t) => t.status === "REJECTED").length;
 
   return (
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        <StatCard gradient="linear-gradient(135deg,#f59e0b,#fbbf24)" shadow="rgba(245,158,11,0.3)" icon={<ClockIcon />} label="Pending"       value={pending_count} />
-        <StatCard gradient="linear-gradient(135deg,#6366f1,#818cf8)" shadow="rgba(99,102,241,0.3)"  icon={<PlayIcon />}  label="In Progress"   value={inprogress_count} />
-        <StatCard gradient="linear-gradient(135deg,#10b981,#34d399)" shadow="rgba(16,185,129,0.3)"  icon={<CheckIcon />} label="Completed"     value={completed_count} />
-        <StatCard gradient="linear-gradient(135deg,#ef4444,#f87171)" shadow="rgba(239,68,68,0.3)"   icon={<AlertIcon />} label="Overdue"        value={overdue_count} />
-        <StatCard gradient="linear-gradient(135deg,#ec4899,#f43f5e)" shadow="rgba(236,72,153,0.3)"  icon={<FireIcon />}  label="High Priority"  value={high_count} />
+        <StatCard gradient="linear-gradient(135deg,#f59e0b,#fbbf24)" shadow="rgba(245,158,11,0.3)"  icon={<ClockIcon />}  label="Pending"          value={pending_count} />
+        <StatCard gradient="linear-gradient(135deg,#6366f1,#818cf8)" shadow="rgba(99,102,241,0.3)"  icon={<PlayIcon />}   label="In Progress"      value={inprogress_count} />
+        <StatCard gradient="linear-gradient(135deg,#f97316,#fb923c)" shadow="rgba(249,115,22,0.3)"  icon={<ReviewIcon />} label="Awaiting Review"  value={awaiting_review_count} />
+        <StatCard gradient="linear-gradient(135deg,#10b981,#34d399)" shadow="rgba(16,185,129,0.3)"  icon={<CheckIcon />}  label="Closed"           value={closed_count} />
+        <StatCard gradient="linear-gradient(135deg,#ef4444,#f87171)" shadow="rgba(239,68,68,0.3)"   icon={<AlertIcon />}  label="Rejected"         value={rejected_count} />
       </div>
 
       {/* ── Task board (full width) ── */}
@@ -142,7 +144,13 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <FilterPill label="Status"   value={statusFilter}   options={["ALL","PENDING","IN_PROGRESS","COMPLETED"]} onChange={setStatusFilter} />
+            <FilterPill
+              label="Status"
+              value={statusFilter}
+              options={["ALL","PENDING","IN_PROGRESS","COMPLETED","CLOSED","REJECTED"]}
+              onChange={setStatusFilter}
+              labels={{ PENDING: "Pending", IN_PROGRESS: "In Progress", COMPLETED: "Awaiting Review", CLOSED: "Closed", REJECTED: "Rejected" }}
+            />
             <FilterPill label="Priority" value={priorityFilter} options={["ALL","LOW","MEDIUM","HIGH"]}               onChange={setPriorityFilter} />
             <FilterPill label="Label"    value={labelFilter}    options={["ALL",...data.labelOptions]}                onChange={setLabelFilter} />
           </div>
@@ -358,8 +366,6 @@ function TaskCard({
   onTaskUpdated: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.PENDING;
   const pc = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.LOW;
 
@@ -461,9 +467,22 @@ function TaskCard({
               </div>
             )}
 
+            {/* Rejection banner for employees */}
+            {!canAssign && task.status === "REJECTED" && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5">
+                <span className="mt-0.5 text-red-500">
+                  <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+                </span>
+                <p className="text-[0.75rem] font-semibold text-red-600">
+                  This task was rejected by your admin. Please revise and resubmit.
+                </p>
+              </div>
+            )}
+
             {/* Status update + comments + delete */}
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              {!readOnly && (
+              {/* Employee status dropdown — only for assigned user, only PENDING/IN_PROGRESS/COMPLETED */}
+              {!canAssign && !readOnly && task.status !== "CLOSED" && (
                 <form
                   action={async (formData) => {
                     await updateTaskStatus(formData);
@@ -475,12 +494,12 @@ function TaskCard({
                   <input name="taskId" type="hidden" value={task.id} />
                   <select
                     className="rounded-xl border border-slate-200 bg-white py-1.5 pl-3 pr-7 text-xs font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-50"
-                    defaultValue={task.status}
+                    defaultValue={task.status === "REJECTED" ? "IN_PROGRESS" : task.status}
                     name="status"
                   >
                     <option value="PENDING">Pending</option>
                     <option value="IN_PROGRESS">In Progress</option>
-                    <option value="COMPLETED">Completed</option>
+                    <option value="COMPLETED">Submit for Review</option>
                   </select>
                   <FormActionButton
                     className="rounded-xl px-3 py-1.5 text-xs font-bold"
@@ -491,6 +510,50 @@ function TaskCard({
                     Update
                   </FormActionButton>
                 </form>
+              )}
+
+              {/* Admin Accept / Reject — only for COMPLETED (awaiting review) tasks */}
+              {canAssign && task.status === "COMPLETED" && (
+                <div className="flex items-center gap-2">
+                  <form
+                    action={async (formData) => {
+                      await reviewTask(formData);
+                      emitDashboardSync("task-updated");
+                      onTaskUpdated();
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input name="taskId" type="hidden" value={task.id} />
+                    <input name="action" type="hidden" value="ACCEPT" />
+                    <FormActionButton
+                      className="rounded-full px-3 py-1.5 text-[0.65rem] font-bold"
+                      style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff", border: "none", boxShadow: "0 3px 10px rgba(16,185,129,0.3)" } as React.CSSProperties}
+                      pendingLabel="Accepting…"
+                      type="submit"
+                    >
+                      ✓ Accept
+                    </FormActionButton>
+                  </form>
+                  <form
+                    action={async (formData) => {
+                      await reviewTask(formData);
+                      emitDashboardSync("task-updated");
+                      onTaskUpdated();
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input name="taskId" type="hidden" value={task.id} />
+                    <input name="action" type="hidden" value="REJECT" />
+                    <FormActionButton
+                      className="rounded-full px-3 py-1.5 text-[0.65rem] font-bold"
+                      style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", border: "none", boxShadow: "0 3px 10px rgba(239,68,68,0.3)" } as React.CSSProperties}
+                      pendingLabel="Rejecting…"
+                      type="submit"
+                    >
+                      ✗ Reject
+                    </FormActionButton>
+                  </form>
+                </div>
               )}
 
               <button
@@ -506,61 +569,7 @@ function TaskCard({
                 <span>{expanded ? "▲" : "▼"}</span>
               </button>
 
-              {/* Admin-only delete */}
-              {canAssign && (
-                confirmDelete ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[0.65rem] font-semibold text-rose-600">Delete this task?</span>
-                    <form
-                      action={async (formData) => {
-                        const result = await deleteTask(formData);
-                        if (result.error) {
-                          setDeleteError(result.error);
-                          setConfirmDelete(false);
-                        } else {
-                          emitDashboardSync("task-updated");
-                          onTaskUpdated();
-                        }
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <input name="taskId" type="hidden" value={task.id} />
-                      <FormActionButton
-                        className="rounded-full px-3 py-1 text-[0.62rem] font-bold"
-                        style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", border: "none", boxShadow: "0 3px 10px rgba(239,68,68,0.3)" } as React.CSSProperties}
-                        pendingLabel="Deleting…"
-                        type="submit"
-                      >
-                        Yes, Delete
-                      </FormActionButton>
-                    </form>
-                    <button
-                      className="rounded-full px-3 py-1 text-[0.62rem] font-semibold text-slate-500 transition hover:bg-slate-100"
-                      onClick={() => setConfirmDelete(false)}
-                      type="button"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.65rem] font-semibold transition-colors"
-                    style={{ background: "rgba(239,68,68,0.07)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.15)" }}
-                    onClick={() => setConfirmDelete(true)}
-                    type="button"
-                  >
-                    <svg fill="none" height="11" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="11">
-                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
-                    </svg>
-                    Delete
-                  </button>
-                )
-              )}
             </div>
-
-            {deleteError && (
-              <p className="mt-2 text-[0.7rem] font-semibold text-rose-600">{deleteError}</p>
-            )}
 
             {/* Comments section (expandable) */}
             {expanded && (
@@ -643,8 +652,9 @@ function StatCard({ gradient, shadow, icon, label, value }: {
 }
 
 /* ─── Filter pill ─── */
-function FilterPill({ label, value, options, onChange }: {
+function FilterPill({ label, value, options, onChange, labels }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void;
+  labels?: Record<string, string>;
 }) {
   return (
     <div className="relative">
@@ -655,7 +665,7 @@ function FilterPill({ label, value, options, onChange }: {
       >
         {options.map((o) => (
           <option key={o} value={o}>
-            {o === "ALL" ? `All ${label}` : o.replace(/_/g, " ")}
+            {o === "ALL" ? `All ${label}` : (labels?.[o] ?? o.replace(/_/g, " "))}
           </option>
         ))}
       </select>
@@ -755,8 +765,8 @@ function CheckIcon() {
 function AlertIcon() {
   return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>;
 }
-function FireIcon() {
-  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>;
+function ReviewIcon() {
+  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>;
 }
 function TitleIcon() {
   return <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14"><line x1="21" x2="3" y1="6" y2="6" /><line x1="15" x2="3" y1="12" y2="12" /><line x1="17" x2="3" y1="18" y2="18" /></svg>;

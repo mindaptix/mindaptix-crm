@@ -1055,17 +1055,17 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
   ]);
 
   const userMap = new Map(users.map((user) => [user._id.toString(), user.fullName]));
-  const overdueCount = tasks.filter((task) => task.status !== "COMPLETED" && task.dueDate < getTodayDate()).length;
-  const highPriorityCount = tasks.filter((task) => task.priority === "HIGH").length;
-  const completedCount = tasks.filter((task) => task.status === "COMPLETED").length;
+  const awaitingReviewCount = tasks.filter((task) => task.status === "COMPLETED").length;
+  const closedCount = tasks.filter((task) => task.status === "CLOSED").length;
+  const rejectedCount = tasks.filter((task) => task.status === "REJECTED").length;
 
   return {
     summaryCards: [
       { label: "Pending", value: String(tasks.filter((task) => task.status === "PENDING").length), detail: "Tasks waiting to start." },
       { label: "In Progress", value: String(tasks.filter((task) => task.status === "IN_PROGRESS").length), detail: "Tasks currently being worked on." },
-      { label: "Completed", value: String(completedCount), detail: "Tasks completed and ready for admin review." },
-      { label: "Overdue", value: String(overdueCount), detail: "Tasks that crossed their due date." },
-      { label: "High Priority", value: String(highPriorityCount), detail: "Important tasks requiring closer follow-up." },
+      { label: "Awaiting Review", value: String(awaitingReviewCount), detail: "Employee-submitted tasks pending admin review." },
+      { label: "Closed", value: String(closedCount), detail: "Tasks accepted and closed by admin." },
+      { label: "Rejected", value: String(rejectedCount), detail: "Tasks rejected by admin, need to be redone." },
     ],
     tasks: tasks.map((task) => mapTaskRow(task, userMap)),
     assignedProjects: assignedProjects.map((project) => ({
@@ -2544,7 +2544,7 @@ function mapTaskRow(task: {
     status: task.status,
     priority: task.priority ?? "MEDIUM",
     labels: task.labels ?? [],
-    isOverdue: task.status !== "COMPLETED" && task.dueDate < getTodayDate(),
+    isOverdue: !["COMPLETED", "CLOSED"].includes(task.status) && task.dueDate < getTodayDate(),
     attachments: mapAttachments(task.attachments),
     comments: (task.comments ?? []).map((comment, index) => ({
       id: comment._id?.toString() ?? `${task._id.toString()}-${index}`,

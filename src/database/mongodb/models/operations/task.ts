@@ -1,7 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 import { baseSchemaOptions } from "@/database/mongodb/models/shared/schema-options";
 
-export const TASK_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED"] as const;
+export const TASK_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED", "CLOSED", "REJECTED"] as const;
 export const TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 export const TASK_LABELS = ["SEO", "DESIGN", "DEV", "ADS", "CONTENT", "SALES"] as const;
 
@@ -119,6 +119,10 @@ const taskSchema = new mongoose.Schema(
       default: [],
     },
     completedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewedAt: {
       type: Date,
       default: null,
     },
