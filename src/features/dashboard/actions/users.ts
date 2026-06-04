@@ -199,6 +199,7 @@ export async function updateManagedUserAccess(
   });
 
   revalidatePath("/dashboard/employees");
+  revalidatePath(`/dashboard/employees/${userId}`);
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/reports");
 

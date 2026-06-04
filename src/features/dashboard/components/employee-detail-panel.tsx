@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useActionState } from "react";
 import type {
   EmployeeDetailData,
   EmployeeDetailProjectEntry,
 } from "@/features/dashboard/types";
+import { updateManagedUserAccess } from "@/features/dashboard/actions/users";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -113,18 +114,19 @@ function formatLeaveType(type: string) {
 
 // ── main component ────────────────────────────────────────────────────────────
 
-type Tab = "overview" | "projects" | "attendance" | "salary";
+type Tab = "overview" | "projects" | "attendance" | "salary" | "edit";
 
 export function EmployeeDetailPanel({ data }: { data: EmployeeDetailData }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
-  const { employee, salary, projects, currentMonthAttendance, leaveHistory, leaveBalance, recentPayslips, canViewSensitive } = data;
+  const { employee, salary, projects, currentMonthAttendance, leaveHistory, leaveBalance, recentPayslips, canViewSensitive, canEdit, managerOptions } = data;
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "projects", label: `Projects (${projects.length})` },
     { key: "attendance", label: "Attendance & Leave" },
     ...(canViewSensitive ? [{ key: "salary" as Tab, label: "Salary" }] : []),
+    ...(canEdit ? [{ key: "edit" as Tab, label: "Edit Profile" }] : []),
   ];
 
   return (
@@ -294,6 +296,8 @@ export function EmployeeDetailPanel({ data }: { data: EmployeeDetailData }) {
           />
         ) : activeTab === "salary" && canViewSensitive ? (
           <SalaryTab salary={salary} payslips={recentPayslips} />
+        ) : activeTab === "edit" && canEdit ? (
+          <EditProfileTab employee={employee} managerOptions={managerOptions} />
         ) : null}
 
       </div>
@@ -717,6 +721,162 @@ function AttendanceLeaveTab({
         )}
       </section>
     </div>
+  );
+}
+
+// ── Edit Profile Tab ──────────────────────────────────────────────────────────
+
+const INPUT_CLS = "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50";
+const LABEL_CLS = "mb-1.5 block text-sm font-medium text-slate-700";
+
+function EditProfileTab({
+  employee,
+  managerOptions,
+}: {
+  employee: EmployeeDetailData["employee"];
+  managerOptions: EmployeeDetailData["managerOptions"];
+}) {
+  const [state, dispatch, pending] = useActionState(updateManagedUserAccess, { values: {} });
+
+  const v = state.values ?? {};
+  const joiningDateVal = (v.joiningDate ?? employee.joiningDate ?? "").slice(0, 10);
+  const dobVal = (v.dateOfBirth ?? employee.dateOfBirth ?? "").slice(0, 10);
+  const defaultRole = (employee.role === "SUPER_ADMIN" ? "MANAGER" : employee.role) as string;
+
+  function handleSubmit(formData: FormData) {
+    // Convert comma-separated techStack input into multiple entries that the action expects
+    const raw = String(formData.get("techStackInput") ?? "");
+    formData.delete("techStackInput");
+    raw.split(",").map((s) => s.trim()).filter(Boolean).forEach((tech) => {
+      formData.append("techStack", tech);
+    });
+    return dispatch(formData);
+  }
+
+  return (
+    <form action={handleSubmit} className="space-y-5">
+      <input type="hidden" name="userId" value={employee.id} />
+
+      {state.error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{state.error}</div>
+      ) : null}
+      {state.success ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{state.success}</div>
+      ) : null}
+
+      {/* Account Info */}
+      <section className="overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="border-b border-slate-100 px-6 py-4" style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)" }}>
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em] text-blue-600">Account</p>
+          <h3 className="mt-0.5 text-lg font-bold text-slate-900">Basic Information</h3>
+        </div>
+        <div className="grid gap-4 p-6 sm:grid-cols-2">
+          <label className="block">
+            <span className={LABEL_CLS}>Full Name <span className="text-rose-500">*</span></span>
+            <input className={INPUT_CLS} defaultValue={v.fullName ?? employee.fullName} name="fullName" placeholder="Full name" required />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Email Address <span className="text-rose-500">*</span></span>
+            <input className={INPUT_CLS} defaultValue={v.email ?? employee.email} name="email" placeholder="Email" required type="email" />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Phone Number</span>
+            <input className={INPUT_CLS} defaultValue={v.phone ?? employee.phone} name="phone" placeholder="+91 98765 43210" />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Joining Date</span>
+            <input className={INPUT_CLS} defaultValue={joiningDateVal} name="joiningDate" type="date" />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Employee ID</span>
+            <input className={INPUT_CLS} defaultValue={v.employeeId ?? employee.employeeId} name="employeeId" placeholder="EMP-001" />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Status</span>
+            <select className={INPUT_CLS} defaultValue={v.status ?? employee.status} name="status">
+              <option value="ACTIVE">Active</option>
+              <option value="SUSPENDED">Suspended</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Role</span>
+            <select className={INPUT_CLS} defaultValue={v.role ?? defaultRole} name="role">
+              <option value="EMPLOYEE">Employee</option>
+              <option value="MANAGER">Admin / Manager</option>
+              <option value="SALES">Sales</option>
+            </select>
+          </label>
+          {managerOptions.length > 0 ? (
+            <label className="block">
+              <span className={LABEL_CLS}>Reporting Manager</span>
+              <select className={INPUT_CLS} defaultValue={v.managerId ?? employee.managerId} name="managerId">
+                <option value="">— No manager —</option>
+                {managerOptions.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Personal Details */}
+      <section className="overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="border-b border-slate-100 px-6 py-4" style={{ background: "linear-gradient(135deg,#f0fdf4,#dcfce7)" }}>
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em] text-emerald-600">Profile</p>
+          <h3 className="mt-0.5 text-lg font-bold text-slate-900">Personal Details</h3>
+        </div>
+        <div className="grid gap-4 p-6 sm:grid-cols-2">
+          <label className="block">
+            <span className={LABEL_CLS}>Designation</span>
+            <input className={INPUT_CLS} defaultValue={v.designation ?? employee.designation} name="designation" placeholder="e.g. Senior Developer" />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Department</span>
+            <input className={INPUT_CLS} defaultValue={v.department ?? employee.department} name="department" placeholder="e.g. Engineering" />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Date of Birth</span>
+            <input className={INPUT_CLS} defaultValue={dobVal} name="dateOfBirth" type="date" />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLS}>Emergency Contact</span>
+            <input className={INPUT_CLS} defaultValue={v.emergencyContact ?? employee.emergencyContact} name="emergencyContact" placeholder="Name and phone number" />
+          </label>
+          <label className="col-span-full block">
+            <span className={LABEL_CLS}>Address</span>
+            <input className={INPUT_CLS} defaultValue={v.address ?? employee.address} name="address" placeholder="Full address" />
+          </label>
+        </div>
+      </section>
+
+      {/* Tech Stack */}
+      <section className="overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="border-b border-slate-100 px-6 py-4" style={{ background: "linear-gradient(135deg,#fdf4ff,#fae8ff)" }}>
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em] text-purple-600">Skills</p>
+          <h3 className="mt-0.5 text-lg font-bold text-slate-900">Tech Stack</h3>
+        </div>
+        <div className="p-6">
+          <input
+            className={INPUT_CLS}
+            defaultValue={(v.techStack as string[] | undefined)?.join(", ") ?? employee.techStack.join(", ")}
+            name="techStackInput"
+            placeholder="e.g. React, Node.js, MongoDB"
+          />
+          <p className="mt-1.5 text-xs text-slate-400">Separate each skill with a comma.</p>
+        </div>
+      </section>
+
+      <div className="flex items-center gap-3 pb-2">
+        <button
+          className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+          disabled={pending}
+          type="submit"
+        >
+          {pending ? "Saving changes…" : "Save Changes"}
+        </button>
+      </div>
+    </form>
   );
 }
 

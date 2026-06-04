@@ -225,22 +225,55 @@ function DsrReviewPanel({
   data: Extract<DsrPageData, { mode: "review" }>;
   simplifiedReview: boolean;
 }) {
-  const submittedEmployees = dedupeSubmittedEmployees(data.updates);
+  const [selectedDate, setSelectedDate] = useState(data.todayKey);
+
+  const filteredUpdates = data.updates.filter((u) => u.workDate === selectedDate);
+  const submittedEmails = new Set(filteredUpdates.map((u) => u.employeeEmail));
+  const missingForDate = data.allEmployees.filter((e) => !submittedEmails.has(e.employeeEmail));
+  const isToday = selectedDate === data.todayKey;
 
   const statCards = simplifiedReview
     ? [
-        { label: "Submitted Today", value: String(submittedEmployees.length), detail: "Employees who filled DSR today.", gradient: "linear-gradient(135deg,#10b981,#34d399)", shadow: "rgba(16,185,129,0.28)", icon: <CheckIcon /> },
-        { label: "Missing Today",   value: String(data.missingEmployees.length), detail: "Employees who have not submitted.", gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.28)", icon: <ClockIcon /> },
+        { label: "Submitted", value: String(filteredUpdates.length), detail: `DSR submitted on ${selectedDate}.`, gradient: "linear-gradient(135deg,#10b981,#34d399)", shadow: "rgba(16,185,129,0.28)", icon: <CheckIcon /> },
+        { label: "Missing",   value: String(missingForDate.length), detail: "Employees who have not submitted.", gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.28)", icon: <ClockIcon /> },
       ]
-    : data.summaryCards.map((c, i) => ({
-        ...c,
-        gradient: ["linear-gradient(135deg,#6366f1,#818cf8)","linear-gradient(135deg,#10b981,#34d399)","linear-gradient(135deg,#f59e0b,#fbbf24)"][i % 3],
-        shadow: ["rgba(99,102,241,0.28)","rgba(16,185,129,0.28)","rgba(245,158,11,0.28)"][i % 3],
-        icon: [<DocIcon key="d"/>,<CheckIcon key="c"/>,<ClockIcon key="cl"/>][i % 3],
-      }));
+    : [
+        { label: "Submitted", value: String(filteredUpdates.length), detail: `DSR entries for ${selectedDate}.`, gradient: "linear-gradient(135deg,#6366f1,#818cf8)", shadow: "rgba(99,102,241,0.28)", icon: <DocIcon /> },
+        { label: "Missing",   value: String(missingForDate.length), detail: "Employees without a DSR on this date.", gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.28)", icon: <ClockIcon /> },
+        { label: "Total Employees", value: String(data.allEmployees.length), detail: "Active employees in review scope.", gradient: "linear-gradient(135deg,#10b981,#34d399)", shadow: "rgba(16,185,129,0.28)", icon: <CheckIcon /> },
+      ];
 
   return (
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
+
+      {/* Date picker bar */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm">
+        <div className="flex items-center gap-2 text-slate-500">
+          <svg fill="none" height="15" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="15">
+            <rect height="18" rx="2" width="18" x="3" y="4"/><line x1="3" x2="21" y1="10" y2="10"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="16" x2="16" y1="2" y2="6"/>
+          </svg>
+          <span className="text-sm font-semibold text-slate-600">DSR Date:</span>
+        </div>
+        <input
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 scheme-light"
+          max={data.todayKey}
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+        />
+        {!isToday && (
+          <button
+            className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
+            onClick={() => setSelectedDate(data.todayKey)}
+            type="button"
+          >
+            Back to Today
+          </button>
+        )}
+        <span className="ml-auto text-xs text-slate-400">
+          {isToday ? "Showing today's DSR" : `Showing DSR for ${selectedDate}`}
+        </span>
+      </div>
 
       {/* Stat cards */}
       <div className={`grid gap-3 ${statCards.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
@@ -249,8 +282,8 @@ function DsrReviewPanel({
         ))}
       </div>
 
-      {!simplifiedReview && (
-        <ReminderBanner message={(data as Extract<DsrPageData, { mode: "review" }>).reminderMessage} />
+      {!simplifiedReview && isToday && (
+        <ReminderBanner message={data.reminderMessage} />
       )}
 
       {/* Missing DSR employees */}
@@ -260,21 +293,21 @@ function DsrReviewPanel({
           style={{ background: "linear-gradient(135deg,#fffbf0 0%,#fef3c7 100%)", borderBottom: "1px solid rgba(245,158,11,0.15)" }}>
           <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#d97706" }}>Pending</p>
           <div className="mt-1 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-800">Missing DSR Today</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Missing DSR — {selectedDate}</h2>
             <span className="rounded-full px-3 py-1.5 text-[0.65rem] font-bold"
               style={{ background: "rgba(245,158,11,0.12)", color: "#d97706", border: "1px solid rgba(245,158,11,0.25)" }}>
-              {data.missingEmployees.length} pending
+              {missingForDate.length} pending
             </span>
           </div>
         </div>
         <div className="divide-y divide-slate-100">
-          {data.missingEmployees.length === 0 ? (
+          {missingForDate.length === 0 ? (
             <div className="flex items-center justify-center gap-3 py-10">
               <span className="text-2xl">🎉</span>
-              <p className="text-sm font-semibold text-emerald-600">Everyone has submitted DSR today!</p>
+              <p className="text-sm font-semibold text-emerald-600">Sabne DSR submit kiya is date ke liye!</p>
             </div>
           ) : (
-            data.missingEmployees.map((emp) => (
+            missingForDate.map((emp) => (
               <div key={emp.id} className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-amber-50/40">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white"
                   style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)" }}>
@@ -301,25 +334,25 @@ function DsrReviewPanel({
           style={{ background: "linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%)", borderBottom: "1px solid rgba(16,185,129,0.15)" }}>
           <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#059669" }}>Review Feed</p>
           <div className="mt-1 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-800">Today&apos;s Submissions</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Submissions — {selectedDate}</h2>
             <div className="flex items-center gap-2 rounded-full px-3 py-1.5"
               style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              <span className="text-[0.65rem] font-bold text-emerald-600">{data.updates.length} submitted</span>
+              {isToday && <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />}
+              <span className="text-[0.65rem] font-bold text-emerald-600">{filteredUpdates.length} submitted</span>
             </div>
           </div>
         </div>
 
-        {data.updates.length === 0 ? (
+        {filteredUpdates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl text-3xl"
               style={{ background: "linear-gradient(135deg,#f1f5f9,#e2e8f0)" }}>📋</div>
-            <p className="text-sm font-bold text-slate-600">No submissions yet today</p>
-            <p className="mt-1 text-xs text-slate-400">Employee DSRs will appear here as they submit.</p>
+            <p className="text-sm font-bold text-slate-600">Is date ka koi DSR nahi mila</p>
+            <p className="mt-1 text-xs text-slate-400">Koi aur date try karo ya employees se submit karwao.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {data.updates.map((entry) => (
+            {filteredUpdates.map((entry) => (
               <AdminDsrCard key={entry.id} entry={entry} />
             ))}
           </div>
@@ -604,11 +637,6 @@ function DsrSelect({ icon, label, name, defaultValue, includePlaceholder, placeh
 function avatarGrad(name: string) {
   const g = ["#6366f1,#8b5cf6","#0ea5e9,#6366f1","#10b981,#0d9488","#f59e0b,#ef4444","#ec4899,#8b5cf6"];
   return g[name.charCodeAt(0) % g.length];
-}
-
-function dedupeSubmittedEmployees(updates: Extract<DsrPageData, { mode: "review" }>["updates"]) {
-  const seen = new Set<string>();
-  return updates.filter((u) => { if (seen.has(u.employeeEmail)) return false; seen.add(u.employeeEmail); return true; });
 }
 
 function getInitials(value: string) {

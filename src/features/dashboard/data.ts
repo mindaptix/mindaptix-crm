@@ -402,15 +402,18 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
 
   const hasAdminLikeAccess = session?.user.role === "SUPER_ADMIN" || session?.user.role === "MANAGER";
   const isSalesSelfView = session?.user.role === "SALES";
+  const isEmployeeDirectoryView = session?.user.role === "EMPLOYEE";
   const userFilter = hasAdminLikeAccess
     ? { role: { $ne: "SUPER_ADMIN" } }
     : isSalesSelfView
       ? { _id: session.user.id }
-      : { _id: { $in: [] } };
+      : isEmployeeDirectoryView
+        ? { status: "ACTIVE", role: { $in: ["EMPLOYEE", "SALES"] } }
+        : { _id: { $in: [] } };
 
   const users = await UserModel.find(
     userFilter,
-    { fullName: 1, email: 1, phone: 1, joiningDate: 1, managerId: 1, role: 1, status: 1, projectIds: 1, techStack: 1, documentName: 1, documentUrl: 1 },
+    { fullName: 1, email: 1, phone: 1, joiningDate: 1, managerId: 1, role: 1, status: 1, projectIds: 1, techStack: 1, documentName: 1, documentUrl: 1, designation: 1, department: 1, employeeId: 1 },
   ).sort({ createdAt: -1 }).lean();
 
   const updatesFilter = hasAdminLikeAccess ? {} : { userId: { $in: [] } };
@@ -1145,8 +1148,15 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
       ? await getAllActiveEmployeeIds()
       : await getVisibleUserIdsForSession(session, { employeesOnly: true });
   const scope = inScope(visibleEmployeeIds);
+
+  const thirtyDaysAgo = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  })();
+
   const [updates, users, projects] = await Promise.all([
-    DailyUpdateModel.find({ userId: scope, workDate: today }).sort({ createdAt: -1 }).limit(20).lean(),
+    DailyUpdateModel.find({ userId: scope, workDate: { $gte: thirtyDaysAgo } }).sort({ workDate: -1, createdAt: -1 }).limit(500).lean(),
     UserModel.find({ _id: scope }, { fullName: 1, email: 1, status: 1 }).lean(),
     ProjectModel.find({}, { name: 1 }).lean(),
   ]);
@@ -1154,14 +1164,20 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
   const userMap = new Map(users.map((user) => [user._id.toString(), user]));
   const projectMap = new Map(projects.map((project) => [project._id.toString(), project.name]));
   const activeUsers = users.filter((user) => user.status === "ACTIVE");
-  const submittedTodayIds = new Set(updates.map((update) => update.userId));
-  const missingEmployees = users
-    .filter((user) => user.status === "ACTIVE" && !submittedTodayIds.has(user._id.toString()))
+  const submittedTodayIds = new Set(updates.filter((u) => u.workDate === today).map((u) => u.userId));
+  const missingEmployees = activeUsers
+    .filter((user) => !submittedTodayIds.has(user._id.toString()))
     .map((user) => ({
       id: user._id.toString(),
       employeeName: user.fullName,
       employeeEmail: user.email,
     }));
+
+  const allEmployees = activeUsers.map((user) => ({
+    id: user._id.toString(),
+    employeeName: user.fullName,
+    employeeEmail: user.email,
+  }));
 
   return {
     mode: "review",
@@ -1183,6 +1199,8 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
       attachments: mapAttachments(update.attachments),
     })),
     missingEmployees,
+    allEmployees,
+    todayKey: today,
     reminderMessage:
       currentTime >= "19:00"
         ? `${missingEmployees.length} employee(s) are still pending DSR after 7 PM.`
@@ -1495,9 +1513,10 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
   await connectDb();
 
   const currentYear = new Date().getFullYear();
-  const [settings, holidays] = await Promise.all([
+  const [settings, holidays, currentUser] = await Promise.all([
     SettingModel.findOne({ key: "company" }).lean(),
     HolidayModel.find({ year: currentYear }).sort({ date: 1 }).lean(),
+    UserModel.findById(session.user.id, { phone: 1, designation: 1, department: 1, dateOfBirth: 1, address: 1, emergencyContact: 1 }).lean(),
   ]);
 
   return {
@@ -1506,6 +1525,12 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     currentUserEmail: session.user.email,
     currentUserName: session.user.fullName,
     currentUserRoleLabel: session.user.role === "SUPER_ADMIN" ? "Super Admin" : session.user.role === "MANAGER" ? "Admin" : formatLabel(session.user.role),
+    currentUserPhone: readString(toRecord(currentUser).phone) ?? "",
+    currentUserDesignation: readString(toRecord(currentUser).designation) ?? "",
+    currentUserDepartment: readString(toRecord(currentUser).department) ?? "",
+    currentUserDateOfBirth: currentUser?.dateOfBirth ? String(currentUser.dateOfBirth).slice(0, 10) : "",
+    currentUserAddress: readString(toRecord(currentUser).address) ?? "",
+    currentUserEmergencyContact: readString(toRecord(currentUser).emergencyContact) ?? "",
     workStart: settings?.workStart ?? "10:00",
     workEnd: settings?.workEnd ?? "19:00",
     leavePolicy: settings?.leavePolicy ?? "Paid Leave and Sick Leave are available for approved requests.",
@@ -1928,7 +1953,7 @@ export async function getEmployeeDetailData(
   const targetUser = await UserModel.findById(employeeId).lean();
   if (!targetUser) throw new Error("Employee not found");
 
-  const [managerUser, todayAttendance, todayLeave, projects, allPayments] = await Promise.all([
+  const [managerUser, todayAttendance, todayLeave, projects, allPayments, managersList] = await Promise.all([
     targetUser.managerId
       ? UserModel.findById(targetUser.managerId, { fullName: 1 }).lean()
       : Promise.resolve(null),
@@ -1949,6 +1974,7 @@ export async function getEmployeeDetailData(
       {},
       { clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, status: 1 },
     ).lean(),
+    UserModel.find({ role: "MANAGER", status: "ACTIVE" }, { fullName: 1 }).sort({ fullName: 1 }).lean(),
   ]);
 
   let todayStatus = "Absent";
@@ -2181,6 +2207,8 @@ export async function getEmployeeDetailData(
       : null,
     recentPayslips,
     canViewSensitive,
+    canEdit: canViewSensitive,
+    managerOptions: managersList.map((m) => ({ id: m._id.toString(), label: readString(toRecord(m).fullName) ?? "" })),
   };
 }
 

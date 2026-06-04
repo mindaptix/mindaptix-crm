@@ -133,7 +133,16 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
   });
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAccountPassword, INITIAL_PASSWORD_STATE);
   const [profileState, profileAction, profilePending] = useActionState(updateAccountProfile, {
-    values: { fullName: data.currentUserName, email: data.currentUserEmail },
+    values: {
+      fullName: data.currentUserName,
+      email: data.currentUserEmail,
+      phone: data.currentUserPhone,
+      designation: data.currentUserDesignation,
+      department: data.currentUserDepartment,
+      dateOfBirth: data.currentUserDateOfBirth,
+      address: data.currentUserAddress,
+      emergencyContact: data.currentUserEmergencyContact,
+    },
   });
   const [holidayAddState, holidayAddAction, holidayAddPending] = useActionState(addHoliday, INIT_HOLIDAY);
   const [holidayDelState, holidayDelAction, holidayDelPending] = useActionState(deleteHoliday, INIT_HOLIDAY);
@@ -181,24 +190,71 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
               <h3 className="text-lg font-semibold leading-tight text-slate-950">Edit Profile</h3>
             </div>
           </div>
-          <p className="mt-2 text-sm leading-6 text-slate-500">Update your display name and login email address.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Update your personal details — name, contact info, and address.</p>
 
           <form action={profileAction} className="mt-5 space-y-4">
             {profileState.error ? <Feedback>{profileState.error}</Feedback> : null}
             {profileState.success ? <Feedback tone="success">{profileState.success}</Feedback> : null}
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InputField
+                defaultValue={profileState.values?.fullName ?? data.currentUserName}
+                label="Full Name"
+                name="fullName"
+                placeholder="Enter your full name"
+              />
+              <InputField
+                defaultValue={profileState.values?.email ?? data.currentUserEmail}
+                label="Email Address"
+                name="email"
+                placeholder="Enter your email"
+                type="email"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InputField
+                defaultValue={profileState.values?.phone ?? data.currentUserPhone}
+                label="Phone Number"
+                name="phone"
+                placeholder="e.g. +91 98765 43210"
+              />
+              <InputField
+                defaultValue={profileState.values?.dateOfBirth ?? data.currentUserDateOfBirth}
+                label="Date of Birth"
+                name="dateOfBirth"
+                placeholder=""
+                type="date"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InputField
+                defaultValue={profileState.values?.designation ?? data.currentUserDesignation}
+                label="Designation"
+                name="designation"
+                placeholder="e.g. Frontend Developer"
+              />
+              <InputField
+                defaultValue={profileState.values?.department ?? data.currentUserDepartment}
+                label="Department"
+                name="department"
+                placeholder="e.g. Engineering"
+              />
+            </div>
+
             <InputField
-              defaultValue={profileState.values?.fullName ?? data.currentUserName}
-              label="Full Name"
-              name="fullName"
-              placeholder="Enter your full name"
+              defaultValue={profileState.values?.emergencyContact ?? data.currentUserEmergencyContact}
+              label="Emergency Contact"
+              name="emergencyContact"
+              placeholder="Name and phone number"
             />
+
             <InputField
-              defaultValue={profileState.values?.email ?? data.currentUserEmail}
-              label="Email Address"
-              name="email"
-              placeholder="Enter your email"
-              type="email"
+              defaultValue={profileState.values?.address ?? data.currentUserAddress}
+              label="Address"
+              name="address"
+              placeholder="Your full address"
             />
 
             <Button className="sm:w-auto" disabled={profilePending} type="submit">

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AnnouncementsPanel } from "@/features/dashboard/components/announcements-panel";
 import { AttendancePanel } from "@/features/dashboard/components/attendance-panel";
 import { DsrPanel } from "@/features/dashboard/components/dsr-panel";
+import { TeamDirectoryPanel } from "@/features/dashboard/components/team-directory-panel";
 import { EmployeeProjectsPanel } from "@/features/dashboard/components/employee-projects-panel";
 import { ExpensesPanel } from "@/features/dashboard/components/expenses-panel";
 import { LeavesPanel } from "@/features/dashboard/components/leaves-panel";
@@ -15,6 +16,7 @@ import {
   getAnnouncementsPageData,
   getAttendancePageData,
   getDsrPageData,
+  getEmployeesPageData,
   getExpensesPageData,
   getLeavesPageData,
   getPayrollPageData,
@@ -27,6 +29,10 @@ import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
 export async function renderEmployeeDashboardPage(page: DashboardPageKey, session: AuthenticatedSession) {
   switch (page) {
+    case "employees": {
+      const data = await getEmployeesPageData(session);
+      return <TeamDirectoryPanel users={data.users} />;
+    }
     case "projects": {
       const data = await getProjectsPageData(session);
       return <EmployeeProjectsPanel data={data} />;

@@ -484,6 +484,8 @@ export type DsrPageData =
       summaryCards: SummaryCard[];
       updates: DsrFeedEntry[];
       missingEmployees: DsrMissingEntry[];
+      allEmployees: DsrMissingEntry[];
+      todayKey: string;
       reminderMessage: string;
     };
 
@@ -561,6 +563,12 @@ export type SettingsPageData = {
   currentUserEmail: string;
   currentUserName: string;
   currentUserRoleLabel: string;
+  currentUserPhone: string;
+  currentUserDesignation: string;
+  currentUserDepartment: string;
+  currentUserDateOfBirth: string;
+  currentUserAddress: string;
+  currentUserEmergencyContact: string;
   workStart: string;
   workEnd: string;
   leavePolicy: string;
@@ -813,6 +821,8 @@ export type EmployeeDetailData = {
   } | null;
   recentPayslips: EmployeeDetailPayslip[];
   canViewSensitive: boolean;
+  canEdit: boolean;
+  managerOptions: EmployeeOption[];
 };
 
 // ─── Project Detail Page ─────────────────────────────────────────────────────

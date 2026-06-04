@@ -138,6 +138,12 @@ type ProfileSettingsState = {
   values?: {
     fullName?: string;
     email?: string;
+    phone?: string;
+    designation?: string;
+    department?: string;
+    dateOfBirth?: string;
+    address?: string;
+    emergencyContact?: string;
   };
 };
 
@@ -153,27 +159,46 @@ export async function updateAccountProfile(
 
   const fullName = String(formData.get("fullName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const designation = String(formData.get("designation") ?? "").trim();
+  const department = String(formData.get("department") ?? "").trim();
+  const dateOfBirth = String(formData.get("dateOfBirth") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const emergencyContact = String(formData.get("emergencyContact") ?? "").trim();
 
   if (fullName.length < 2) {
-    return { error: "Full name must be at least 2 characters.", values: { fullName, email } };
+    return { error: "Full name must be at least 2 characters.", values: { fullName, email, phone, designation, department, dateOfBirth, address, emergencyContact } };
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: "Enter a valid email address.", values: { fullName, email } };
+    return { error: "Enter a valid email address.", values: { fullName, email, phone, designation, department, dateOfBirth, address, emergencyContact } };
+  }
+
+  if (phone && !/^[0-9+\-()\s]{7,20}$/.test(phone)) {
+    return { error: "Enter a valid phone number.", values: { fullName, email, phone, designation, department, dateOfBirth, address, emergencyContact } };
   }
 
   await connectDb();
 
   const existing = await UserModel.findOne({ email, _id: { $ne: session.user.id } }).lean();
   if (existing) {
-    return { error: "This email is already in use by another account.", values: { fullName, email } };
+    return { error: "This email is already in use by another account.", values: { fullName, email, phone, designation, department, dateOfBirth, address, emergencyContact } };
   }
 
-  await UserModel.findByIdAndUpdate(session.user.id, { fullName, email });
+  await UserModel.findByIdAndUpdate(session.user.id, {
+    fullName,
+    email,
+    phone,
+    designation,
+    department,
+    dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+    address,
+    emergencyContact,
+  });
 
   revalidatePath("/dashboard/settings");
 
-  return { success: "Profile updated successfully.", values: { fullName, email } };
+  return { success: "Profile updated successfully.", values: { fullName, email, phone, designation, department, dateOfBirth, address, emergencyContact } };
 }
 
 type PasswordSettingsState = {
