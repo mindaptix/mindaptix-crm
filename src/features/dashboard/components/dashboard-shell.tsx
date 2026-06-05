@@ -273,9 +273,10 @@ function getServerHydrationSnapshot() {
 
 const NAV_GROUPS: { label: string | null; keys: DashboardNavKey[] }[] = [
   { label: null, keys: ["dashboard"] },
-  { label: "People", keys: ["employees", "attendance", "leaves"] },
+  { label: "People", keys: ["employees", "attendance", "leaves", "regularize"] },
   { label: "Work", keys: ["projects", "tasks", "dsr"] },
-  { label: "Finance", keys: ["reports", "payroll", "expenses"] },
+  { label: "Finance", keys: ["reports", "payroll", "expenses", "payments"] },
+  { label: "Resources", keys: ["assets", "documents", "alldocs"] },
   { label: "Communication", keys: ["announcements"] },
   { label: "Account", keys: ["settings"] },
 ];
@@ -310,11 +311,58 @@ function getMenuIcon(key: DashboardNavKey) {
       return <PayrollIcon />;
     case "expenses":
       return <ExpenseIcon />;
+    case "payments":
+      return <PaymentsIcon />;
+    case "assets":
+      return <AssetsIcon />;
+    case "regularize":
+      return <RegularizeIcon />;
+    case "documents":
+    case "alldocs":
+      return <DocumentsIcon />;
     case "announcements":
       return <MegaphoneIcon />;
     case "settings":
       return <SettingsIcon />;
   }
+}
+
+function PaymentsIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <rect height="14" rx="2" stroke="currentColor" strokeWidth="1.8" width="20" x="2" y="5" />
+      <path d="M2 10h20" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function AssetsIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <rect height="14" rx="2" stroke="currentColor" strokeWidth="1.8" width="18" x="3" y="3" />
+      <path d="M3 9h18M9 21V9" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function DocumentsIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" />
+      <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" />
+      <line x1="8" x2="16" y1="13" y2="13" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <line x1="8" x2="13" y1="17" y2="17" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function RegularizeIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <rect height="18" rx="2" stroke="currentColor" strokeWidth="1.8" width="18" x="3" y="4" />
+      <path d="M3 10h18M8 2v4M16 2v4M8 15l2 2 4-4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
 }
 
 function HamburgerIcon() {

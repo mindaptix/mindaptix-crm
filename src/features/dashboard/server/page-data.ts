@@ -15,4 +15,8 @@ export {
   getReportsPageData,
   getSettingsPageData,
   getTasksPageData,
+  getRegularizationPageData,
+  getAssetsPageData,
+  getEmployeeDocumentsData,
+  getAllEmployeeDocumentsData,
 } from "@/features/dashboard/data";

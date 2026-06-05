@@ -365,6 +365,7 @@ export type AttendancePageData = {
   todayRecord: AttendanceRecordView | null;
   todayRecords: AttendanceRecordView[];
   monthlyRows: AttendanceMonthlyRow[];
+  pendingRegularizations: RegularizationEntry[];
 };
 
 export type LeaveEntry = {
@@ -823,6 +824,7 @@ export type EmployeeDetailData = {
   canViewSensitive: boolean;
   canEdit: boolean;
   managerOptions: EmployeeOption[];
+  documents: EmployeeDocumentEntry[];
 };
 
 // ─── Project Detail Page ─────────────────────────────────────────────────────
@@ -955,4 +957,72 @@ export type PaymentsPageData = {
   partialCount: number;
   pendingCount: number;
   projectSuggestions: { clientName: string; projectName: string }[];
+};
+
+// ─── Attendance Regularization ──────────────────────────────────────────────
+
+export type RegularizationEntry = {
+  id: string;
+  userId: string;
+  employeeName: string;
+  employeeEmail: string;
+  dateKey: string;
+  requestedCheckIn: string;
+  requestedCheckOut: string;
+  workMode: string;
+  reason: string;
+  status: string;
+  reviewedByName: string;
+  reviewNote: string;
+  reviewedAt: string;
+  createdAt: string;
+};
+
+export type RegularizationPageData = {
+  myRequests: RegularizationEntry[];
+  pendingRequests: RegularizationEntry[];
+  allRequests: RegularizationEntry[];
+  canReview: boolean;
+};
+
+// ─── Asset Management ───────────────────────────────────────────────────────
+
+export type AssetEntry = {
+  id: string;
+  name: string;
+  brand: string;
+  model: string;
+  category: string;
+  serialNumber: string;
+  purchaseDate: string;
+  purchasePrice: number;
+  condition: string;
+  notes: string;
+  status: string;
+  assignedToUserId: string;
+  assignedToName: string;
+  assignedAt: string;
+  returnedAt: string;
+  fineAmount: number;
+  fineNote: string;
+  createdAt: string;
+};
+
+export type AssetsPageData = {
+  assets: AssetEntry[];
+  canManage: boolean;
+  employeeOptions: EmployeeOption[];
+  totalAssets: number;
+  assignedCount: number;
+  availableCount: number;
+  lostOrDamagedCount: number;
+};
+
+// ─── Employee Documents (multiple) ──────────────────────────────────────────
+
+export type EmployeeDocumentsPageData = {
+  documents: EmployeeDocumentEntry[];
+  canManage: boolean;
+  targetUserId: string;
+  targetUserName: string;
 };

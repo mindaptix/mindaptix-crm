@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
+import { reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
 import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
-import type { AttendancePageData } from "@/features/dashboard/types";
+import type { AttendancePageData, RegularizationEntry } from "@/features/dashboard/types";
 
 type AttendancePanelProps = {
   data: AttendancePageData;
@@ -649,7 +651,24 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                 </div>
               )}
             </div>
+          {/* Regularization nudge */}
+          <div className="mx-6 mb-5 mt-1">
+            <Link
+              href="/dashboard/regularize"
+              className="flex items-center justify-between rounded-xl px-4 py-3 transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-lg">📋</span>
+                <div>
+                  <p className="text-[0.75rem] font-semibold text-white/80">Missed attendance on a previous day?</p>
+                  <p className="text-[0.65rem] text-white/45">Submit a regularization request for admin review.</p>
+                </div>
+              </div>
+              <span className="shrink-0 text-xs font-bold text-blue-300">Request →</span>
+            </Link>
           </div>
+        </div>
         )}
 
         {/* Today's roster */}
@@ -762,6 +781,11 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
         </div>
       </div>
 
+      {/* ── Pending Regularization Requests (admin only) ── */}
+      {!data.canMarkAttendance && data.pendingRegularizations.length > 0 && (
+        <PendingRegularizationsCard requests={data.pendingRegularizations} />
+      )}
+
       {/* ── Monthly report ── */}
       <div className="overflow-hidden rounded-[1.8rem] shadow-[0_8px_40px_rgba(15,23,42,0.08)]"
         style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff" }}>
@@ -830,6 +854,126 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
             );
           })}
         </DashboardTable>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Pending Regularizations Card (admin) ─── */
+
+function PendingRegularizationsCard({ requests }: { requests: RegularizationEntry[] }) {
+  const [state, action, pending] = useActionState(reviewRegularizationRequest, {});
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+
+  return (
+    <div
+      className="overflow-hidden rounded-[1.8rem]"
+      style={{ border: "1px solid rgba(245,158,11,0.3)", background: "#fff", boxShadow: "0 8px 40px rgba(245,158,11,0.08)" }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-6 py-5"
+        style={{ background: "linear-gradient(135deg,#fffbeb,#fef3c7)", borderBottom: "1px solid rgba(245,158,11,0.15)" }}
+      >
+        <div>
+          <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#d97706" }}>Action Required</p>
+          <h2 className="mt-0.5 text-lg font-bold text-slate-800">Pending Regularization Requests</h2>
+          <p className="text-sm text-slate-500">Employees have requested attendance corrections for previous days.</p>
+        </div>
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black text-white"
+          style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}
+        >
+          {requests.length}
+        </span>
+      </div>
+
+      {state.error   && <div className="mx-6 mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{state.error}</div>}
+      {state.success && <div className="mx-6 mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{state.success}</div>}
+
+      <div className="divide-y divide-slate-50">
+        {requests.map((req) => (
+          <div key={req.id}>
+            <div className="flex flex-wrap items-start gap-4 px-6 py-4 transition-colors hover:bg-amber-50/30">
+              {/* Avatar */}
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-bold text-white"
+                style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)" }}
+              >
+                {req.employeeName.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase()}
+              </div>
+
+              {/* Info */}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-slate-800">{req.employeeName}</p>
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[0.6rem] font-bold text-amber-700">PENDING</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-3 text-[0.73rem] text-slate-500">
+                  <span>📅 {req.dateKey}</span>
+                  <span>🕐 {req.requestedCheckIn}{req.requestedCheckOut ? ` — ${req.requestedCheckOut}` : ""}</span>
+                  <span>{req.workMode === "WFH" ? "🏠 WFH" : req.workMode === "FIELD" ? "🚗 Field" : "🏢 Office"}</span>
+                </div>
+                <p className="mt-1.5 text-[0.8rem] text-slate-600">{req.reason}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[0.72rem] font-semibold text-slate-600 transition hover:bg-slate-100"
+                  onClick={() => setReviewingId(reviewingId === req.id ? null : req.id)}
+                  type="button"
+                >
+                  {reviewingId === req.id ? "Cancel" : "Review"}
+                </button>
+              </div>
+            </div>
+
+            {/* Inline review form */}
+            {reviewingId === req.id && (
+              <div className="border-t border-amber-50 bg-amber-50/50 px-6 py-4">
+                <form action={action} className="space-y-3">
+                  <input type="hidden" name="requestId" value={req.id} />
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">Note for employee (optional)</span>
+                    <input
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                      name="reviewNote"
+                      placeholder="e.g. Internet issue accepted, attendance marked."
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      className="flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition disabled:opacity-50"
+                      disabled={pending}
+                      name="action"
+                      style={{ background: "linear-gradient(135deg,#10b981,#059669)", boxShadow: "0 4px 12px rgba(16,185,129,0.3)" }}
+                      type="submit"
+                      value="APPROVED"
+                    >
+                      ✓ Approve
+                    </button>
+                    <button
+                      className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                      disabled={pending}
+                      name="action"
+                      type="submit"
+                      value="REJECTED"
+                    >
+                      ✕ Reject
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-slate-50 px-6 py-3">
+        <Link href="/dashboard/regularize" className="text-[0.72rem] font-semibold text-indigo-600 hover:text-indigo-800">
+          View all regularization history →
+        </Link>
       </div>
     </div>
   );
@@ -940,4 +1084,3 @@ function StatusChip({ status }: { status: string }) {
     </span>
   );
 }
-

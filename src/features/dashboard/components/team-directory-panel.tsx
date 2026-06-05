@@ -125,7 +125,7 @@ export function TeamDirectoryPanel({ users }: Props) {
       >
         {filtered.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="text-sm text-slate-400">Koi employee nahi mila is search ke liye.</p>
+            <p className="text-sm text-slate-400">No employee matched this search.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

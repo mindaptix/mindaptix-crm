@@ -144,8 +144,6 @@ export function EmployeesManagementPanel({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [lastUpdateSuccess, setLastUpdateSuccess] = useState<string | null>(null);
-  const [techStackFilter, setTechStackFilter] = useState<string | null>(null);
-  const techSummary = buildTechSummary(users);
 
   // ── Create-form draft state (persists across tab switches + page nav) ──
   const [createDraft, setCreateDraft] = useState<CreateDraft>(loadDraft);
@@ -176,10 +174,6 @@ export function EmployeesManagementPanel({
         return false;
       }
 
-      if (techStackFilter && !user.techStack.includes(techStackFilter)) {
-        return false;
-      }
-
       if (!query) {
         return true;
       }
@@ -189,7 +183,7 @@ export function EmployeesManagementPanel({
         .toLowerCase()
         .includes(query);
     });
-  }, [roleFilter, searchTerm, techStackFilter, users]);
+  }, [roleFilter, searchTerm, users]);
 
   const selectedUser = filteredUsers.find((user) => user.id === selectedUserId) ?? filteredUsers[0] ?? null;
   const canManageWorkspace = !readOnly && !salesOnly;
@@ -270,128 +264,6 @@ export function EmployeesManagementPanel({
         ))}
       </section>
 
-      {/* ── Tech Stack Overview ─────────────────────────────────────────── */}
-      {techSummary.length > 0 && !salesOnly ? (
-        <section
-          className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_8px_32px_rgba(15,23,42,0.06)]"
-        >
-          {/* Header */}
-          <div
-            className="flex flex-wrap items-center justify-between gap-3 px-6 py-5"
-            style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}
-          >
-            <div>
-              <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em] text-indigo-600">Workforce Skills</p>
-              <h2 className="mt-0.5 text-xl font-bold text-slate-900">Tech Stack Overview</h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {techSummary.length} skill{techSummary.length !== 1 ? "s" : ""} across {users.length} team member{users.length !== 1 ? "s" : ""}.
-                {techStackFilter ? null : " Click any skill to filter employees."}
-              </p>
-            </div>
-            {techStackFilter ? (
-              <button
-                className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-4 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
-                onClick={() => setTechStackFilter(null)}
-                type="button"
-              >
-                {techStackFilter} &times; Clear filter
-              </button>
-            ) : null}
-          </div>
-
-          <div className="p-6 space-y-5">
-            {/* Skill tags with count badges */}
-            <div className="flex flex-wrap gap-2">
-              {techSummary.map((item) => {
-                const isActive = techStackFilter === item.label;
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => setTechStackFilter(isActive ? null : item.label)}
-                    type="button"
-                    className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
-                      isActive
-                        ? "border-indigo-500 bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.35)]"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
-                    }`}
-                  >
-                    {item.label}
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[0.62rem] font-bold ${
-                        isActive ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* When a skill is selected — show matching employees */}
-            {techStackFilter ? (
-              <div>
-                <p className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.26em] text-indigo-600">
-                  Employees with &ldquo;{techStackFilter}&rdquo; — {users.filter((u) => u.techStack.includes(techStackFilter)).length} found
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {users
-                    .filter((u) => u.techStack.includes(techStackFilter))
-                    .map((u) => (
-                      <Link
-                        key={u.id}
-                        href={`/dashboard/employees/${u.id}`}
-                        className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-                      >
-                        <span
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
-                          style={{ background: "linear-gradient(135deg,#6366f1,#818cf8)" }}
-                        >
-                          {u.fullName.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase()}
-                        </span>
-                        <div>
-                          <p className="leading-tight">{u.fullName}</p>
-                          <p className="text-[0.65rem] font-normal text-slate-400">{u.designation || u.role}</p>
-                        </div>
-                      </Link>
-                    ))}
-                </div>
-              </div>
-            ) : (
-              /* Top-5 bar chart when no filter active */
-              <div>
-                <p className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.26em] text-slate-400">Top Skills by Employee Count</p>
-                <div className="space-y-2.5">
-                  {techSummary.slice(0, 8).map((item) => {
-                    const pct = Math.round((item.count / users.length) * 100);
-                    const barColor =
-                      pct >= 60 ? "#6366f1" : pct >= 30 ? "#10b981" : pct >= 15 ? "#f59e0b" : "#94a3b8";
-                    return (
-                      <button
-                        key={item.label}
-                        className="group flex w-full items-center gap-3 text-left"
-                        onClick={() => setTechStackFilter(item.label)}
-                        type="button"
-                      >
-                        <span className="w-28 shrink-0 truncate text-right text-xs font-semibold text-slate-600 group-hover:text-indigo-600">
-                          {item.label}
-                        </span>
-                        <div className="flex-1 h-2.5 rounded-full bg-slate-100">
-                          <div
-                            className="h-2.5 rounded-full transition-all duration-500 group-hover:opacity-80"
-                            style={{ width: `${Math.max(pct, 3)}%`, background: barColor }}
-                          />
-                        </div>
-                        <span className="w-8 shrink-0 text-xs font-bold text-slate-500">{item.count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      ) : null}
 
       {shouldShowDirectory ? (
         <section className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-6">
@@ -984,19 +856,6 @@ export function EmployeesManagementPanel({
                 </div>
               ) : null}
 
-              {/* Tech coverage summary (read-only view) */}
-              {readOnly && techSummary.length > 0 ? (
-                <div className="mt-2 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Tech Coverage</p>
-                  <div className="flex flex-wrap gap-2">
-                    {techSummary.map((item) => (
-                      <span className="rounded-full border border-blue-100 bg-white px-3 py-1 text-sm font-semibold text-blue-700" key={item.label}>
-                        {item.label} <span className="text-slate-400">({item.count})</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </div>
           ) : null}
 
@@ -1511,19 +1370,6 @@ function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function buildTechSummary(users: EmployeeDirectoryEntry[]) {
-  const countMap = new Map<string, number>();
-
-  for (const user of users) {
-    for (const tech of user.techStack) {
-      countMap.set(tech, (countMap.get(tech) ?? 0) + 1);
-    }
-  }
-
-  return Array.from(countMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
-}
 
 function roleLabel(role: EmployeeDirectoryEntry["role"]) {
   switch (role) {

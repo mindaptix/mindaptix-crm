@@ -28,8 +28,8 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
   ]);
 
   return {
-    title: "Employee Dashboard",
-    description: "Personal workflow view for attendance, assigned tasks, DSR discipline, and upcoming work.",
+    title: "My Workspace",
+    description: "Quick access to attendance, tasks, DSR, and leave without duplicate widgets.",
     priorityAlert:
       !dsrCount && currentTime >= "19:00"
         ? {
@@ -46,9 +46,9 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
       { label: "Assigned Projects", value: String(projectCount), detail: "Projects currently linked to your account." },
       { label: "DSR Today", value: dsrCount ? "Submitted" : "Pending", detail: "Daily status report state for today." },
     ],
-    notificationTitle: "System Notifications",
+    notificationTitle: "Updates",
     notifications,
-    weeklySummaryTitle: "Weekly Summary",
+    weeklySummaryTitle: "Weekly Pulse",
     weeklySummaryCards: buildOverviewWeeklySummaryCards({
       attendanceRows: attendanceRow ? [attendanceRow] : [],
       dsrRows: dsrCount ? [{ userId: session.user.id, workDate: today }] : [],
@@ -56,15 +56,15 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
       taskRows,
       activePeopleCount: 1,
     }),
-    calendarTitle: "Upcoming Calendar",
+    calendarTitle: "Upcoming",
     calendarItems: buildOverviewCalendarItems({
       leaves: [],
       tasks: taskRows.map((task) => ({ ...task, assignedUserId: session.user.id })),
       userMap: new Map([[session.user.id, { fullName: session.user.fullName, email: session.user.email }]]),
     }),
-    performanceTitle: "Performance Score",
+    performanceTitle: "My Score",
     performanceRows: await buildOverviewPerformanceRows([session.user.id]),
-    primaryListTitle: "My Tasks",
+    primaryListTitle: "Active Work",
     primaryEmptyMessage: "No tasks assigned right now.",
     primaryItems: taskRows.map((row) => ({
       id: row._id.toString(),
@@ -72,12 +72,12 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
       meta: `${formatLabel(row.status)} | ${formatLabel(row.priority ?? "MEDIUM")}`,
       description: `Due ${row.dueDate}`,
     })),
-    secondaryListTitle: "My Work Focus",
-    secondaryEmptyMessage: "Your next work updates will appear here.",
+    secondaryListTitle: "Sidebar Shortcuts",
+    secondaryEmptyMessage: "Shortcut links will appear here.",
     secondaryItems: [
-      { id: "attendance", title: "Mark Attendance", meta: "Daily", description: "Use the Attendance page to check in and check out." },
-      { id: "dsr", title: "Submit DSR", meta: "Daily", description: "Use the DSR page to report today's work and tomorrow's plan." },
-      { id: "leave", title: "Apply Leave", meta: "As needed", description: "Use the Leaves page for sick or paid leave requests." },
+      { id: "attendance", title: "Attendance", meta: "Daily", description: "Check in, check out, and review today." },
+      { id: "dsr", title: "DSR", meta: "Daily", description: "Submit today's work and tomorrow's plan." },
+      { id: "leave", title: "Leaves", meta: "As needed", description: "Apply or track leave requests." },
     ],
   };
 }

@@ -7,6 +7,8 @@ import type {
   EmployeeDetailProjectEntry,
 } from "@/features/dashboard/types";
 import { updateManagedUserAccess } from "@/features/dashboard/actions/users";
+import { EmployeeDocumentsPanel } from "@/features/dashboard/components/employee-documents-panel";
+import type { EmployeeDocumentsPageData } from "@/features/dashboard/types";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,18 +116,19 @@ function formatLeaveType(type: string) {
 
 // ── main component ────────────────────────────────────────────────────────────
 
-type Tab = "overview" | "projects" | "attendance" | "salary" | "edit";
+type Tab = "overview" | "projects" | "attendance" | "salary" | "edit" | "documents";
 
 export function EmployeeDetailPanel({ data }: { data: EmployeeDetailData }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
-  const { employee, salary, projects, currentMonthAttendance, leaveHistory, leaveBalance, recentPayslips, canViewSensitive, canEdit, managerOptions } = data;
+  const { employee, salary, projects, currentMonthAttendance, leaveHistory, leaveBalance, recentPayslips, canViewSensitive, canEdit, managerOptions, documents } = data;
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "projects", label: `Projects (${projects.length})` },
     { key: "attendance", label: "Attendance & Leave" },
     ...(canViewSensitive ? [{ key: "salary" as Tab, label: "Salary" }] : []),
+    { key: "documents", label: `Documents (${documents.length})` },
     ...(canEdit ? [{ key: "edit" as Tab, label: "Edit Profile" }] : []),
   ];
 
@@ -296,6 +299,15 @@ export function EmployeeDetailPanel({ data }: { data: EmployeeDetailData }) {
           />
         ) : activeTab === "salary" && canViewSensitive ? (
           <SalaryTab salary={salary} payslips={recentPayslips} />
+        ) : activeTab === "documents" ? (
+          <EmployeeDocumentsPanel
+            data={{
+              documents,
+              canManage: canEdit,
+              targetUserId: employee.id,
+              targetUserName: employee.fullName,
+            } satisfies EmployeeDocumentsPageData}
+          />
         ) : activeTab === "edit" && canEdit ? (
           <EditProfileTab employee={employee} managerOptions={managerOptions} />
         ) : null}

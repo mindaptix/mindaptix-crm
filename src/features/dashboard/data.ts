@@ -28,6 +28,9 @@ import { ExpenseModel } from "@/database/mongodb/models/workforce/expense";
 import { LeaveBalanceModel } from "@/database/mongodb/models/workforce/leave-balance";
 import { TASK_LABELS, TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
+import { AttendanceRegularizationModel } from "@/database/mongodb/models/workforce/attendance-regularization";
+import { AssetModel } from "@/database/mongodb/models/workforce/asset";
+import { EmployeeDocumentModel } from "@/database/mongodb/models/workforce/employee-document";
 import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import type {
   AnnouncementsPageData,
@@ -66,6 +69,9 @@ import type {
   SalesWorkspaceData,
   SettingsPageData,
   TaskPageData,
+  RegularizationPageData,
+  AssetsPageData,
+  EmployeeDocumentsPageData,
 } from "@/features/dashboard/types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -958,6 +964,32 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
         return rightPending - leftPending || left.employeeName.localeCompare(right.employeeName);
       }),
     monthlyRows: Array.from(monthlyMap.values()).sort((left, right) => left.employeeName.localeCompare(right.employeeName)),
+    pendingRegularizations: await (async () => {
+      const isAdmin = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+      if (!isAdmin) return [];
+      const visibleIds = await getAllActiveEmployeeIds();
+      const [reqs, empUsers] = await Promise.all([
+        AttendanceRegularizationModel.find({ userId: { $in: visibleIds }, status: "PENDING" }).sort({ createdAt: -1 }).lean(),
+        UserModel.find({ _id: { $in: visibleIds } }, { fullName: 1, email: 1 }).lean(),
+      ]);
+      const empMap = new Map(empUsers.map((u) => [u._id.toString(), u]));
+      return reqs.map((r) => ({
+        id: r._id.toString(),
+        userId: r.userId,
+        employeeName: empMap.get(r.userId)?.fullName ?? "Unknown",
+        employeeEmail: empMap.get(r.userId)?.email ?? "",
+        dateKey: r.dateKey,
+        requestedCheckIn: r.requestedCheckIn,
+        requestedCheckOut: r.requestedCheckOut ?? "",
+        workMode: r.workMode ?? "OFFICE",
+        reason: r.reason,
+        status: r.status,
+        reviewedByName: r.reviewedByName ?? "",
+        reviewNote: r.reviewNote ?? "",
+        reviewedAt: "",
+        createdAt: (r as unknown as { createdAt: Date }).createdAt?.toISOString().slice(0, 10) ?? "",
+      }));
+    })(),
   };
 }
 
@@ -2209,6 +2241,18 @@ export async function getEmployeeDetailData(
     canViewSensitive,
     canEdit: canViewSensitive,
     managerOptions: managersList.map((m) => ({ id: m._id.toString(), label: readString(toRecord(m).fullName) ?? "" })),
+    documents: await EmployeeDocumentModel.find({ userId: employeeId }).sort({ createdAt: -1 }).lean().then((docs) =>
+      docs.map((d) => ({
+        id: d._id.toString(),
+        userId: d.userId,
+        documentType: d.documentType,
+        fileName: d.fileName,
+        fileUrl: d.fileUrl,
+        note: d.note ?? "",
+        expiryDate: d.expiryDate ?? "",
+        uploadedAt: (d as unknown as { createdAt: Date }).createdAt?.toISOString().slice(0, 10) ?? "",
+      }))
+    ),
   };
 }
 
@@ -2938,6 +2982,183 @@ function resolveProjectTechStack(project: { name?: string; summary?: string; tec
 
     return text.includes(normalized);
   });
+}
+
+// ─── Attendance Regularization ──────────────────────────────────────────────
+
+export async function getRegularizationPageData(session: AuthenticatedSession): Promise<RegularizationPageData> {
+  await connectDb();
+  const canReview = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
+  if (canReview) {
+    const visibleIds = await getAllActiveEmployeeIds();
+    const [requests, users] = await Promise.all([
+      AttendanceRegularizationModel.find({ userId: { $in: visibleIds } }).sort({ createdAt: -1 }).limit(200).lean(),
+      UserModel.find({ _id: { $in: visibleIds } }, { fullName: 1, email: 1 }).lean(),
+    ]);
+    const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+    const mapEntry = (r: (typeof requests)[number]) => ({
+      id: r._id.toString(),
+      userId: r.userId,
+      employeeName: userMap.get(r.userId)?.fullName ?? "Unknown",
+      employeeEmail: userMap.get(r.userId)?.email ?? "",
+      dateKey: r.dateKey,
+      requestedCheckIn: r.requestedCheckIn,
+      requestedCheckOut: r.requestedCheckOut ?? "",
+      workMode: r.workMode ?? "OFFICE",
+      reason: r.reason,
+      status: r.status,
+      reviewedByName: r.reviewedByName ?? "",
+      reviewNote: r.reviewNote ?? "",
+      reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString().slice(0, 10) : "",
+      createdAt: (r as unknown as { createdAt: Date }).createdAt?.toISOString().slice(0, 10) ?? "",
+    });
+    const pending = requests.filter((r) => r.status === "PENDING").map(mapEntry);
+    const all = requests.map(mapEntry);
+    return { myRequests: [], pendingRequests: pending, allRequests: all, canReview: true };
+  }
+
+  const myRequests = await AttendanceRegularizationModel.find({ userId: session.user.id }).sort({ createdAt: -1 }).limit(50).lean();
+  return {
+    myRequests: myRequests.map((r) => ({
+      id: r._id.toString(),
+      userId: r.userId,
+      employeeName: session.user.fullName,
+      employeeEmail: session.user.email,
+      dateKey: r.dateKey,
+      requestedCheckIn: r.requestedCheckIn,
+      requestedCheckOut: r.requestedCheckOut ?? "",
+      workMode: r.workMode ?? "OFFICE",
+      reason: r.reason,
+      status: r.status,
+      reviewedByName: r.reviewedByName ?? "",
+      reviewNote: r.reviewNote ?? "",
+      reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString().slice(0, 10) : "",
+      createdAt: (r as unknown as { createdAt: Date }).createdAt?.toISOString().slice(0, 10) ?? "",
+    })),
+    pendingRequests: [],
+    allRequests: [],
+    canReview: false,
+  };
+}
+
+// ─── Assets ─────────────────────────────────────────────────────────────────
+
+export async function getAssetsPageData(session: AuthenticatedSession): Promise<AssetsPageData> {
+  await connectDb();
+  const canManage = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
+  const [assets, employees] = await Promise.all([
+    AssetModel.find({}).sort({ createdAt: -1 }).lean(),
+    canManage
+      ? UserModel.find({ role: { $in: ["EMPLOYEE", "SALES", "MANAGER"] }, status: "ACTIVE" }, { fullName: 1 }).sort({ fullName: 1 }).lean()
+      : Promise.resolve([]),
+  ]);
+
+  const myAssets = canManage ? assets : assets.filter((a) => a.assignedToUserId === session.user.id);
+
+  return {
+    assets: myAssets.map((a) => ({
+      id: a._id.toString(),
+      name: a.name,
+      brand: (a as unknown as { brand?: string }).brand ?? "",
+      model: (a as unknown as { model?: string }).model ?? "",
+      category: a.category,
+      serialNumber: a.serialNumber ?? "",
+      purchaseDate: a.purchaseDate ?? "",
+      purchasePrice: a.purchasePrice ?? 0,
+      condition: a.condition ?? "GOOD",
+      notes: a.notes ?? "",
+      status: a.status,
+      assignedToUserId: a.assignedToUserId ?? "",
+      assignedToName: a.assignedToName ?? "",
+      assignedAt: a.assignedAt ? new Date(a.assignedAt).toISOString().slice(0, 10) : "",
+      returnedAt: a.returnedAt ? new Date(a.returnedAt).toISOString().slice(0, 10) : "",
+      fineAmount: (a as unknown as { fineAmount?: number }).fineAmount ?? 0,
+      fineNote: (a as unknown as { fineNote?: string }).fineNote ?? "",
+      createdAt: (a as unknown as { createdAt: Date }).createdAt?.toISOString().slice(0, 10) ?? "",
+    })),
+    canManage,
+    employeeOptions: employees.map((e) => ({ id: e._id.toString(), label: e.fullName })),
+    totalAssets: assets.length,
+    assignedCount: assets.filter((a) => a.status === "ASSIGNED").length,
+    availableCount: assets.filter((a) => a.status === "AVAILABLE").length,
+    lostOrDamagedCount: assets.filter((a) => a.status === "LOST" || a.status === "DAMAGED").length,
+  };
+}
+
+// ─── Employee Documents ──────────────────────────────────────────────────────
+
+export async function getAllEmployeeDocumentsData(session: AuthenticatedSession) {
+  await connectDb();
+  const isAdmin = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  if (!isAdmin) throw new Error("Unauthorized");
+
+  const [docs, users] = await Promise.all([
+    EmployeeDocumentModel.find({}).sort({ createdAt: -1 }).lean(),
+    UserModel.find({ role: { $in: ["EMPLOYEE", "SALES"] }, status: "ACTIVE" }, { fullName: 1, email: 1 }).lean(),
+  ]);
+
+  const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+
+  const grouped = new Map<string, { userId: string; employeeName: string; employeeEmail: string; docs: typeof docs }>();
+  for (const doc of docs) {
+    const user = userMap.get(doc.userId);
+    if (!user) continue;
+    const existing = grouped.get(doc.userId) ?? { userId: doc.userId, employeeName: user.fullName, employeeEmail: user.email, docs: [] };
+    existing.docs.push(doc);
+    grouped.set(doc.userId, existing);
+  }
+
+  return {
+    groups: Array.from(grouped.values()).map((g) => ({
+      userId: g.userId,
+      employeeName: g.employeeName,
+      employeeEmail: g.employeeEmail,
+      documents: g.docs.map((d) => ({
+        id: d._id.toString(),
+        userId: d.userId,
+        documentType: d.documentType,
+        fileName: d.fileName,
+        fileUrl: d.fileUrl,
+        note: d.note ?? "",
+        expiryDate: d.expiryDate ?? "",
+        uploadedAt: (d as unknown as { createdAt: Date }).createdAt?.toISOString().slice(0, 10) ?? "",
+      })),
+    })),
+    totalDocuments: docs.length,
+    totalEmployees: grouped.size,
+  };
+}
+
+export async function getEmployeeDocumentsData(
+  session: AuthenticatedSession,
+  targetUserId?: string,
+): Promise<EmployeeDocumentsPageData> {
+  await connectDb();
+  const canManage = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  const resolvedUserId = canManage && targetUserId ? targetUserId : session.user.id;
+  const [docs, targetUser] = await Promise.all([
+    EmployeeDocumentModel.find({ userId: resolvedUserId }).sort({ createdAt: -1 }).lean(),
+    resolvedUserId !== session.user.id
+      ? UserModel.findById(resolvedUserId, { fullName: 1 }).lean()
+      : Promise.resolve(null),
+  ]);
+  return {
+    documents: docs.map((d) => ({
+      id: d._id.toString(),
+      userId: d.userId,
+      documentType: d.documentType,
+      fileName: d.fileName,
+      fileUrl: d.fileUrl,
+      note: d.note ?? "",
+      expiryDate: d.expiryDate ?? "",
+      uploadedAt: (d as unknown as { createdAt: Date }).createdAt?.toISOString().slice(0, 10) ?? "",
+    })),
+    canManage,
+    targetUserId: resolvedUserId,
+    targetUserName: targetUser?.fullName ?? session.user.fullName,
+  };
 }
 
 

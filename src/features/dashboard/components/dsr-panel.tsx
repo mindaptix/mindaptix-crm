@@ -73,9 +73,8 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
       </div>
 
       {/* ── Reminder alert ── */}
-      <ReminderBanner message={data.reminderMessage} />
-
       {/* ── Assigned projects ── */}
+      {data.projects.length > 0 && (
       <div className="overflow-hidden rounded-[1.8rem]"
         style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
         <div className="px-6 py-5"
@@ -98,6 +97,7 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
           )}
         </div>
       </div>
+      )}
 
       {/* ── Submit DSR form ── */}
       <div className="overflow-hidden rounded-[1.8rem]"
@@ -282,10 +282,6 @@ function DsrReviewPanel({
         ))}
       </div>
 
-      {!simplifiedReview && isToday && (
-        <ReminderBanner message={data.reminderMessage} />
-      )}
-
       {/* Missing DSR employees */}
       <div className="overflow-hidden rounded-[1.8rem]"
         style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
@@ -347,8 +343,8 @@ function DsrReviewPanel({
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl text-3xl"
               style={{ background: "linear-gradient(135deg,#f1f5f9,#e2e8f0)" }}>📋</div>
-            <p className="text-sm font-bold text-slate-600">Is date ka koi DSR nahi mila</p>
-            <p className="mt-1 text-xs text-slate-400">Koi aur date try karo ya employees se submit karwao.</p>
+              <p className="text-sm font-bold text-slate-600">No DSR found for this date</p>
+              <p className="mt-1 text-xs text-slate-400">Try another date or ask employees to submit their DSR.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -548,6 +544,7 @@ function StatCard({ gradient, shadow, icon, label, value, detail }: {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ReminderBanner({ message }: { message: string }) {
   const isPending = message.toLowerCase().includes("pending") || message.toLowerCase().includes("not yet");
   return (

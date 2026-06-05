@@ -12,6 +12,9 @@ import { ProjectsPanel } from "@/features/dashboard/components/projects-panel";
 import { ReportsPanel } from "@/features/dashboard/components/reports-panel";
 import { SettingsPanel } from "@/features/dashboard/components/settings-panel";
 import { TasksPanel } from "@/features/dashboard/components/tasks-panel";
+import { RegularizationPanel } from "@/features/dashboard/components/regularization-panel";
+import { AssetsPanel } from "@/features/dashboard/components/assets-panel";
+import { AllDocumentsPanel } from "@/features/dashboard/components/all-documents-panel";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import {
   getAnnouncementsPageData,
@@ -26,6 +29,9 @@ import {
   getReportsPageData,
   getSettingsPageData,
   getTasksPageData,
+  getRegularizationPageData,
+  getAssetsPageData,
+  getAllEmployeeDocumentsData,
 } from "@/features/dashboard/server/page-data";
 import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
@@ -72,6 +78,18 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
     case "reports": {
       const data = await getReportsPageData(session);
       return <ReportsPanel data={data} simplifiedView={false} />;
+    }
+    case "assets": {
+      const data = await getAssetsPageData(session);
+      return <AssetsPanel data={data} />;
+    }
+    case "alldocs": {
+      const data = await getAllEmployeeDocumentsData(session);
+      return <AllDocumentsPanel data={data} />;
+    }
+    case "regularize": {
+      const data = await getRegularizationPageData(session);
+      return <RegularizationPanel data={data} />;
     }
     case "payroll": {
       const data = await getPayrollPageData(session);
