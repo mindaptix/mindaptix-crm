@@ -285,6 +285,89 @@ function StatusPicker({ defaultValue }: { defaultValue?: string }) {
   );
 }
 
+// ─── Recurring toggle section ────────────────────────────────────────────────
+
+function RecurringSection({ defaultEnabled, defaultDay, defaultEndDate }: {
+  defaultEnabled?: boolean;
+  defaultDay?: number | null;
+  defaultEndDate?: string;
+}) {
+  const [enabled, setEnabled] = useState(defaultEnabled ?? false);
+  return (
+    <div className="rounded-2xl border border-violet-100/80 bg-white p-4 shadow-[0_2px_12px_rgba(139,92,246,0.06)]">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl"
+            style={{ background: enabled ? "linear-gradient(135deg,#6d28d9,#8b5cf6)" : "#e2e8f0" }}>
+            <svg fill="none" height="12" viewBox="0 0 24 24" width="12">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" strokeLinecap="round" strokeWidth="2.5" />
+            </svg>
+          </span>
+          <div>
+            <p className="text-[0.72rem] font-black text-slate-800">Recurring Payment</p>
+            <p className="text-[0.62rem] text-slate-500">Auto-generate every month on a fixed date</p>
+          </div>
+        </div>
+        <button
+          className="relative flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200"
+          onClick={() => setEnabled((v) => !v)}
+          style={{
+            background: enabled ? "#8b5cf6" : "#e2e8f0",
+            borderColor: enabled ? "#7c3aed" : "#d1d5db",
+          }}
+          type="button"
+          aria-pressed={enabled}
+        >
+          <span
+            className="absolute flex h-5 w-5 items-center justify-center rounded-full bg-white shadow transition-transform duration-200"
+            style={{ transform: enabled ? "translateX(1.35rem)" : "translateX(0.1rem)" }}
+          />
+        </button>
+      </div>
+
+      <input name="isRecurring" type="hidden" value={String(enabled)} />
+
+      {enabled ? (
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-violet-600">
+              Billing Day of Month <span className="text-amber-500">*</span>
+            </label>
+            <input
+              className="w-full rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
+              defaultValue={defaultDay ?? ""}
+              max={28}
+              min={1}
+              name="recurringDayOfMonth"
+              placeholder="e.g. 15 (15th of every month)"
+              required={enabled}
+              type="number"
+            />
+            <p className="mt-1 text-[0.62rem] text-slate-400">1–28 · Payment will auto-appear on this day each month</p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[0.67rem] font-bold uppercase tracking-[0.18em] text-violet-600">
+              End Date <span className="font-medium normal-case tracking-normal text-slate-400">(optional)</span>
+            </label>
+            <input
+              className="w-full rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
+              defaultValue={defaultEndDate ?? ""}
+              name="recurringEndDate"
+              type="date"
+            />
+            <p className="mt-1 text-[0.62rem] text-slate-400">Leave blank for indefinite recurring</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <input name="recurringDayOfMonth" type="hidden" value="" />
+          <input name="recurringEndDate" type="hidden" value="" />
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Payment modal (premium) ──────────────────────────────────────────────────
 
 function PaymentModal({
@@ -313,6 +396,9 @@ function PaymentModal({
           receivedDate: initial.receivedDate,
           status: initial.status,
           note: initial.note,
+          isRecurring: String(initial.isRecurring ?? false),
+          recurringDayOfMonth: initial.recurringDayOfMonth ? String(initial.recurringDayOfMonth) : "",
+          recurringEndDate: initial.recurringEndDate ?? "",
         }
       : {},
   });
@@ -552,6 +638,15 @@ function PaymentModal({
                 rows={2}
               />
             </div>
+
+            {/* Recurring — only for new payments */}
+            {!isEdit ? (
+              <RecurringSection
+                defaultEnabled={v.isRecurring === "true"}
+                defaultDay={v.recurringDayOfMonth ? Number(v.recurringDayOfMonth) : null}
+                defaultEndDate={v.recurringEndDate ?? ""}
+              />
+            ) : null}
           </form>
         </div>
 
@@ -719,13 +814,34 @@ function PaymentCard({
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-[0.95rem] font-bold text-slate-900">{payment.clientName || "Unknown Client"}</h3>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h3 className="truncate text-[0.95rem] font-bold text-slate-900">{payment.clientName || "Unknown Client"}</h3>
+              {payment.isRecurring ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[0.58rem] font-black uppercase tracking-wide text-violet-700">
+                  <svg fill="none" height="8" viewBox="0 0 24 24" width="8"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5"/></svg>
+                  Recurring
+                </span>
+              ) : null}
+              {payment.recurringParentId ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[0.58rem] font-black uppercase tracking-wide text-sky-700">
+                  <svg fill="none" height="8" viewBox="0 0 24 24" width="8"><rect height="18" rx="2" width="14" x="5" y="3" stroke="currentColor" strokeWidth="2.5"/><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/></svg>
+                  Monthly
+                </span>
+              ) : null}
+            </div>
             <p className="mt-0.5 truncate text-[0.72rem] text-slate-500">{payment.projectName || "—"}</p>
           </div>
           <StatusBadge status={payment.status} />
         </div>
         {payment.invoiceNumber ? (
           <p className="mt-1.5 text-[0.65rem] font-semibold tracking-wider text-slate-400">INV: {payment.invoiceNumber}</p>
+        ) : null}
+        {payment.isRecurring && payment.recurringDayOfMonth ? (
+          <p className="mt-1 flex items-center gap-1 text-[0.63rem] font-semibold text-violet-600">
+            <svg fill="none" height="9" viewBox="0 0 24 24" width="9"><rect height="18" rx="2" width="18" x="3" y="4" stroke="currentColor" strokeWidth="2.5"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/></svg>
+            Renews on {payment.recurringDayOfMonth}{["st","nd","rd"][((payment.recurringDayOfMonth + 90) % 100 - 10) % 10 - 1] ?? "th"} of every month
+            {payment.recurringEndDate ? ` · until ${payment.recurringEndDate}` : ""}
+          </p>
         ) : null}
       </div>
 

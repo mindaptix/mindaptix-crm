@@ -288,7 +288,7 @@ export function EmployeeDetailPanel({ data }: { data: EmployeeDetailData }) {
 
         {/* ── Tab Content ── */}
         {activeTab === "overview" ? (
-          <OverviewTab employee={employee} />
+          <OverviewTab employee={employee} canViewSensitive={canViewSensitive} />
         ) : activeTab === "projects" ? (
           <ProjectsTab projects={projects} />
         ) : activeTab === "attendance" ? (
@@ -360,7 +360,7 @@ function StatCard({
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
-function OverviewTab({ employee }: { employee: EmployeeDetailData["employee"] }) {
+function OverviewTab({ employee, canViewSensitive }: { employee: EmployeeDetailData["employee"]; canViewSensitive: boolean }) {
   const personalFields: { label: string; value: string; icon: React.ReactNode }[] = [
     {
       label: "Email",
@@ -468,6 +468,64 @@ function OverviewTab({ employee }: { employee: EmployeeDetailData["employee"] })
           ))}
         </div>
       </section>
+
+      {/* Bank & Financial Details — admin/super admin only */}
+      {canViewSensitive && (employee.bankName || employee.bankAccountNumber || employee.bankIfscCode || employee.panNumber) ? (
+        <section className="lg:col-span-2 overflow-hidden rounded-[1.8rem] border border-emerald-100 bg-white shadow-[0_8px_24px_rgba(16,185,129,0.07)]">
+          <div className="border-b border-emerald-50 bg-gradient-to-r from-emerald-50 to-white px-6 py-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100">
+                <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-emerald-700">
+                  <rect height="16" rx="2" width="20" x="2" y="5" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M2 10h20M6 15h2M10 15h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em] text-emerald-600">Confidential</p>
+                <h3 className="text-base font-bold text-slate-900 leading-tight">Bank & Financial Details</h3>
+              </div>
+              <span className="ml-auto flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[0.62rem] font-bold text-amber-700">
+                <svg fill="none" height="9" viewBox="0 0 24 24" width="9">
+                  <rect height="11" rx="2" width="14" x="5" y="11" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/>
+                </svg>
+                Admin Only
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+            {[
+              {
+                label: "Bank Name",
+                value: employee.bankName || "—",
+                icon: <svg fill="none" height="14" viewBox="0 0 24 24" width="14"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke="currentColor" strokeWidth="2"/></svg>,
+              },
+              {
+                label: "Account Number",
+                value: employee.bankAccountNumber
+                  ? "•".repeat(Math.max(0, employee.bankAccountNumber.length - 4)) + employee.bankAccountNumber.slice(-4)
+                  : "—",
+                icon: <svg fill="none" height="14" viewBox="0 0 24 24" width="14"><rect height="16" rx="2" width="20" x="2" y="5" stroke="currentColor" strokeWidth="2"/><path d="M2 10h20" stroke="currentColor" strokeWidth="2"/></svg>,
+              },
+              {
+                label: "IFSC Code",
+                value: employee.bankIfscCode || "—",
+                icon: <svg fill="none" height="14" viewBox="0 0 24 24" width="14"><rect height="18" rx="2" width="14" x="5" y="3" stroke="currentColor" strokeWidth="2"/><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/></svg>,
+              },
+              {
+                label: "PAN Number",
+                value: employee.panNumber || "—",
+                icon: <svg fill="none" height="14" viewBox="0 0 24 24" width="14"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" strokeWidth="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" strokeWidth="2"/></svg>,
+              },
+            ].map(({ label, value, icon }) => (
+              <div key={label} className="bg-white px-5 py-4">
+                <div className="flex items-center gap-1.5 text-slate-400">{icon}<p className="text-[0.63rem] font-bold uppercase tracking-[0.18em]">{label}</p></div>
+                <p className="mt-1.5 font-mono text-sm font-semibold text-slate-800">{value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Document + Quick Info sidebar */}
       <div className="space-y-4">

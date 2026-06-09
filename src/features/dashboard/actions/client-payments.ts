@@ -24,6 +24,9 @@ export type ClientPaymentFormState = {
     receivedDate?: string;
     status?: string;
     note?: string;
+    isRecurring?: string;
+    recurringDayOfMonth?: string;
+    recurringEndDate?: string;
   };
 };
 
@@ -54,18 +57,21 @@ export async function createClientPayment(
   const receivedDate = String(formData.get("receivedDate") ?? "").trim();
   const status = String(formData.get("status") ?? "PENDING");
   const note = String(formData.get("note") ?? "").trim();
+  const isRecurring = formData.get("isRecurring") === "true";
+  const recurringDayStr = String(formData.get("recurringDayOfMonth") ?? "").trim();
+  const recurringEndDate = String(formData.get("recurringEndDate") ?? "").trim();
 
   if (!clientName || clientName.length < 2) {
     return {
       error: "Client name is required (at least 2 characters).",
-      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note },
+      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note, isRecurring: String(isRecurring), recurringDayOfMonth: recurringDayStr, recurringEndDate },
     };
   }
 
   if (!projectName || projectName.length < 2) {
     return {
       error: "Project name is required (at least 2 characters).",
-      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note },
+      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note, isRecurring: String(isRecurring), recurringDayOfMonth: recurringDayStr, recurringEndDate },
     };
   }
 
@@ -75,22 +81,34 @@ export async function createClientPayment(
   if (isNaN(amount) || amount < 0) {
     return {
       error: "Total amount must be a valid positive number.",
-      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note },
+      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note, isRecurring: String(isRecurring), recurringDayOfMonth: recurringDayStr, recurringEndDate },
     };
   }
 
   if (isNaN(receivedAmount) || receivedAmount < 0) {
     return {
       error: "Received amount must be a valid positive number.",
-      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note },
+      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note, isRecurring: String(isRecurring), recurringDayOfMonth: recurringDayStr, recurringEndDate },
     };
   }
 
   if (receivedAmount > amount) {
     return {
       error: "Received amount cannot be greater than total amount.",
-      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note },
+      values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note, isRecurring: String(isRecurring), recurringDayOfMonth: recurringDayStr, recurringEndDate },
     };
+  }
+
+  // Validate recurring day
+  let recurringDayOfMonth: number | null = null;
+  if (isRecurring) {
+    recurringDayOfMonth = recurringDayStr ? Number(recurringDayStr) : null;
+    if (!recurringDayOfMonth || isNaN(recurringDayOfMonth) || recurringDayOfMonth < 1 || recurringDayOfMonth > 28) {
+      return {
+        error: "Recurring billing day must be between 1 and 28.",
+        values: { clientName, projectName, invoiceNumber, amount: amountStr, receivedAmount: receivedAmountStr, dueDate, receivedDate, status, note, isRecurring: "true", recurringDayOfMonth: recurringDayStr, recurringEndDate },
+      };
+    }
   }
 
   // Auto-compute status if not explicitly set
@@ -115,6 +133,11 @@ export async function createClientPayment(
     receivedDate,
     status: computedStatus,
     note,
+    isRecurring,
+    recurringDayOfMonth,
+    recurringEndDate,
+    recurringParentId: "",
+    recurringLastGenerated: "",
   });
 
   revalidatePath("/dashboard/payments");
@@ -122,7 +145,7 @@ export async function createClientPayment(
 
   return {
     success: "Payment record created successfully.",
-    values: { clientName: "", projectName: "", invoiceNumber: "", amount: "0", receivedAmount: "0", dueDate: "", receivedDate: "", status: "PENDING", note: "" },
+    values: { clientName: "", projectName: "", invoiceNumber: "", amount: "0", receivedAmount: "0", dueDate: "", receivedDate: "", status: "PENDING", note: "", isRecurring: "false", recurringDayOfMonth: "", recurringEndDate: "" },
   };
 }
 

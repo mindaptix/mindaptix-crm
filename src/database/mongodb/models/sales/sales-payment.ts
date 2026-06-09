@@ -83,6 +83,31 @@ const salesPaymentSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    isRecurring: {
+      type: Boolean,
+      default: false,
+    },
+    recurringDayOfMonth: {
+      type: Number,
+      min: 1,
+      max: 28,
+      default: null,
+    },
+    recurringEndDate: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    recurringParentId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    recurringLastGenerated: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
   baseSchemaOptions,
 );

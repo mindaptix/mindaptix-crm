@@ -570,6 +570,13 @@ export type SettingsPageData = {
   currentUserDateOfBirth: string;
   currentUserAddress: string;
   currentUserEmergencyContact: string;
+  currentUserProfilePhotoUrl: string;
+  currentUserEmployeeId: string;
+  currentUserBankName: string;
+  currentUserBankAccountNumber: string;
+  currentUserBankIfscCode: string;
+  currentUserPanNumber: string;
+  bankDetailsSaved: boolean;
   workStart: string;
   workEnd: string;
   leavePolicy: string;
@@ -943,6 +950,10 @@ export type ClientPaymentEntry = {
   createdByName: string;
   createdAt: string;
   transactions: PaymentTransaction[];
+  isRecurring: boolean;
+  recurringDayOfMonth: number | null;
+  recurringEndDate: string;
+  recurringParentId: string;
 };
 
 export type PaymentsPageData = {

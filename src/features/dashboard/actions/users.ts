@@ -177,26 +177,35 @@ export async function updateManagedUserAccess(
     };
   }
 
-  await UserModel.findByIdAndUpdate(userId, {
-    fullName,
-    email,
-    phone,
-    joiningDate: joiningDate ? new Date(joiningDate) : null,
-    role,
-    managerId: resolvedManagerId.value,
-    status,
-    techStack,
-    employeeId,
-    department,
-    designation,
-    dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-    address,
-    emergencyContact,
-    bankAccountNumber,
-    bankName,
-    bankIfscCode,
-    panNumber,
-  });
+  const updateOps: Promise<unknown>[] = [
+    UserModel.findByIdAndUpdate(userId, {
+      fullName,
+      email,
+      phone,
+      joiningDate: joiningDate ? new Date(joiningDate) : null,
+      role,
+      managerId: resolvedManagerId.value,
+      status,
+      techStack,
+      employeeId,
+      department,
+      designation,
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+      address,
+      emergencyContact,
+      bankAccountNumber,
+      bankName,
+      bankIfscCode,
+      panNumber,
+    }),
+  ];
+
+  // Kill all active sessions immediately when account is suspended or deleted
+  if (status === "SUSPENDED") {
+    updateOps.push(UserSessionModel.deleteMany({ userId }));
+  }
+
+  await Promise.all(updateOps);
 
   revalidatePath("/dashboard/employees");
   revalidatePath(`/dashboard/employees/${userId}`);

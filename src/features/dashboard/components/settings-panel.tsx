@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useActionState } from "react";
-import { updateAccountPassword, updateAccountProfile, updateCompanySettings } from "@/features/dashboard/actions/settings";
+import Image from "next/image";
+import { useEffect, useRef, useState, useActionState } from "react";
+import { createPortal } from "react-dom";
+import { updateAccountPassword, updateAccountProfile, updateBankDetails, updateCompanySettings, uploadProfilePhoto } from "@/features/dashboard/actions/settings";
 import { addHoliday, deleteHoliday } from "@/features/dashboard/actions/holidays";
 import { Feedback } from "@/shared/ui/feedback";
 import { Button } from "@/shared/ui/button";
@@ -147,6 +149,30 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
   const [holidayAddState, holidayAddAction, holidayAddPending] = useActionState(addHoliday, INIT_HOLIDAY);
   const [holidayDelState, holidayDelAction, holidayDelPending] = useActionState(deleteHoliday, INIT_HOLIDAY);
   const [showHolidayForm, setShowHolidayForm] = useState(false);
+  const [bankState, bankAction, bankPending] = useActionState(updateBankDetails, {
+    values: {
+      bankName: data.currentUserBankName,
+      bankAccountNumber: data.currentUserBankAccountNumber,
+      bankIfscCode: data.currentUserBankIfscCode,
+      panNumber: data.currentUserPanNumber,
+    },
+  });
+  const isAdminOrSuper = (data.currentUserRoleLabel === "Super Admin" || data.currentUserRoleLabel === "Admin");
+  const bankLocked = data.bankDetailsSaved && !isAdminOrSuper;
+  const [photoState, photoAction, photoPending] = useActionState(uploadProfilePhoto, {
+    photoUrl: data.currentUserProfilePhotoUrl,
+  });
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const currentPhotoUrl = photoState.photoUrl || data.currentUserProfilePhotoUrl;
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
+
+  // Close lightbox on Escape
+  useEffect(() => {
+    if (!showPhotoViewer) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowPhotoViewer(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showPhotoViewer]);
 
   const initials = getInitials(data.currentUserName);
 
@@ -161,15 +187,119 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
         </p>
       </div>
 
+      {/* WhatsApp-style photo lightbox */}
+      {showPhotoViewer && currentPhotoUrl && typeof document !== "undefined" ? createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+          onClick={() => setShowPhotoViewer(false)}
+          style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)" }}
+        >
+          {/* Top bar */}
+          <div className="absolute left-0 right-0 top-0 flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white">
+                {initials}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">{data.currentUserName}</p>
+                <p className="text-xs text-white/50">Profile photo</p>
+              </div>
+            </div>
+            <button
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+              onClick={() => setShowPhotoViewer(false)}
+              type="button"
+            >
+              <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Photo */}
+          <Image
+            alt="Profile"
+            className="max-h-[70vh] max-w-[90vw] rounded-2xl object-contain shadow-[0_32px_80px_rgba(0,0,0,0.6)]"
+            onClick={(e) => e.stopPropagation()}
+            src={currentPhotoUrl}
+            width={1200}
+            height={900}
+            style={{ userSelect: "none", width: "auto", height: "auto" }}
+          />
+
+          {/* Bottom hint */}
+          <p className="absolute bottom-6 text-xs text-white/30">Tap anywhere outside to close · Press Esc</p>
+        </div>,
+        document.body,
+      ) : null}
+
       {/* Identity banner */}
       <div className="overflow-hidden rounded-[1.8rem] border border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#f0f9ff_55%,#f8fbff_100%)] shadow-[0_16px_40px_rgba(37,99,235,0.09)]">
-        <div className="flex flex-wrap items-center gap-4 px-6 py-5">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.2rem] bg-[linear-gradient(135deg,#1d4ed8_0%,#0f172a_100%)] text-xl font-bold tracking-wide text-white shadow-[0_14px_32px_rgba(29,78,216,0.36)]">
-            {initials}
-          </div>
+        <div className="flex flex-wrap items-center gap-5 px-6 py-6">
+          {/* Avatar + upload */}
+          <form action={photoAction} className="relative shrink-0">
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              name="profilePhoto"
+              onChange={(e) => { if (e.target.form) e.target.form.requestSubmit(); }}
+              ref={photoInputRef}
+              type="file"
+            />
+            {currentPhotoUrl ? (
+              <button
+                className="block cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
+                onClick={() => setShowPhotoViewer(true)}
+                title="View full photo"
+                type="button"
+              >
+                <Image
+                  alt="Profile"
+                  className="h-24 w-24 rounded-full object-cover shadow-[0_8px_32px_rgba(29,78,216,0.25)] ring-4 ring-white"
+                  src={currentPhotoUrl}
+                  width={96}
+                  height={96}
+                />
+              </button>
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[linear-gradient(135deg,#1d4ed8_0%,#0f172a_100%)] text-2xl font-bold tracking-wide text-white shadow-[0_8px_32px_rgba(29,78,216,0.36)] ring-4 ring-white">
+                {initials}
+              </div>
+            )}
+            {/* Upload button */}
+            <button
+              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 disabled:opacity-60"
+              disabled={photoPending}
+              onClick={() => photoInputRef.current?.click()}
+              title="Upload new photo"
+              type="button"
+            >
+              {photoPending ? (
+                <svg className="animate-spin" fill="none" height="12" viewBox="0 0 24 24" width="12">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                  <path className="opacity-75" d="M4 12a8 8 0 018-8" stroke="white" strokeLinecap="round" strokeWidth="4" />
+                </svg>
+              ) : (
+                <svg fill="none" height="12" viewBox="0 0 24 24" width="12">
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="white" strokeWidth="2" />
+                  <circle cx="12" cy="13" r="4" stroke="white" strokeWidth="2" />
+                </svg>
+              )}
+            </button>
+          </form>
+
           <div className="min-w-0 flex-1">
             <p className="truncate text-xl font-semibold text-slate-950">{data.currentUserName}</p>
             <p className="mt-0.5 truncate text-sm text-slate-500">{data.currentUserEmail}</p>
+            {photoState.error ? (
+              <p className="mt-1.5 text-xs font-semibold text-red-600">{photoState.error}</p>
+            ) : photoState.success ? (
+              <p className="mt-1.5 text-xs font-semibold text-emerald-600">{photoState.success}</p>
+            ) : (
+              <p className="mt-1.5 text-xs text-slate-400">
+                {currentPhotoUrl ? "Click photo to view full · Camera icon to change" : "Click camera icon to upload a photo · Max 2 MB"}
+              </p>
+            )}
           </div>
           <span className="inline-flex shrink-0 items-center rounded-full border border-blue-200 bg-white/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 shadow-sm">
             {data.currentUserRoleLabel}
@@ -195,6 +325,21 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
           <form action={profileAction} className="mt-5 space-y-4">
             {profileState.error ? <Feedback>{profileState.error}</Feedback> : null}
             {profileState.success ? <Feedback tone="success">{profileState.success}</Feedback> : null}
+
+            {/* Employee ID — read-only */}
+            {data.currentUserEmployeeId ? (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-500">Employee ID</label>
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="shrink-0 text-slate-400">
+                    <rect height="18" rx="2" width="14" x="5" y="3" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/>
+                  </svg>
+                  <span className="text-sm font-semibold text-slate-700">{data.currentUserEmployeeId}</span>
+                  <span className="ml-auto rounded-full bg-slate-200 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-slate-500">Read Only</span>
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <InputField
@@ -307,6 +452,146 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
           </form>
         </section>
       </div>
+
+      {/* Bank & Financial Details */}
+      <section className="rounded-[1.8rem] border border-emerald-100 bg-white p-6 shadow-[0_16px_40px_rgba(16,185,129,0.07)]">
+        {/* Header */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-emerald-100 bg-emerald-50">
+              <svg fill="none" height="18" viewBox="0 0 24 24" width="18" className="text-emerald-600">
+                <rect height="16" rx="2" width="20" x="2" y="5" stroke="currentColor" strokeWidth="2"/>
+                <path d="M2 10h20" stroke="currentColor" strokeWidth="2"/>
+                <path d="M6 15h2M10 15h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-emerald-600">Financial Info</p>
+              <h3 className="text-lg font-semibold leading-tight text-slate-950">Bank Details</h3>
+            </div>
+          </div>
+          {bankLocked ? (
+            <span className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+              <svg fill="none" height="11" viewBox="0 0 24 24" width="11">
+                <rect height="11" rx="2" width="14" x="5" y="11" stroke="currentColor" strokeWidth="2"/>
+                <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/>
+              </svg>
+              Locked — Contact admin to update
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              <svg fill="none" height="11" viewBox="0 0 24 24" width="11">
+                <path d="M12 2C8.13 2 5 5.13 5 9v2H4a2 2 0 00-2 2v7a2 2 0 002 2h16a2 2 0 002-2v-7a2 2 0 00-2-2h-1V9c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              {data.bankDetailsSaved ? "Editable (Admin)" : "Save once — locked after saving"}
+            </span>
+          )}
+        </div>
+
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          {bankLocked
+            ? "Your bank details are saved and locked. Only an admin can update them."
+            : isAdminOrSuper
+              ? "You can update bank details at any time."
+              : "You can save these details once. After saving, only an admin can update them."}
+        </p>
+
+        {bankLocked ? (
+          /* ── Read-only view for locked employees ── */
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Bank Name", value: data.currentUserBankName },
+              { label: "Account Number", value: data.currentUserBankAccountNumber ? "•".repeat(data.currentUserBankAccountNumber.length - 4) + data.currentUserBankAccountNumber.slice(-4) : "" },
+              { label: "IFSC Code", value: data.currentUserBankIfscCode },
+              { label: "PAN Number", value: data.currentUserPanNumber || "—" },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                <p className="mt-1 font-semibold text-slate-800">{value || "—"}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* ── Editable form ── */
+          <form action={bankAction} className="mt-5 space-y-4">
+            {bankState.error ? <Feedback>{bankState.error}</Feedback> : null}
+            {bankState.success ? <Feedback tone="success">{bankState.success}</Feedback> : null}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Bank Name <span className="text-red-400">*</span></span>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  defaultValue={bankState.values?.bankName ?? data.currentUserBankName}
+                  name="bankName"
+                  placeholder="e.g. HDFC Bank"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Account Number <span className="text-red-400">*</span></span>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  defaultValue={bankState.values?.bankAccountNumber ?? data.currentUserBankAccountNumber}
+                  name="bankAccountNumber"
+                  placeholder="Account number"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">IFSC Code <span className="text-red-400">*</span></span>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  defaultValue={bankState.values?.bankIfscCode ?? data.currentUserBankIfscCode}
+                  name="bankIfscCode"
+                  placeholder="HDFC0001234"
+                  style={{ textTransform: "uppercase" }}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">PAN Number</span>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  defaultValue={bankState.values?.panNumber ?? data.currentUserPanNumber}
+                  name="panNumber"
+                  placeholder="ABCDE1234F"
+                  style={{ textTransform: "uppercase" }}
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                disabled={bankPending}
+                type="submit"
+              >
+                {bankPending ? (
+                  <>
+                    <svg className="animate-spin" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4"/>
+                      <path className="opacity-75" d="M4 12a8 8 0 018-8" stroke="white" strokeLinecap="round" strokeWidth="4"/>
+                    </svg>
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <svg fill="none" height="14" viewBox="0 0 24 24" width="14">
+                      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="white" strokeWidth="2"/>
+                      <path d="M17 21v-8H7v8M7 3v5h8" stroke="white" strokeLinecap="round" strokeWidth="2"/>
+                    </svg>
+                    Save Bank Details
+                  </>
+                )}
+              </button>
+              {!data.bankDetailsSaved && !isAdminOrSuper ? (
+                <p className="text-xs text-amber-600 font-medium">⚠ These details will be locked after saving.</p>
+              ) : null}
+            </div>
+          </form>
+        )}
+      </section>
 
       {/* Company Settings — admin only */}
       {data.canManageCompany ? (

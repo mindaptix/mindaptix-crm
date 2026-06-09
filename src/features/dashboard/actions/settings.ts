@@ -9,6 +9,7 @@ import { UserModel } from "@/database/mongodb/models/user";
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { UserSessionModel } from "@/database/mongodb/models/user-session";
 import { headers } from "next/headers";
+import { saveUploadedFile } from "@/shared/storage/uploads/shared";
 
 type SettingsState = {
   error?: string;
@@ -289,4 +290,106 @@ export async function updateAccountPassword(
   };
 }
 
+type BankDetailsState = {
+  error?: string;
+  success?: string;
+  values?: {
+    bankName?: string;
+    bankAccountNumber?: string;
+    bankIfscCode?: string;
+    panNumber?: string;
+  };
+};
+
+export async function updateBankDetails(
+  _previousState: BankDetailsState,
+  formData: FormData,
+): Promise<BankDetailsState> {
+  const session = await getCurrentSession();
+  if (!session) return { error: "Please sign in again." };
+
+  const bankName         = String(formData.get("bankName") ?? "").trim();
+  const bankAccountNumber = String(formData.get("bankAccountNumber") ?? "").trim();
+  const bankIfscCode     = String(formData.get("bankIfscCode") ?? "").trim();
+  const panNumber        = String(formData.get("panNumber") ?? "").trim();
+
+  if (!bankName || !bankAccountNumber || !bankIfscCode) {
+    return {
+      error: "Bank name, account number, and IFSC code are required.",
+      values: { bankName, bankAccountNumber, bankIfscCode, panNumber },
+    };
+  }
+
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankIfscCode.toUpperCase())) {
+    return {
+      error: "Enter a valid IFSC code (e.g. HDFC0001234).",
+      values: { bankName, bankAccountNumber, bankIfscCode, panNumber },
+    };
+  }
+
+  if (panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(panNumber.toUpperCase())) {
+    return {
+      error: "Enter a valid PAN number (e.g. ABCDE1234F).",
+      values: { bankName, bankAccountNumber, bankIfscCode, panNumber },
+    };
+  }
+
+  await connectDb();
+
+  const isAdminOrSuper = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+
+  // Employees can save bank details only once
+  if (!isAdminOrSuper) {
+    const existing = await UserModel.findById(session.user.id, { bankAccountNumber: 1 }).lean();
+    const alreadySaved = Boolean((existing as unknown as { bankAccountNumber?: string })?.bankAccountNumber?.trim());
+    if (alreadySaved) {
+      return { error: "Bank details are locked. Contact your admin to update them." };
+    }
+  }
+
+  await UserModel.findByIdAndUpdate(session.user.id, {
+    bankName,
+    bankAccountNumber,
+    bankIfscCode: bankIfscCode.toUpperCase(),
+    panNumber: panNumber ? panNumber.toUpperCase() : "",
+  });
+
+  revalidatePath("/dashboard/settings");
+
+  return {
+    success: "Bank details saved successfully.",
+    values: { bankName, bankAccountNumber, bankIfscCode: bankIfscCode.toUpperCase(), panNumber: panNumber.toUpperCase() },
+  };
+}
+
+export async function uploadProfilePhoto(
+  _previousState: { error?: string; success?: string; photoUrl?: string },
+  formData: FormData,
+): Promise<{ error?: string; success?: string; photoUrl?: string }> {
+  const session = await getCurrentSession();
+  if (!session) return { error: "Please sign in again." };
+
+  const file = formData.get("profilePhoto") as File | null;
+  if (!file || file.size === 0) return { error: "Please select a photo to upload." };
+
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    return { error: "Only JPEG, PNG, and WebP images are allowed." };
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    return { error: "Photo must be under 2 MB." };
+  }
+
+  const result = await saveUploadedFile(file, "profile-photos");
+  if (!result) return { error: "Failed to save the photo. Please try again." };
+
+  await connectDb();
+  await UserModel.findByIdAndUpdate(session.user.id, { profilePhotoUrl: result.fileUrl });
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+
+  return { success: "Profile photo updated successfully.", photoUrl: result.fileUrl };
+}
 

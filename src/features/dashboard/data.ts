@@ -1548,7 +1548,7 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
   const [settings, holidays, currentUser] = await Promise.all([
     SettingModel.findOne({ key: "company" }).lean(),
     HolidayModel.find({ year: currentYear }).sort({ date: 1 }).lean(),
-    UserModel.findById(session.user.id, { phone: 1, designation: 1, department: 1, dateOfBirth: 1, address: 1, emergencyContact: 1 }).lean(),
+    UserModel.findById(session.user.id, { phone: 1, designation: 1, department: 1, dateOfBirth: 1, address: 1, emergencyContact: 1, profilePhotoUrl: 1, employeeId: 1, bankName: 1, bankAccountNumber: 1, bankIfscCode: 1, panNumber: 1 }).lean(),
   ]);
 
   return {
@@ -1563,6 +1563,13 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     currentUserDateOfBirth: currentUser?.dateOfBirth ? String(currentUser.dateOfBirth).slice(0, 10) : "",
     currentUserAddress: readString(toRecord(currentUser).address) ?? "",
     currentUserEmergencyContact: readString(toRecord(currentUser).emergencyContact) ?? "",
+    currentUserProfilePhotoUrl: readString(toRecord(currentUser).profilePhotoUrl) ?? "",
+    currentUserEmployeeId: readString(toRecord(currentUser).employeeId) ?? "",
+    currentUserBankName: readString(toRecord(currentUser).bankName) ?? "",
+    currentUserBankAccountNumber: readString(toRecord(currentUser).bankAccountNumber) ?? "",
+    currentUserBankIfscCode: readString(toRecord(currentUser).bankIfscCode) ?? "",
+    currentUserPanNumber: readString(toRecord(currentUser).panNumber) ?? "",
+    bankDetailsSaved: Boolean(readString(toRecord(currentUser).bankAccountNumber)),
     workStart: settings?.workStart ?? "10:00",
     workEnd: settings?.workEnd ?? "19:00",
     leavePolicy: settings?.leavePolicy ?? "Paid Leave and Sick Leave are available for approved requests.",
@@ -1856,10 +1863,63 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
   // Fetch all payment records — admin sees all, no scope filter
   const rawPayments = await SalesPaymentModel.find(
     {},
-    { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1, transactions: 1 },
+    { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1, transactions: 1, isRecurring: 1, recurringDayOfMonth: 1, recurringEndDate: 1, recurringParentId: 1, recurringLastGenerated: 1 },
   )
     .sort({ dueDate: 1, createdAt: -1 })
     .lean();
+
+  // Auto-generate this month's entries for recurring payment templates
+  const currentYearMonth = today.slice(0, 7); // "YYYY-MM"
+  const todayDay = new Date().getDate();
+  type RawPayment = typeof rawPayments[number];
+  const recurringTemplates = (rawPayments as unknown as (RawPayment & { isRecurring?: boolean; recurringDayOfMonth?: number | null; recurringEndDate?: string; recurringParentId?: string; recurringLastGenerated?: string })[])
+    .filter((p) =>
+      p.isRecurring &&
+      !p.recurringParentId &&
+      (!p.recurringLastGenerated || p.recurringLastGenerated < currentYearMonth) &&
+      todayDay >= (p.recurringDayOfMonth ?? 1) &&
+      (!p.recurringEndDate || p.recurringEndDate >= today),
+    );
+
+  if (recurringTemplates.length > 0) {
+    const newEntries = await Promise.all(
+      recurringTemplates.map(async (template) => {
+        const day = String(template.recurringDayOfMonth ?? 1).padStart(2, "0");
+        const dueDate = `${currentYearMonth}-${day}`;
+        const baseInvoice = template.invoiceNumber ?? "";
+        const newInvoice = baseInvoice ? `${baseInvoice}-${currentYearMonth}` : "";
+
+        const created = await SalesPaymentModel.create({
+          salesUserId: template.salesUserId,
+          clientName: (template as unknown as { clientName?: string }).clientName ?? "",
+          projectName: (template as unknown as { projectName?: string }).projectName ?? "",
+          invoiceNumber: newInvoice,
+          amount: template.amount ?? 0,
+          receivedAmount: 0,
+          dueDate,
+          receivedDate: "",
+          status: "PENDING",
+          note: template.note ?? "",
+          isRecurring: false,
+          recurringParentId: template._id.toString(),
+          recurringDayOfMonth: null,
+          recurringEndDate: "",
+          recurringLastGenerated: "",
+        });
+
+        await SalesPaymentModel.findByIdAndUpdate(template._id, {
+          recurringLastGenerated: currentYearMonth,
+        });
+
+        return created;
+      }),
+    );
+
+    // Add newly generated entries to rawPayments so they show up immediately
+    for (const entry of newEntries) {
+      (rawPayments as unknown as typeof rawPayments).push(entry as unknown as typeof rawPayments[number]);
+    }
+  }
 
   // Auto-mark overdue in memory (don't save to DB on every read — that's done lazily)
   const creatorIds = Array.from(new Set(rawPayments.map((p) => p.salesUserId).filter(Boolean)));
@@ -1868,7 +1928,7 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
     : [];
   const creatorMap = new Map(creatorUsers.map((u) => [u._id.toString(), u.fullName]));
 
-  const payments: ClientPaymentEntry[] = rawPayments.map((p) => {
+  const payments: ClientPaymentEntry[] = (rawPayments as unknown as (typeof rawPayments[number] & { isRecurring?: boolean; recurringDayOfMonth?: number | null; recurringEndDate?: string; recurringParentId?: string })[]).map((p) => {
     const amount = Number(p.amount ?? 0);
     const receivedAmount = Number(p.receivedAmount ?? 0);
     const balanceDue = Math.max(amount - receivedAmount, 0);
@@ -1900,6 +1960,10 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
         note: t.note ?? "",
         createdAt: t.createdAt ? formatDateTime(t.createdAt) : "",
       })),
+      isRecurring: p.isRecurring ?? false,
+      recurringDayOfMonth: p.recurringDayOfMonth ?? null,
+      recurringEndDate: p.recurringEndDate ?? "",
+      recurringParentId: p.recurringParentId ?? "",
     };
   });
 
