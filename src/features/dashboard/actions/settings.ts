@@ -389,6 +389,10 @@ export async function uploadProfilePhoto(
 
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/employees");
+  revalidatePath("/dashboard/projects");
+  revalidatePath("/dashboard/tasks");
 
   return { success: "Profile photo updated successfully.", photoUrl: result.fileUrl };
 }

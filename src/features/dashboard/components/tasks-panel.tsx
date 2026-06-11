@@ -2,6 +2,7 @@
 
 import React, { type ReactNode, useActionState, useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { addTaskComment, createTask, reviewTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
 import { emitDashboardSync, subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
@@ -420,6 +421,15 @@ function TaskCard({
                 </svg>
                 <span className="font-semibold text-indigo-600">{task.assignedByName || "Admin"}</span>
                 <span className="text-slate-400">assigned to</span>
+                {task.assignedUserPhotoUrl ? (
+                  <Image
+                    alt={task.assignedUserName}
+                    className="h-5 w-5 rounded-full object-cover"
+                    height={20}
+                    src={task.assignedUserPhotoUrl}
+                    width={20}
+                  />
+                ) : null}
                 <span className="font-semibold text-slate-700">{task.assignedUserName}</span>
               </span>
 

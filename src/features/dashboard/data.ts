@@ -763,7 +763,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
     // Include EMPLOYEE + MANAGER + SUPER_ADMIN — all can be assigned to projects
     UserModel.find(
       { role: { $in: ["EMPLOYEE", "MANAGER", "SUPER_ADMIN"] }, status: "ACTIVE" },
-      { fullName: 1, email: 1, role: 1 },
+      { fullName: 1, email: 1, role: 1, profilePhotoUrl: 1 },
     ).sort({ role: 1, fullName: 1 }).lean(),
   ]);
 
@@ -795,6 +795,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
       techStack: resolveProjectTechStack(project),
       assignedUserIds: project.assignedUserIds ?? [],
       assignedUserNames: (project.assignedUserIds ?? []).map((userId) => employeeMap.get(userId)?.fullName ?? "Assigned employee"),
+      assignedUserPhotoUrls: (project.assignedUserIds ?? []).map((userId) => readString(toRecord(employeeMap.get(userId)).profilePhotoUrl) ?? ""),
       createdByUserId: project.createdByUserId ?? "",
       closedByEmployeeId: project.closedByEmployeeId ?? "",
       closedByEmployeeAt: formatDate(project.closedByEmployeeAt ?? null),
@@ -828,7 +829,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
     AttendanceModel.findOne({ userId: session.user.id, dateKey: today }).lean(),
     AttendanceModel.find({ userId: attendanceScope, dateKey: today }).sort({ checkInAt: 1 }).lean(),
     AttendanceModel.find({ userId: attendanceScope, dateKey: { $regex: `^${monthPrefix}` } }).lean(),
-    UserModel.find({ _id: attendanceScope }, { fullName: 1, email: 1, role: 1, status: 1 }).lean(),
+    UserModel.find({ _id: attendanceScope }, { fullName: 1, email: 1, role: 1, status: 1, profilePhotoUrl: 1 }).lean(),
     SettingModel.findOne(
       { key: "company" },
       {
@@ -898,6 +899,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           id: todayRecord._id.toString(),
           employeeName: session.user.fullName,
           employeeEmail: session.user.email,
+          profilePhotoUrl: session.user.profilePhotoUrl,
           dateKey: todayRecord.dateKey,
           checkInAt: formatDateTime(todayRecord.checkInAt),
           checkOutAt: formatDateTime(todayRecord.checkOutAt),
@@ -919,6 +921,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
             id: `missing-${user._id.toString()}`,
             employeeName: user.fullName,
             employeeEmail: user.email,
+            profilePhotoUrl: readString(toRecord(user).profilePhotoUrl) ?? "",
             dateKey: today,
             checkInAt: "Not marked",
             checkOutAt: "Not marked",
@@ -946,6 +949,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           id: record._id.toString(),
           employeeName: user.fullName,
           employeeEmail: user.email,
+          profilePhotoUrl: readString(toRecord(user).profilePhotoUrl) ?? "",
           dateKey: record.dateKey,
           checkInAt: formatDateTime(record.checkInAt),
           checkOutAt: formatDateTime(record.checkOutAt),
@@ -1081,7 +1085,7 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
   const [tasks, employees, users, assignedProjects] = await Promise.all([
     TaskModel.find(taskFilter).sort({ createdAt: -1 }).lean(),
     UserModel.find(assignableRoleFilter, { fullName: 1, email: 1, role: 1 }).sort({ fullName: 1 }).lean(),
-    UserModel.find({}, { fullName: 1 }).lean(),
+    UserModel.find({}, { fullName: 1, profilePhotoUrl: 1 }).lean(),
     hasAdminLikeAccess
       ? Promise.resolve([])
       : ProjectModel.find({ assignedUserIds: session.user.id }, { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1 })
@@ -1089,7 +1093,10 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
           .lean(),
   ]);
 
-  const userMap = new Map(users.map((user) => [user._id.toString(), user.fullName]));
+  const userMap = new Map(users.map((user) => [user._id.toString(), {
+    fullName: user.fullName,
+    profilePhotoUrl: readString(toRecord(user).profilePhotoUrl) ?? "",
+  }]));
   const awaitingReviewCount = tasks.filter((task) => task.status === "COMPLETED").length;
   const closedCount = tasks.filter((task) => task.status === "CLOSED").length;
   const rejectedCount = tasks.filter((task) => task.status === "REJECTED").length;
@@ -1258,7 +1265,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
   const scope = inScope(scopedIds);
 
   const [users, attendance, leaves, tasks, dsrRows] = await Promise.all([
-      UserModel.find({ _id: scope }, { fullName: 1, email: 1 }).lean(),
+      UserModel.find({ _id: scope }, { fullName: 1, email: 1, profilePhotoUrl: 1 }).lean(),
       AttendanceModel.find({ userId: scope, dateKey: { $gte: monthStart, $lte: today } }).lean(),
       LeaveRequestModel.find({ userId: scope, endDate: { $gte: monthStart }, startDate: { $lte: today } }).sort({ createdAt: -1 }).lean(),
       TaskModel.find({ assignedUserId: scope, dueDate: { $gte: monthStart, $lte: getMonthEndDate(currentMonthKey) } }).sort({ createdAt: -1 }).lean(),
@@ -1512,7 +1519,10 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
           status: leave.status,
           updatedAt: formatDateTime(leave.updatedAt),
         })),
-    taskRows: tasks.map((task) => mapTaskRow(task, new Map(users.map((user) => [user._id.toString(), user.fullName])))),
+    taskRows: tasks.map((task) => mapTaskRow(task, new Map(users.map((user) => [user._id.toString(), {
+      fullName: user.fullName,
+      profilePhotoUrl: readString(toRecord(user).profilePhotoUrl) ?? "",
+    }])))),
     monthLabel: formatMonthYearLabel(currentMonthKey),
     monthlyEmployeeRows: monthlyReportRows,
     monthlyEmployeeReports: Array.from(monthlyEmployeeRows.values())
@@ -2668,14 +2678,15 @@ function mapTaskRow(task: {
   labels?: string[];
   attachments?: Array<{ name?: string; url?: string }>;
   comments?: Array<{ _id?: { toString(): string }; userName?: string; role?: string; message?: string; createdAt?: Date | null }>;
-}, userMap: Map<string, string>) {
+}, userMap: Map<string, { fullName: string; profilePhotoUrl: string }>) {
   return {
     id: task._id.toString(),
     title: task.title,
     description: task.description,
     assignedUserId: task.assignedUserId,
-    assignedUserName: userMap.get(task.assignedUserId) ?? "Unknown employee",
-    assignedByName: userMap.get(task.assignedByUserId) ?? "Unknown admin",
+    assignedUserName: userMap.get(task.assignedUserId)?.fullName ?? "Unknown employee",
+    assignedUserPhotoUrl: userMap.get(task.assignedUserId)?.profilePhotoUrl ?? "",
+    assignedByName: userMap.get(task.assignedByUserId)?.fullName ?? "Unknown admin",
     dueDate: task.dueDate,
     status: task.status,
     priority: task.priority ?? "MEDIUM",

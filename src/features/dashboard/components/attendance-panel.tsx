@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
 import { reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
@@ -292,6 +293,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
   const locating = geoStatus === "loading";
   const checkInDisabled = checkInPending || locating || checkedIn || checkedOut;
   const checkOutDisabled = checkOutPending || locating || !checkedIn || checkedOut;
+  const officeLocationRequired = true;
 
   async function handleCheckIn() {
     setGeoError(null);
@@ -308,18 +310,18 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
         location = await getBrowserLocation();
       } catch (error) {
         setGeoStatus("error");
-        if (officeLocation.geoFenceEnabled) {
-          // Geofence is on — location is required, block check-in
+        if (officeLocationRequired) {
+          // Office check-in always requires location.
           setGeoError(getLocationErrorMessage(error, "check-in"));
           return;
         }
-        // Geofence off — proceed without location (it just won't be recorded)
+        // Non-office modes skip this location block before reaching here.
         setGeoStatus("idle");
       }
 
       if (location) {
         setGeoStatus("idle");
-        if (officeLocation.geoFenceEnabled) {
+        if (officeLocationRequired) {
           const locationError = validateOfficeLocation(location, officeLocation, "check-in");
           if (locationError) {
             setGeoStatus("error");
@@ -362,7 +364,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
         location = await getBrowserLocation();
       } catch (error) {
         setGeoStatus("error");
-        if (officeLocation.geoFenceEnabled) {
+        if (officeLocationRequired) {
           setCheckOutError(getLocationErrorMessage(error, "check-out"));
           return;
         }
@@ -371,7 +373,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
       if (location) {
         setGeoStatus("idle");
-        if (officeLocation.geoFenceEnabled) {
+        if (officeLocationRequired) {
           const locationError = validateOfficeLocation(location, officeLocation, "check-out");
           if (locationError) {
             setGeoStatus("error");
@@ -728,12 +730,22 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                     >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white shadow-sm"
-                            style={{ background: `linear-gradient(135deg,${avatarGrad(record.employeeName)})` }}
-                          >
-                            {record.employeeName.charAt(0).toUpperCase()}
-                          </div>
+                          {record.profilePhotoUrl ? (
+                            <Image
+                              alt={record.employeeName}
+                              className="h-9 w-9 shrink-0 rounded-xl object-cover shadow-sm"
+                              height={36}
+                              src={record.profilePhotoUrl}
+                              width={36}
+                            />
+                          ) : (
+                            <div
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white shadow-sm"
+                              style={{ background: `linear-gradient(135deg,${avatarGrad(record.employeeName)})` }}
+                            >
+                              {record.employeeName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <div>
                             <p className="text-sm font-semibold text-slate-800">{record.employeeName}</p>
                             <p className="text-[0.7rem] text-slate-400">{record.employeeEmail}</p>

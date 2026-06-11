@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { submitRegularizationRequest, reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
+import {
+  deleteRegularizationRequest,
+  reviewRegularizationRequest,
+  submitRegularizationRequest,
+} from "@/features/dashboard/actions/regularization";
 import type { RegularizationPageData, RegularizationEntry } from "@/features/dashboard/types";
 
 const STATUS_CFG: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -90,8 +94,8 @@ export function RegularizationPanel({ data }: Props) {
 
       {/* Tab content */}
       {tab === "submit" && <SubmitForm />}
-      {tab === "mine"   && <RequestList entries={data.canReview ? data.allRequests : data.myRequests} canReview={false} />}
-      {tab === "review" && data.canReview && <RequestList entries={data.pendingRequests} canReview allEntries={data.allRequests} />}
+      {tab === "mine"   && <RequestList entries={data.canReview ? data.allRequests : data.myRequests} canDelete={data.canReview} canReview={false} />}
+      {tab === "review" && data.canReview && <RequestList entries={data.pendingRequests} canDelete canReview allEntries={data.allRequests} />}
     </div>
   );
 }
@@ -172,14 +176,17 @@ function SubmitForm() {
 
 function RequestList({
   entries,
+  canDelete,
   canReview,
   allEntries,
 }: {
   entries: RegularizationEntry[];
+  canDelete?: boolean;
   canReview: boolean;
   allEntries?: RegularizationEntry[];
 }) {
   const [reviewState, reviewAction, reviewPending] = useActionState(reviewRegularizationRequest, {});
+  const [deleteState, deleteAction, deletePending] = useActionState(deleteRegularizationRequest, {});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -200,15 +207,21 @@ function RequestList({
         <div className="overflow-hidden rounded-[1.8rem]" style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
           <div className="px-7 py-5" style={{ background: "linear-gradient(135deg,#fffbeb,#fef3c7)", borderBottom: "1px solid rgba(245,158,11,0.15)" }}>
             <p className="text-[0.62rem] font-bold uppercase tracking-[0.26em]" style={{ color: "#d97706" }}>
-              {canReview ? "Pending Review" : "My Requests"}
+              {canReview ? "Pending Review" : canDelete ? "All Requests" : "My Requests"}
             </p>
             <h2 className="mt-0.5 text-xl font-bold text-slate-900">
-              {canReview ? `${entries.length} Request${entries.length !== 1 ? "s" : ""} Awaiting Review` : "Submitted Requests"}
+              {canReview
+                ? `${entries.length} Request${entries.length !== 1 ? "s" : ""} Awaiting Review`
+                : canDelete
+                  ? "All Regularization Requests"
+                  : "Submitted Requests"}
             </h2>
           </div>
 
           {reviewState.error   && <div className="mx-7 mt-4"><FeedbackBanner tone="error">{reviewState.error}</FeedbackBanner></div>}
           {reviewState.success && <div className="mx-7 mt-4"><FeedbackBanner tone="success">{reviewState.success}</FeedbackBanner></div>}
+          {deleteState.error   && <div className="mx-7 mt-4"><FeedbackBanner tone="error">{deleteState.error}</FeedbackBanner></div>}
+          {deleteState.success && <div className="mx-7 mt-4"><FeedbackBanner tone="success">{deleteState.success}</FeedbackBanner></div>}
 
           <div className="divide-y divide-slate-50">
             {entries.map((entry) => (
@@ -223,7 +236,7 @@ function RequestList({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    {canReview && <p className="font-semibold text-slate-800">{entry.employeeName}</p>}
+                    {(canReview || canDelete) && <p className="font-semibold text-slate-800">{entry.employeeName}</p>}
                     <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[0.75rem] text-slate-500">
                       <span>📅 {entry.dateKey}</span>
                       <span>🕐 {entry.requestedCheckIn}{entry.requestedCheckOut ? ` — ${entry.requestedCheckOut}` : ""}</span>
@@ -239,6 +252,23 @@ function RequestList({
 
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     <StatusBadge status={entry.status} />
+                    {canDelete && (
+                      <form action={deleteAction}>
+                        <input type="hidden" name="requestId" value={entry.id} />
+                        <button
+                          className="text-[0.7rem] font-semibold text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                          disabled={deletePending}
+                          onClick={(event) => {
+                            if (!window.confirm("Delete this regularization request?")) {
+                              event.preventDefault();
+                            }
+                          }}
+                          type="submit"
+                        >
+                          Delete
+                        </button>
+                      </form>
+                    )}
                     {canReview && entry.status === "PENDING" && (
                       <button
                         className="text-[0.7rem] font-semibold text-indigo-600 hover:text-indigo-800"
@@ -312,6 +342,23 @@ function RequestList({
                     <p className="mt-0.5 text-[0.72rem] text-slate-400 line-clamp-1">{entry.reason}</p>
                   </div>
                   <StatusBadge status={entry.status} />
+                  {canDelete && (
+                    <form action={deleteAction}>
+                      <input type="hidden" name="requestId" value={entry.id} />
+                      <button
+                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-[0.7rem] font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                        disabled={deletePending}
+                        onClick={(event) => {
+                          if (!window.confirm("Delete this regularization request?")) {
+                            event.preventDefault();
+                          }
+                        }}
+                        type="submit"
+                      >
+                        Delete
+                      </button>
+                    </form>
+                  )}
                 </div>
               ))}
             </div>

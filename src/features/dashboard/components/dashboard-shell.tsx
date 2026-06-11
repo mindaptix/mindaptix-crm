@@ -158,9 +158,19 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
 
           <div className="mt-3 shrink-0 overflow-hidden rounded-[1.45rem] border border-white/10 bg-[linear-gradient(145deg,rgba(15,35,65,0.95)_0%,rgba(10,50,90,0.92)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-8px_24px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-3 px-3.5 pt-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-[linear-gradient(135deg,#1d4ed8,#0f172a)] text-sm font-bold text-white shadow-[0_8px_20px_rgba(29,78,216,0.4)]">
-                {session.user.fullName.trim().split(" ").filter(Boolean).slice(0, 2).map((p: string) => p[0]).join("").toUpperCase()}
-              </div>
+              {session.user.profilePhotoUrl ? (
+                <Image
+                  alt={session.user.fullName}
+                  className="h-10 w-10 shrink-0 rounded-[0.85rem] object-cover shadow-[0_8px_20px_rgba(29,78,216,0.4)]"
+                  height={40}
+                  src={session.user.profilePhotoUrl}
+                  width={40}
+                />
+              ) : (
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-[linear-gradient(135deg,#1d4ed8,#0f172a)] text-sm font-bold text-white shadow-[0_8px_20px_rgba(29,78,216,0.4)]">
+                  {session.user.fullName.trim().split(" ").filter(Boolean).slice(0, 2).map((p: string) => p[0]).join("").toUpperCase()}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">{session.user.fullName}</p>
                 <p className="mt-0.5 truncate text-xs text-blue-200/70">{getDisplayRoleLabel(session.user.role)}</p>

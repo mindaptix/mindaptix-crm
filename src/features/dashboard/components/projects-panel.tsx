@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -272,15 +273,28 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
                         <span className="text-[0.65rem] font-semibold text-white/60">No team assigned</span>
                       ) : (
                         <>
-                          {project.assignedUserNames.slice(0, 5).map((name, i) => (
-                            <div
-                              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/30 bg-gradient-to-br ${avatarGradients[i % avatarGradients.length]} text-[0.55rem] font-bold text-white shadow-md`}
-                              key={`${project.id}-av-${i}`}
-                              title={name}
-                            >
-                              {name.trim().charAt(0).toUpperCase()}
-                            </div>
-                          ))}
+                          {project.assignedUserNames.slice(0, 5).map((name, i) => {
+                            const photoUrl = project.assignedUserPhotoUrls?.[i] ?? "";
+                            return photoUrl ? (
+                              <Image
+                                alt={name}
+                                className="h-7 w-7 rounded-full border-2 border-white/30 object-cover shadow-md"
+                                height={28}
+                                key={`${project.id}-av-${i}`}
+                                src={photoUrl}
+                                title={name}
+                                width={28}
+                              />
+                            ) : (
+                              <div
+                                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/30 bg-gradient-to-br ${avatarGradients[i % avatarGradients.length]} text-[0.55rem] font-bold text-white shadow-md`}
+                                key={`${project.id}-av-${i}`}
+                                title={name}
+                              >
+                                {name.trim().charAt(0).toUpperCase()}
+                              </div>
+                            );
+                          })}
                           {project.assignedUserNames.length > 5 ? (
                             <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-[0.55rem] font-bold text-white">
                               +{project.assignedUserNames.length - 5}

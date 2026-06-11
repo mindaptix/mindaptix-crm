@@ -136,8 +136,8 @@ export async function checkInAttendance(formData: FormData): Promise<AttendanceA
   const lateGraceMinutes: number = Number(companySettings.lateGraceMinutes ?? 15);
   const office = getOfficeGeoFence(companySettings);
 
-  // Office attendance is pinned to the configured office location and radius.
-  const shouldEnforceGeoFence = workMode === "OFFICE" && office.enabled;
+  // Office attendance always requires the configured office location.
+  const shouldEnforceGeoFence = workMode === "OFFICE";
 
   if (shouldEnforceGeoFence) {
     const locationError = validateOfficeLocation({
@@ -218,9 +218,7 @@ export async function checkOutAttendance(formData?: FormData): Promise<Attendanc
   const settings = await SettingModel.findOne({ key: "company" }).lean();
   const companySettings = (settings ?? {}) as unknown as Partial<CompanySettings>;
   const office = getOfficeGeoFence(companySettings);
-  const shouldEnforceGeoFence =
-    existingAttendance.workMode === "OFFICE" &&
-    office.enabled;
+  const shouldEnforceGeoFence = existingAttendance.workMode === "OFFICE";
 
   if (shouldEnforceGeoFence) {
     const locationError = validateOfficeLocation({

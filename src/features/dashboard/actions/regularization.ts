@@ -105,3 +105,31 @@ export async function reviewRegularizationRequest(
   revalidatePath("/dashboard/attendance");
   return { success: `Request ${action === "APPROVED" ? "approved" : "rejected"} successfully.` };
 }
+
+export async function deleteRegularizationRequest(
+  _prev: RegularizationState,
+  formData: FormData,
+): Promise<RegularizationState> {
+  const session = await getCurrentSession();
+  if (!session || (session.user.role !== "SUPER_ADMIN" && session.user.role !== "MANAGER")) {
+    return { error: "Only admin can delete requests." };
+  }
+
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  if (!requestId) {
+    return { error: "Invalid delete payload." };
+  }
+
+  await connectDb();
+
+  const request = await AttendanceRegularizationModel.findById(requestId).lean();
+  if (!request) {
+    return { error: "Request not found." };
+  }
+
+  await AttendanceRegularizationModel.findByIdAndDelete(requestId);
+
+  revalidatePath("/dashboard/regularize");
+  revalidatePath("/dashboard/attendance");
+  return { success: "Request deleted successfully." };
+}

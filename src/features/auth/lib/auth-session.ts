@@ -19,6 +19,7 @@ export type AuthenticatedSession = {
     managerId: string;
     projectIds: string[];
     leadIds: string[];
+    profilePhotoUrl: string;
   };
 };
 
@@ -156,7 +157,7 @@ async function getSessionByToken(token: string): Promise<AuthenticatedSession | 
   // Step 2: fetch only the fields we need from user (projection = faster)
   const user = await UserModel.findById(
     sessionRecord.userId,
-    { fullName: 1, email: 1, role: 1, managerId: 1, projectIds: 1, leadIds: 1, status: 1 },
+    { fullName: 1, email: 1, role: 1, managerId: 1, projectIds: 1, leadIds: 1, profilePhotoUrl: 1, status: 1 },
   ).lean<UserRecord | null>();
 
   if (!user || user.status === "SUSPENDED") return null;
@@ -171,6 +172,7 @@ async function getSessionByToken(token: string): Promise<AuthenticatedSession | 
       managerId: user.managerId ?? "",
       projectIds: user.projectIds ?? [],
       leadIds: user.leadIds ?? [],
+      profilePhotoUrl: user.profilePhotoUrl ?? "",
     },
   };
 }

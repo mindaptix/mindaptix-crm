@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createManagedUser, deleteManagedUser, updateManagedUserAccess } from "@/features/dashboard/actions/users";
@@ -1097,9 +1098,19 @@ function EmployeeRow({
     >
       {/* Col 1 — Avatar + Name */}
       <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-none">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.75rem] text-xs font-bold text-white shadow-sm ${getRoleGradient(user.role)}`}>
-          {getInitials(user.fullName)}
-        </div>
+        {user.profilePhotoUrl ? (
+          <Image
+            alt={user.fullName}
+            className="h-9 w-9 shrink-0 rounded-[0.75rem] object-cover shadow-sm"
+            height={36}
+            src={user.profilePhotoUrl}
+            width={36}
+          />
+        ) : (
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.75rem] text-xs font-bold text-white shadow-sm ${getRoleGradient(user.role)}`}>
+            {getInitials(user.fullName)}
+          </div>
+        )}
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900">{user.fullName}</p>
           <p className="truncate text-xs text-slate-400">{user.designation || user.email}</p>

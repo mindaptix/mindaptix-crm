@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import type { EmployeeDirectoryEntry } from "@/features/dashboard/types";
 
@@ -144,12 +145,22 @@ export function TeamDirectoryPanel({ users }: Props) {
                     {/* Name + avatar */}
                     <td className="whitespace-nowrap px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[0.62rem] font-bold text-white"
-                          style={{ background: avatarGrad(user.fullName) }}
-                        >
-                          {initials(user.fullName)}
-                        </div>
+                        {user.profilePhotoUrl ? (
+                          <Image
+                            alt={user.fullName}
+                            className="h-9 w-9 shrink-0 rounded-full object-cover"
+                            height={36}
+                            src={user.profilePhotoUrl}
+                            width={36}
+                          />
+                        ) : (
+                          <div
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[0.62rem] font-bold text-white"
+                            style={{ background: avatarGrad(user.fullName) }}
+                          >
+                            {initials(user.fullName)}
+                          </div>
+                        )}
                         <div>
                           <p className="text-sm font-semibold text-slate-800">{user.fullName}</p>
                           <p className="text-[0.65rem] text-slate-400">{user.email}</p>

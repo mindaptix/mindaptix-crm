@@ -178,6 +178,7 @@ export type EmployeeProjectEntry = {
   techStack: string[];
   assignedUserIds: string[];
   assignedUserNames: string[];
+  assignedUserPhotoUrls?: string[];
   createdByUserId: string;
   closedByEmployeeId: string;
   closedByEmployeeAt: string;
@@ -328,6 +329,7 @@ export type AttendanceRecordView = {
   id: string;
   employeeName: string;
   employeeEmail: string;
+  profilePhotoUrl?: string;
   dateKey: string;
   checkInAt: string;
   checkOutAt: string;
@@ -413,6 +415,7 @@ export type TaskEntry = {
   description: string;
   assignedUserId: string;
   assignedUserName: string;
+  assignedUserPhotoUrl?: string;
   assignedByName: string;
   dueDate: string;
   status: string;
