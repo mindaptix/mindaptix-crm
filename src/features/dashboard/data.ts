@@ -1272,7 +1272,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       TaskModel.find({ assignedUserId: scope, dueDate: { $gte: reportRangeStart, $lte: getMonthEndDate(currentMonthKey) } }).sort({ createdAt: -1 }).lean(),
       DailyUpdateModel.find(
         { userId: scope, workDate: { $gte: reportRangeStart, $lte: today } },
-        { userId: 1, projectId: 1, workDate: 1, summary: 1, accomplishments: 1, blockers: 1, nextPlan: 1 },
+        { userId: 1, projectId: 1, workDate: 1, summary: 1, accomplishments: 1, blockers: 1, nextPlan: 1, createdAt: 1 },
       )
         .sort({ workDate: -1, createdAt: -1 })
         .lean(),
@@ -1308,6 +1308,17 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
           checkInAt: string;
           checkOutAt: string;
           date: string;
+          dsrEntries: Array<{
+            accomplishments: string;
+            blockers: string;
+            id: string;
+            nextPlan: string;
+            projectName: string;
+            submittedAt: string;
+            submittedDate: string;
+            summary: string;
+            workDate: string;
+          }>;
           dsrSummary: string;
           projectNames: Set<string>;
         }>;
@@ -1317,6 +1328,8 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
           id: string;
           nextPlan: string;
           projectName: string;
+          submittedAt: string;
+          submittedDate: string;
           summary: string;
           workDate: string;
         }>;
@@ -1349,6 +1362,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
           checkInAt: "Not marked",
           checkOutAt: "Not marked",
           date,
+          dsrEntries: [],
           dsrSummary: "",
           projectNames: new Set<string>(),
         })),
@@ -1436,20 +1450,26 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       }
 
       const projectName = update.projectId ? projectMap.get(update.projectId) ?? "General" : "General";
-      item.dsrRows.push({
+      const submittedAt = formatDateTime(update.createdAt);
+      const submittedDate = formatDate(update.createdAt);
+      const dsrEntry = {
         accomplishments: update.accomplishments,
         blockers: update.blockers ?? "",
         id: update._id.toString(),
         nextPlan: update.nextPlan ?? "",
         projectName,
+        submittedAt,
+        submittedDate,
         summary: update.summary,
         workDate: update.workDate,
-      });
+      };
+      item.dsrRows.push(dsrEntry);
 
       const dailyRow = item.dailyRows.find((entry) => entry.date === update.workDate);
       if (dailyRow) {
         dailyRow.projectNames.add(projectName);
-        dailyRow.dsrSummary = update.summary;
+        dailyRow.dsrEntries.push(dsrEntry);
+        dailyRow.dsrSummary = dailyRow.dsrEntries.map((entry) => entry.summary).join(" | ");
       }
     }
 
@@ -1483,6 +1503,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
           checkInAt: dailyRow.checkInAt,
           checkOutAt: dailyRow.checkOutAt,
           date: dailyRow.date,
+          dsrEntries: dailyRow.dsrEntries.sort((left, right) => right.submittedAt.localeCompare(left.submittedAt)),
           dsrSummary: dailyRow.dsrSummary || "No DSR submitted",
           projectNames: Array.from(dailyRow.projectNames),
         })),

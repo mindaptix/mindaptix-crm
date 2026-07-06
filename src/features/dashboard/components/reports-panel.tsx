@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReportsPageData } from "@/features/dashboard/types";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -62,12 +63,178 @@ function triggerCSVDownload(rows: (string | number)[][], filename: string) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 type ReportsPanelProps = { data: ReportsPageData; simplifiedView?: boolean };
+type DailyReportRow = ReportsPageData["monthlyEmployeeReports"][number]["dailyRows"][number];
+type MonthlyDsrRow = ReportsPageData["monthlyEmployeeReports"][number]["dsrRows"][number];
+type MonthlyEmployeeReport = ReportsPageData["monthlyEmployeeReports"][number];
+
+function getDsrStatus(row: DailyReportRow, today: string): "filled" | "late" | "none" {
+  if (row.dsrEntries.length > 0) return "filled";
+  const attended = row.attendanceStatus === "Present" || row.attendanceStatus === "Present + Checkout";
+  if (attended) return "late";
+  if (row.date < today && row.attendanceStatus !== "On Leave") return "late";
+  return "none";
+}
+
+function DsrStatusBadge({ row, today, compact = false }: { row: DailyReportRow; today: string; compact?: boolean }) {
+  const status = getDsrStatus(row, today);
+  if (status === "filled") {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 font-bold text-emerald-700 ${compact ? "px-2 py-0.5 text-[0.62rem]" : "px-2.5 py-1 text-[0.68rem]"}`}>
+        <svg fill="none" height="10" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" width="10"><polyline points="20 6 9 17 4 12" /></svg>
+        Filled
+      </span>
+    );
+  }
+  if (status === "late") {
+    return (
+      <span className={`inline-flex items-center rounded-full border border-amber-200 bg-amber-50 font-bold text-amber-700 ${compact ? "px-2 py-0.5 text-[0.62rem]" : "px-2.5 py-1 text-[0.68rem]"}`}>
+        Late bharo
+      </span>
+    );
+  }
+  return <span className={`text-slate-300 ${compact ? "text-[0.75rem]" : "text-[0.8rem]"}`}>—</span>;
+}
+
+function formatTimelineDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-");
+  return `${month}-${day}-${year}`;
+}
+
+function AttendanceTimelineTable({ compact = false, rows, today }: { compact?: boolean; rows: DailyReportRow[]; today: string }) {
+  const cellPad = compact ? "px-2.5 py-2.5" : "px-4 py-3";
+  const headCls = `text-left font-bold uppercase tracking-wider text-[#6366f1] ${compact ? "px-2.5 py-2.5 text-[0.62rem]" : "px-4 py-3 text-[0.65rem]"}`;
+  const bodyText = compact ? "text-[0.75rem]" : "text-[0.82rem]";
+  const badgeText = compact ? "px-2 py-0.5 text-[0.58rem]" : "px-2.5 py-1 text-[0.65rem]";
+
+  function statusLabel(status: string) {
+    if (status === "Present + Checkout") return "Present+";
+    if (status === "Not Marked") return "Pending";
+    return status;
+  }
+
+  return (
+    <div className={`thin-scrollbar ${compact ? "max-h-[360px] overflow-y-auto" : "overflow-x-auto"}`}>
+      <table className="w-full border-separate border-spacing-0 text-sm" style={{ tableLayout: "fixed" }}>
+        <colgroup>
+          <col style={{ width: compact ? 108 : 118 }} />
+          <col style={{ width: compact ? 88 : 96 }} />
+          <col />
+          <col />
+          <col style={{ width: compact ? 76 : 88 }} />
+          <col style={{ width: compact ? 86 : 96 }} />
+        </colgroup>
+        <thead className={compact ? "sticky top-0 z-10" : undefined}>
+          <tr style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)" }}>
+            {["Date", "Status", "Check In", "Check Out", "Projects", "DSR"].map((h) => (
+              <th key={h} className={headCls}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const chip = ATTENDANCE_CFG[row.attendanceStatus] ?? ATTENDANCE_CFG["Not Marked"];
+            return (
+              <tr key={row.date} className="border-t border-slate-50 transition-colors hover:bg-slate-50/50">
+                <td className={`${cellPad} overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-slate-700 ${bodyText}`}>
+                  {formatTimelineDate(row.date)}
+                </td>
+                <td className={`${cellPad} overflow-hidden`}>
+                  <span
+                    className={`inline-flex max-w-full items-center rounded-full font-bold leading-tight ${badgeText}`}
+                    style={{ background: chip.bg, color: chip.text }}
+                  >
+                    <span className="truncate">{statusLabel(row.attendanceStatus)}</span>
+                  </span>
+                </td>
+                <td className={`${cellPad} overflow-hidden text-ellipsis whitespace-nowrap text-slate-500 ${bodyText}`}>
+                  {row.checkInAt === "Not marked" ? "—" : row.checkInAt}
+                </td>
+                <td className={`${cellPad} overflow-hidden text-ellipsis whitespace-nowrap text-slate-500 ${bodyText}`}>
+                  {row.checkOutAt === "Not marked" ? "—" : row.checkOutAt}
+                </td>
+                <td className={`${cellPad} overflow-hidden text-ellipsis whitespace-nowrap text-slate-500 ${bodyText}`}>
+                  {row.projectNames.length ? row.projectNames.join(", ") : "—"}
+                </td>
+                <td className={`${cellPad} whitespace-nowrap`}>
+                  <DsrStatusBadge compact={compact} row={row} today={today} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DsrEntryCard({ dsr }: { dsr: MonthlyDsrRow }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white transition-shadow hover:shadow-md">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-50 bg-slate-50/60 px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[0.72rem] font-bold text-slate-700">{dsr.workDate}</span>
+          <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[0.58rem] font-bold text-emerald-700">{dsr.projectName}</span>
+        </div>
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[0.58rem] font-bold text-emerald-700">Filled</span>
+      </div>
+      <div className="space-y-2 p-4">
+        {dsr.submittedAt && <p className="text-[0.62rem] font-semibold text-slate-400">Submitted {dsr.submittedAt}</p>}
+        <p className="break-words text-[0.82rem] font-semibold leading-5 text-slate-800">{dsr.summary}</p>
+        {dsr.accomplishments && (
+          <div className="rounded-xl bg-slate-50 px-3 py-2">
+            <p className="text-[0.58rem] font-bold uppercase tracking-wider text-slate-400">Completed</p>
+            <p className="mt-0.5 break-words text-[0.72rem] leading-5 text-slate-600">{dsr.accomplishments}</p>
+          </div>
+        )}
+        {dsr.blockers && <p className="break-words text-[0.68rem] font-semibold text-amber-700">Blockers: {dsr.blockers}</p>}
+        {dsr.nextPlan && <p className="break-words text-[0.68rem] text-slate-500">Next: {dsr.nextPlan}</p>}
+      </div>
+    </div>
+  );
+}
+
+function ExpandedEmployeeBanner({ emp, monthLabel }: { emp: MonthlyEmployeeReport; monthLabel: string }) {
+  return (
+    <div
+      className="mb-5 flex flex-wrap items-center gap-4 rounded-2xl px-5 py-4"
+      style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", border: "1px solid rgba(99,102,241,0.12)" }}
+    >
+      <div
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-md"
+        style={{ background: avatarGrad(emp.employeeName) }}
+      >
+        {initials(emp.employeeName)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-lg font-bold text-slate-800">{emp.employeeName}</p>
+        <p className="text-[0.72rem] text-slate-500">{emp.employeeEmail}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {[
+          { label: "Present", value: String(emp.attendanceDays), color: "#10b981" },
+          { label: "Leave", value: String(emp.leaveDays), color: "#f59e0b" },
+          { label: "DSR", value: String(emp.dsrRows.length), color: "#6366f1" },
+          { label: "Tasks", value: `${emp.completedTaskCount}/${emp.taskCount}`, color: "#3b82f6" },
+        ].map((chip) => (
+          <div key={chip.label} className="rounded-xl border border-white bg-white/80 px-3 py-2 text-center shadow-sm">
+            <p className="text-base font-black" style={{ color: chip.color }}>{chip.value}</p>
+            <p className="text-[0.58rem] font-bold uppercase tracking-wider text-slate-400">{chip.label}</p>
+          </div>
+        ))}
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-center">
+          <p className="text-[0.58rem] font-bold uppercase tracking-wider text-indigo-500">{monthLabel}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps) {
   const [search, setSearch] = useState("");
   const [selectedMonthKey, setSelectedMonthKey] = useState(data.reportMonths[0]?.key ?? "");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(data.monthlyEmployeeReports[0]?.id ?? "");
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+  const today = useMemo(() => formatIndiaDateKey(new Date()), []);
   const activeReport = useMemo(
     () =>
       data.reportMonths.find((month) => month.key === selectedMonthKey) ?? data.reportMonths[0] ?? {
@@ -238,33 +405,8 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
               </div>
               <div className="p-6">
                 <p className="mb-4 text-[0.6rem] font-bold uppercase tracking-[0.26em]" style={{ color: "#6366f1" }}>Attendance Timeline</p>
-                <div className="overflow-x-auto rounded-2xl border border-slate-100">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)" }}>
-                        {["Date", "Status", "Check In", "Check Out", "Projects", "DSR Summary"].map((h) => (
-                          <th key={h} className="px-4 py-3 text-left text-[0.6rem] font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: "#6366f1" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedMonthlyReport.dailyRows.map((row) => {
-                        const chip = ATTENDANCE_CFG[row.attendanceStatus] ?? ATTENDANCE_CFG["Not Marked"];
-                        return (
-                          <tr key={row.date} className="border-t border-slate-50 transition-colors hover:bg-slate-50/50">
-                            <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">{row.date}</td>
-                            <td className="whitespace-nowrap px-4 py-3">
-                              <span className="rounded-full px-2.5 py-1 text-[0.62rem] font-bold" style={{ background: chip.bg, color: chip.text }}>{row.attendanceStatus}</span>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-500">{row.checkInAt}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-500">{row.checkOutAt}</td>
-                            <td className="max-w-[140px] px-4 py-3 text-slate-600 text-[0.78rem]">{row.projectNames.length ? row.projectNames.join(", ") : <span className="text-slate-300">—</span>}</td>
-                            <td className="max-w-[220px] px-4 py-3 text-[0.78rem] leading-4 text-slate-500">{row.dsrSummary || <span className="text-slate-300">—</span>}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="rounded-2xl border border-slate-100">
+                  <AttendanceTimelineTable rows={selectedMonthlyReport.dailyRows} today={today} />
                 </div>
               </div>
             </div>
@@ -313,22 +455,14 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
               >
                 <div className="px-6 py-5" style={{ background: "linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%)", borderBottom: "1px solid rgba(16,185,129,0.1)" }}>
                   <p className="text-[0.6rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#059669" }}>Monthly DSR</p>
-                  <h3 className="mt-0.5 text-xl font-bold text-slate-800">Work Reports</h3>
+                  <h3 className="mt-0.5 text-xl font-bold text-slate-800">{selectedMonthlyReport.employeeName} — Work Reports</h3>
                   <p className="text-sm text-slate-500">{selectedMonthlyReport.dsrRows.length} entr{selectedMonthlyReport.dsrRows.length !== 1 ? "ies" : "y"} this month</p>
                 </div>
-                <div className="max-h-[440px] space-y-2.5 overflow-y-auto p-5">
+                <div className="max-h-[440px] space-y-3 overflow-y-auto p-5">
                   {selectedMonthlyReport.dsrRows.length === 0 ? (
                     <p className="py-8 text-center text-sm text-slate-400">No DSR submitted this month.</p>
                   ) : selectedMonthlyReport.dsrRows.map((dsr) => (
-                    <div key={dsr.id} className="rounded-2xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/50">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-[0.7rem] font-semibold text-slate-500">{dsr.workDate}</span>
-                        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[0.62rem] font-bold text-emerald-700">{dsr.projectName}</span>
-                      </div>
-                      <p className="text-[0.82rem] font-semibold leading-5 text-slate-700">{dsr.summary}</p>
-                      {dsr.accomplishments && <p className="mt-1.5 text-[0.72rem] leading-4 text-slate-500">{dsr.accomplishments}</p>}
-                      {dsr.blockers && <p className="mt-1.5 text-[0.68rem] text-amber-600">Blockers: {dsr.blockers}</p>}
-                    </div>
+                    <DsrEntryCard key={dsr.id} dsr={dsr} />
                   ))}
                 </div>
               </div>
@@ -523,7 +657,8 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="border-t border-slate-100 bg-slate-50/40 px-6 pb-6 pt-5">
-                      <div className="grid gap-5 md:grid-cols-2">
+                      <ExpandedEmployeeBanner emp={emp} monthLabel={activeReport.label} />
+                      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
 
                         {/* Daily attendance timeline */}
                         <div
@@ -535,35 +670,9 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                             style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}
                           >
                             <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em]" style={{ color: "#6366f1" }}>Attendance Timeline</p>
-                            <h3 className="mt-0.5 text-base font-bold text-slate-800">{activeReport.label} — Daily Log</h3>
+                            <h3 className="mt-0.5 text-base font-bold text-slate-800">{emp.employeeName} — Daily Log</h3>
                           </div>
-                          <div className="max-h-[340px] overflow-y-auto">
-                            <table className="min-w-full text-sm">
-                              <thead className="sticky top-0 z-10">
-                                <tr style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)" }}>
-                                  {["Date", "Status", "Check In", "Check Out", "DSR Summary"].map((h) => (
-                                    <th key={h} className="whitespace-nowrap px-3 py-2.5 text-left text-[0.6rem] font-bold uppercase tracking-wider" style={{ color: "#6366f1" }}>{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {emp.dailyRows.map((row) => {
-                                  const chip = ATTENDANCE_CFG[row.attendanceStatus] ?? ATTENDANCE_CFG["Not Marked"];
-                                  return (
-                                    <tr key={row.date} className="border-t border-slate-50 transition-colors hover:bg-slate-50/50">
-                                      <td className="whitespace-nowrap px-3 py-2.5 text-[0.75rem] font-medium text-slate-700">{row.date}</td>
-                                      <td className="whitespace-nowrap px-3 py-2.5">
-                                        <span className="rounded-full px-2 py-0.5 text-[0.6rem] font-bold" style={{ background: chip.bg, color: chip.text }}>{row.attendanceStatus}</span>
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2.5 text-[0.72rem] text-slate-500">{row.checkInAt || "—"}</td>
-                                      <td className="whitespace-nowrap px-3 py-2.5 text-[0.72rem] text-slate-500">{row.checkOutAt || "—"}</td>
-                                      <td className="max-w-[180px] truncate px-3 py-2.5 text-[0.7rem] leading-4 text-slate-500">{row.dsrSummary || "—"}</td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
+                          <AttendanceTimelineTable compact rows={emp.dailyRows} today={today} />
                         </div>
 
                         {/* DSR entries */}
@@ -577,22 +686,14 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                           >
                             <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em]" style={{ color: "#059669" }}>DSR Entries</p>
                             <h3 className="mt-0.5 text-base font-bold text-slate-800">
-                              {emp.dsrRows.length} Work Report{emp.dsrRows.length !== 1 ? "s" : ""} — {activeReport.label}
+                              {emp.employeeName} — {emp.dsrRows.length} Report{emp.dsrRows.length !== 1 ? "s" : ""}
                             </h3>
                           </div>
-                          <div className="max-h-[340px] space-y-2.5 overflow-y-auto p-4">
+                          <div className="max-h-[360px] space-y-3 overflow-y-auto p-4">
                             {emp.dsrRows.length === 0 ? (
                               <p className="py-8 text-center text-sm text-slate-400">No DSR submitted this month.</p>
                             ) : emp.dsrRows.map((dsr) => (
-                              <div key={dsr.id} className="rounded-xl border border-slate-100 p-3.5 transition-colors hover:bg-slate-50/50">
-                                <div className="mb-1.5 flex items-center justify-between gap-2">
-                                  <span className="text-[0.68rem] font-semibold text-slate-500">{dsr.workDate}</span>
-                                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-bold text-emerald-700">{dsr.projectName}</span>
-                                </div>
-                                <p className="text-[0.8rem] font-semibold leading-5 text-slate-700">{dsr.summary}</p>
-                                {dsr.accomplishments && <p className="mt-1 text-[0.7rem] leading-4 text-slate-500">{dsr.accomplishments}</p>}
-                                {dsr.blockers && <p className="mt-1 text-[0.66rem] text-amber-600">Blockers: {dsr.blockers}</p>}
-                              </div>
+                              <DsrEntryCard key={dsr.id} dsr={dsr} />
                             ))}
                           </div>
                         </div>

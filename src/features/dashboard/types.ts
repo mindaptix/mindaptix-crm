@@ -535,11 +535,14 @@ export type EmployeeMonthlyDailyStatus = {
   checkOutAt: string;
   projectNames: string[];
   dsrSummary: string;
+  dsrEntries: EmployeeMonthlyDsrReportRow[];
 };
 
 export type EmployeeMonthlyDsrReportRow = {
   id: string;
   workDate: string;
+  submittedAt: string;
+  submittedDate: string;
   projectName: string;
   summary: string;
   accomplishments: string;
