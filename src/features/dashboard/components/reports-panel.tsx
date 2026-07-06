@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReportsPageData } from "@/features/dashboard/types";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -65,16 +65,35 @@ type ReportsPanelProps = { data: ReportsPageData; simplifiedView?: boolean };
 
 export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps) {
   const [search, setSearch] = useState("");
+  const [selectedMonthKey, setSelectedMonthKey] = useState(data.reportMonths[0]?.key ?? "");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(data.monthlyEmployeeReports[0]?.id ?? "");
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+  const activeReport = useMemo(
+    () =>
+      data.reportMonths.find((month) => month.key === selectedMonthKey) ?? data.reportMonths[0] ?? {
+        key: "",
+        label: data.monthLabel,
+        summaryCards: data.summaryCards,
+        monthlyEmployeeRows: data.monthlyEmployeeRows,
+        monthlyEmployeeReports: data.monthlyEmployeeReports,
+      },
+    [data.monthLabel, data.monthlyEmployeeReports, data.monthlyEmployeeRows, data.reportMonths, data.summaryCards, selectedMonthKey],
+  );
+
+  useEffect(() => {
+    if (!activeReport.monthlyEmployeeReports.some((row) => row.id === selectedEmployeeId)) {
+      setSelectedEmployeeId(activeReport.monthlyEmployeeReports[0]?.id ?? "");
+    }
+    setExpandedEmployeeId(null);
+  }, [activeReport, selectedEmployeeId]);
 
   const filteredMonthlyReports = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return data.monthlyEmployeeReports.filter((row) => {
+    return activeReport.monthlyEmployeeReports.filter((row) => {
       if (!q) return true;
       return [row.employeeName, row.employeeEmail, ...row.taskRows.map((t) => t.title), ...row.dsrRows.map((d) => `${d.projectName} ${d.summary}`)].join(" ").toLowerCase().includes(q);
     });
-  }, [data.monthlyEmployeeReports, search]);
+  }, [activeReport.monthlyEmployeeReports, search]);
 
   const selectedMonthlyReport = filteredMonthlyReports.find((r) => r.id === selectedEmployeeId) ?? filteredMonthlyReports[0] ?? null;
 
@@ -82,11 +101,11 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
     triggerCSVDownload(
       [
         ["Employee", "Email", "Attendance Days", "Completed Days", "Leave Days", "Tasks", "Completed Tasks"],
-        ...data.monthlyEmployeeRows.map((r) => [r.employeeName, r.employeeEmail, r.attendanceDays, r.completedAttendanceDays, r.leaveDays, r.taskCount, r.completedTaskCount]),
+        ...activeReport.monthlyEmployeeRows.map((r) => [r.employeeName, r.employeeEmail, r.attendanceDays, r.completedAttendanceDays, r.leaveDays, r.taskCount, r.completedTaskCount]),
       ],
-      `employee-report-${data.monthLabel}.csv`,
+      `employee-report-${activeReport.label}.csv`,
     );
-  }, [data.monthlyEmployeeRows, data.monthLabel]);
+  }, [activeReport.monthlyEmployeeRows, activeReport.label]);
 
   // ── Employee simplified view ────────────────────────────────────────────────
   if (simplifiedView) {
@@ -111,7 +130,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
           <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-7">
             <div>
               <p className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-indigo-200">Monthly Report</p>
-              <h1 className="mt-1.5 text-2xl font-black text-white">{data.monthLabel} Employee Report</h1>
+              <h1 className="mt-1.5 text-2xl font-black text-white">{activeReport.label} Employee Report</h1>
               <p className="mt-1.5 max-w-lg text-[0.78rem] leading-5 text-indigo-200">
                 Month-to-date summary: attendance, leave days, tasks, and DSR submissions.
               </p>
@@ -152,6 +171,18 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+            </div>
+            <div className="w-full sm:min-w-[200px] sm:w-auto">
+              <p className="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-indigo-200">Month</p>
+              <select
+                className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white outline-none focus:border-white/30 scheme-dark"
+                value={activeReport.key}
+                onChange={(e) => setSelectedMonthKey(e.target.value)}
+              >
+                {data.reportMonths.map((month) => (
+                  <option key={month.key} value={month.key} style={{ background: "#1e1b4b" }}>{month.label}</option>
+                ))}
+              </select>
             </div>
             <div className="w-full sm:min-w-[200px] sm:w-auto">
               <p className="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-indigo-200">Employee</p>
@@ -201,7 +232,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                   <p className="text-sm text-slate-500">{selectedMonthlyReport.employeeEmail}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.62rem] font-bold uppercase tracking-wider text-slate-500">{data.monthLabel}</span>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.62rem] font-bold uppercase tracking-wider text-slate-500">{activeReport.label}</span>
                   <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[0.62rem] font-bold uppercase tracking-wider text-indigo-700">Month To Date</span>
                 </div>
               </div>
@@ -324,7 +355,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-7">
           <div>
             <p className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-indigo-200">Monthly Report</p>
-            <h1 className="mt-1.5 text-2xl font-black text-white">{data.monthLabel} — Employee Reports</h1>
+            <h1 className="mt-1.5 text-2xl font-black text-white">{activeReport.label} — Employee Reports</h1>
             <p className="mt-1.5 max-w-lg text-[0.78rem] leading-5 text-indigo-200">
               Per-employee monthly attendance and DSR summary. Click any employee to expand their daily log.
             </p>
@@ -354,8 +385,8 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
         </div>
 
         {/* Search bar */}
-        <div className="border-t border-white/10 bg-white/5 px-4 py-4 sm:px-7">
-          <div className="relative flex items-center">
+        <div className="flex flex-col gap-3 border-t border-white/10 bg-white/5 px-4 py-4 sm:flex-row sm:items-end sm:px-7">
+          <div className="relative flex flex-1 items-center">
             <svg className="pointer-events-none absolute left-3.5 text-white/50" fill="none" height="13" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="13">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
             </svg>
@@ -366,12 +397,24 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <div className="w-full sm:min-w-[220px] sm:w-auto">
+            <p className="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-indigo-200">Report Month</p>
+            <select
+              className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white outline-none focus:border-white/30 scheme-dark"
+              value={activeReport.key}
+              onChange={(e) => setSelectedMonthKey(e.target.value)}
+            >
+              {data.reportMonths.map((month) => (
+                <option key={month.key} value={month.key} style={{ background: "#1e1b4b" }}>{month.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {data.summaryCards.map((card, i) => {
+        {activeReport.summaryCards.map((card, i) => {
           const g = SUMMARY_GRADS[i % SUMMARY_GRADS.length];
           return (
             <div
@@ -492,7 +535,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                             style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}
                           >
                             <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em]" style={{ color: "#6366f1" }}>Attendance Timeline</p>
-                            <h3 className="mt-0.5 text-base font-bold text-slate-800">{data.monthLabel} — Daily Log</h3>
+                            <h3 className="mt-0.5 text-base font-bold text-slate-800">{activeReport.label} — Daily Log</h3>
                           </div>
                           <div className="max-h-[340px] overflow-y-auto">
                             <table className="min-w-full text-sm">
@@ -534,7 +577,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                           >
                             <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em]" style={{ color: "#059669" }}>DSR Entries</p>
                             <h3 className="mt-0.5 text-base font-bold text-slate-800">
-                              {emp.dsrRows.length} Work Report{emp.dsrRows.length !== 1 ? "s" : ""} — {data.monthLabel}
+                              {emp.dsrRows.length} Work Report{emp.dsrRows.length !== 1 ? "s" : ""} — {activeReport.label}
                             </h3>
                           </div>
                           <div className="max-h-[340px] space-y-2.5 overflow-y-auto p-4">

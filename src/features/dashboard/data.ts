@@ -1253,8 +1253,9 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
   const today = getTodayDate();
   const weekStart = addDaysToDate(today, -6);
   const currentMonthKey = today.slice(0, 7);
-  const monthStart = `${currentMonthKey}-01`;
-  const monthDates = listDateRange(monthStart, today);
+  const reportMonthLimit = session.user.role === "EMPLOYEE" || session.user.role === "SALES" ? 2 : 6;
+  const monthKeys = listMonthRange(today, reportMonthLimit).reverse();
+  const reportRangeStart = `${monthKeys[monthKeys.length - 1] ?? currentMonthKey}-01`;
   const visibleEmployeeIds = await getVisibleUserIdsForSession(session, { employeesOnly: true });
   const scopedIds =
         session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER"
@@ -1266,11 +1267,11 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
 
   const [users, attendance, leaves, tasks, dsrRows] = await Promise.all([
       UserModel.find({ _id: scope }, { fullName: 1, email: 1, profilePhotoUrl: 1 }).lean(),
-      AttendanceModel.find({ userId: scope, dateKey: { $gte: monthStart, $lte: today } }).lean(),
-      LeaveRequestModel.find({ userId: scope, endDate: { $gte: monthStart }, startDate: { $lte: today } }).sort({ createdAt: -1 }).lean(),
-      TaskModel.find({ assignedUserId: scope, dueDate: { $gte: monthStart, $lte: getMonthEndDate(currentMonthKey) } }).sort({ createdAt: -1 }).lean(),
+      AttendanceModel.find({ userId: scope, dateKey: { $gte: reportRangeStart, $lte: today } }).lean(),
+      LeaveRequestModel.find({ userId: scope, endDate: { $gte: reportRangeStart }, startDate: { $lte: today } }).sort({ createdAt: -1 }).lean(),
+      TaskModel.find({ assignedUserId: scope, dueDate: { $gte: reportRangeStart, $lte: getMonthEndDate(currentMonthKey) } }).sort({ createdAt: -1 }).lean(),
       DailyUpdateModel.find(
-        { userId: scope, workDate: { $gte: monthStart, $lte: today } },
+        { userId: scope, workDate: { $gte: reportRangeStart, $lte: today } },
         { userId: 1, projectId: 1, workDate: 1, summary: 1, accomplishments: 1, blockers: 1, nextPlan: 1 },
       )
         .sort({ workDate: -1, createdAt: -1 })
@@ -1280,7 +1281,16 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
   const userMap = new Map(users.map((user) => [user._id.toString(), user]));
   const projectMap = await buildProjectMap(dsrRows.map((row) => row.projectId).filter(Boolean));
   const attendanceRows = new Map<string, AttendanceMonthlyRow>();
-  const monthlyEmployeeRows = new Map<
+
+  function buildMonthReport(monthKey: string) {
+    const monthStart = `${monthKey}-01`;
+    const monthEnd = monthKey === currentMonthKey ? today : getMonthEndDate(monthKey);
+    const monthDates = listDateRange(monthStart, monthEnd);
+    const monthAttendance = attendance.filter((row) => row.dateKey >= monthStart && row.dateKey <= monthEnd);
+    const monthLeaves = leaves.filter((leave) => leave.endDate >= monthStart && leave.startDate <= monthEnd);
+    const monthTasks = tasks.filter((task) => task.dueDate >= monthStart && task.dueDate <= monthEnd);
+    const monthDsrRows = dsrRows.filter((row) => row.workDate >= monthStart && row.workDate <= monthEnd);
+    const monthlyEmployeeRows = new Map<
       string,
       {
         id: string;
@@ -1320,30 +1330,16 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       }
     >();
 
-  for (const row of attendance) {
-    const item = attendanceRows.get(row.userId) ?? {
-      id: row.userId,
-      employeeName: userMap.get(row.userId)?.fullName ?? "Unknown employee",
-      daysMarked: 0,
-      completedDays: 0,
-    };
-    item.daysMarked += 1;
-    if (row.status === "COMPLETED") {
-      item.completedDays += 1;
-    }
-    attendanceRows.set(row.userId, item);
-  }
+    for (const user of users) {
+      const userId = user._id.toString();
 
-  for (const user of users) {
-    const userId = user._id.toString();
-
-    monthlyEmployeeRows.set(userId, {
-      id: userId,
-      employeeName: user.fullName,
-      employeeEmail: user.email,
-      attendanceDays: 0,
-      completedAttendanceDays: 0,
-      leaveDays: 0,
+      monthlyEmployeeRows.set(userId, {
+        id: userId,
+        employeeName: user.fullName,
+        employeeEmail: user.email,
+        attendanceDays: 0,
+        completedAttendanceDays: 0,
+        leaveDays: 0,
         leaveRequests: 0,
         taskCount: 0,
         completedTaskCount: 0,
@@ -1361,7 +1357,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       });
     }
 
-  for (const row of attendance) {
+    for (const row of monthAttendance) {
       const item = monthlyEmployeeRows.get(row.userId);
       if (!item) {
         continue;
@@ -1380,7 +1376,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       }
     }
 
-  for (const leave of leaves) {
+    for (const leave of monthLeaves) {
       const item = monthlyEmployeeRows.get(leave.userId);
       if (!item) {
       continue;
@@ -1388,7 +1384,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
 
     const overlapDays = getDateRangeOverlapDays({
       endDate: leave.endDate,
-      rangeEnd: today,
+      rangeEnd: monthEnd,
       rangeStart: monthStart,
       startDate: leave.startDate,
     });
@@ -1409,8 +1405,8 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       }
     }
 
-  for (const task of tasks) {
-      if (task.dueDate.slice(0, 7) !== currentMonthKey) {
+    for (const task of monthTasks) {
+      if (task.dueDate.slice(0, 7) !== monthKey) {
       continue;
     }
 
@@ -1433,7 +1429,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       });
     }
 
-  for (const update of dsrRows) {
+    for (const update of monthDsrRows) {
       const item = monthlyEmployeeRows.get(update.userId);
       if (!item) {
         continue;
@@ -1457,7 +1453,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       }
     }
 
-  const monthlyReportRows = Array.from(monthlyEmployeeRows.values())
+    const monthlyReportRows = Array.from(monthlyEmployeeRows.values())
     .map((row) => ({
       attendanceDays: row.attendanceDays,
       completedAttendanceDays: row.completedAttendanceDays,
@@ -1477,25 +1473,81 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
         left.employeeName.localeCompare(right.employeeName),
     );
 
+    const monthlyEmployeeReports = Array.from(monthlyEmployeeRows.values())
+      .map((row) => ({
+        attendanceDays: row.attendanceDays,
+        completedAttendanceDays: row.completedAttendanceDays,
+        completedTaskCount: row.completedTaskCount,
+        dailyRows: row.dailyRows.map((dailyRow) => ({
+          attendanceStatus: dailyRow.attendanceStatus,
+          checkInAt: dailyRow.checkInAt,
+          checkOutAt: dailyRow.checkOutAt,
+          date: dailyRow.date,
+          dsrSummary: dailyRow.dsrSummary || "No DSR submitted",
+          projectNames: Array.from(dailyRow.projectNames),
+        })),
+        dsrRows: row.dsrRows.sort((left, right) => right.workDate.localeCompare(left.workDate)),
+        employeeEmail: row.employeeEmail,
+        employeeName: row.employeeName,
+        id: row.id,
+        leaveDays: row.leaveDays,
+        leaveRequests: row.leaveRequests,
+        taskCount: row.taskCount,
+        taskRows: row.taskRows.sort((left, right) => left.dueDate.localeCompare(right.dueDate)),
+      }))
+      .sort((left, right) => left.employeeName.localeCompare(right.employeeName));
+
+    return {
+      key: monthKey,
+      label: formatMonthYearLabel(monthKey),
+      summaryCards: [
+        { label: "Team Size", value: String(users.length), detail: "Employees included in this monthly report scope." },
+        {
+          label: "Attendance Days",
+          value: String(monthlyReportRows.reduce((total, row) => total + row.attendanceDays, 0)),
+          detail: `${formatMonthYearLabel(monthKey)} attendance entries marked.`,
+        },
+        {
+          label: "Leave Days",
+          value: String(monthlyReportRows.reduce((total, row) => total + row.leaveDays, 0)),
+          detail: "Approved leave days counted inside this month.",
+        },
+        {
+          label: "Monthly Tasks",
+          value: String(monthlyReportRows.reduce((total, row) => total + row.taskCount, 0)),
+          detail: "Tasks with due dates in this month.",
+        },
+      ],
+      monthlyEmployeeRows: monthlyReportRows,
+      monthlyEmployeeReports,
+    };
+  }
+
+  for (const row of attendance.filter((attendanceRow) => attendanceRow.dateKey.slice(0, 7) === currentMonthKey)) {
+    const item = attendanceRows.get(row.userId) ?? {
+      id: row.userId,
+      employeeName: userMap.get(row.userId)?.fullName ?? "Unknown employee",
+      daysMarked: 0,
+      completedDays: 0,
+    };
+    item.daysMarked += 1;
+    if (row.status === "COMPLETED") {
+      item.completedDays += 1;
+    }
+    attendanceRows.set(row.userId, item);
+  }
+
+  const reportMonths = monthKeys.map((monthKey) => buildMonthReport(monthKey));
+  const currentMonthReport = reportMonths.find((month) => month.key === currentMonthKey) ?? reportMonths[0] ?? {
+    key: currentMonthKey,
+    label: formatMonthYearLabel(currentMonthKey),
+    summaryCards: [],
+    monthlyEmployeeRows: [],
+    monthlyEmployeeReports: [],
+  };
+
   return {
-    summaryCards: [
-      { label: "Team Size", value: String(users.length), detail: "Employees included in this monthly report scope." },
-      {
-        label: "Attendance Days",
-        value: String(monthlyReportRows.reduce((total, row) => total + row.attendanceDays, 0)),
-        detail: `${formatMonthYearLabel(currentMonthKey)} attendance entries marked so far.`,
-      },
-      {
-        label: "Leave Days",
-        value: String(monthlyReportRows.reduce((total, row) => total + row.leaveDays, 0)),
-        detail: "Approved leave days counted inside the current month.",
-      },
-      {
-        label: "Monthly Tasks",
-        value: String(monthlyReportRows.reduce((total, row) => total + row.taskCount, 0)),
-        detail: "Tasks with due dates in the current month.",
-      },
-    ],
+    summaryCards: currentMonthReport.summaryCards,
     weeklySummaryCards: buildWeeklySummaryCards({
       attendanceRows: attendance.filter((row) => row.dateKey >= weekStart),
       dsrRows,
@@ -1523,31 +1575,10 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       fullName: user.fullName,
       profilePhotoUrl: readString(toRecord(user).profilePhotoUrl) ?? "",
     }])))),
-    monthLabel: formatMonthYearLabel(currentMonthKey),
-    monthlyEmployeeRows: monthlyReportRows,
-    monthlyEmployeeReports: Array.from(monthlyEmployeeRows.values())
-      .map((row) => ({
-        attendanceDays: row.attendanceDays,
-        completedAttendanceDays: row.completedAttendanceDays,
-        completedTaskCount: row.completedTaskCount,
-        dailyRows: row.dailyRows.map((dailyRow) => ({
-          attendanceStatus: dailyRow.attendanceStatus,
-          checkInAt: dailyRow.checkInAt,
-          checkOutAt: dailyRow.checkOutAt,
-          date: dailyRow.date,
-          dsrSummary: dailyRow.dsrSummary || "No DSR submitted",
-          projectNames: Array.from(dailyRow.projectNames),
-        })),
-        dsrRows: row.dsrRows.sort((left, right) => right.workDate.localeCompare(left.workDate)),
-        employeeEmail: row.employeeEmail,
-        employeeName: row.employeeName,
-        id: row.id,
-        leaveDays: row.leaveDays,
-        leaveRequests: row.leaveRequests,
-        taskCount: row.taskCount,
-        taskRows: row.taskRows.sort((left, right) => left.dueDate.localeCompare(right.dueDate)),
-      }))
-      .sort((left, right) => left.employeeName.localeCompare(right.employeeName)),
+    monthLabel: currentMonthReport.label,
+    reportMonths,
+    monthlyEmployeeRows: currentMonthReport.monthlyEmployeeRows,
+    monthlyEmployeeReports: currentMonthReport.monthlyEmployeeReports,
   };
 }
 

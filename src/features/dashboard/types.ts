@@ -502,6 +502,15 @@ export type ReportsPageData = {
   leaveRows: LeaveEntry[];
   taskRows: TaskEntry[];
   monthLabel: string;
+  reportMonths: ReportsMonthData[];
+  monthlyEmployeeRows: EmployeeMonthlyReportRow[];
+  monthlyEmployeeReports: EmployeeMonthlyDetailReport[];
+};
+
+export type ReportsMonthData = {
+  key: string;
+  label: string;
+  summaryCards: SummaryCard[];
   monthlyEmployeeRows: EmployeeMonthlyReportRow[];
   monthlyEmployeeReports: EmployeeMonthlyDetailReport[];
 };
