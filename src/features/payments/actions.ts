@@ -10,25 +10,7 @@ import {
   type SalesPaymentStatus,
 } from "@/database/mongodb/models/sales-payment";
 
-export type ClientPaymentFormState = {
-  error?: string;
-  success?: string;
-  values?: {
-    id?: string;
-    clientName?: string;
-    projectName?: string;
-    invoiceNumber?: string;
-    amount?: string;
-    receivedAmount?: string;
-    dueDate?: string;
-    receivedDate?: string;
-    status?: string;
-    note?: string;
-    isRecurring?: string;
-    recurringDayOfMonth?: string;
-    recurringEndDate?: string;
-  };
-};
+import type { ClientPaymentFormState } from "./types";
 
 function safeStatus(value: string): SalesPaymentStatus {
   return SALES_PAYMENT_STATUSES.includes(value as SalesPaymentStatus)

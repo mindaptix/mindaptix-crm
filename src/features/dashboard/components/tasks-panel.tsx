@@ -1,5 +1,7 @@
 "use client";
 
+import { formatTaskDeadline } from "@/features/tasks/deadline";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 import React, { type ReactNode, useActionState, useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -22,7 +24,8 @@ const INITIAL_TASK_STATE = {
     title: "",
     description: "",
     assignedUserId: "",
-    dueDate: new Date().toISOString().slice(0, 10),
+    dueDate: formatIndiaDateKey(),
+    dueTime: "18:00",
     priority: "MEDIUM" as TaskPriority,
     labels: [] as string[],
   },
@@ -209,6 +212,7 @@ type CreateTaskState = {
     description?: string;
     assignedUserId?: string;
     dueDate?: string;
+    dueTime?: string;
     priority?: TaskPriority;
     labels?: string[];
   };
@@ -295,7 +299,8 @@ function CreateTaskModal({
               labels={Object.fromEntries(data.employeeOptions.map((e) => [e.id, e.label]))}
             />
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField icon={<CalIcon />} label="Due Date" name="dueDate" placeholder="Due date" type="date" defaultValue={state.values?.dueDate} />
+              <FormField icon={<CalIcon />} label="Deadline Date (IST)" name="dueDate" placeholder="Due date" type="date" defaultValue={state.values?.dueDate} />
+              <FormField icon={<CalIcon />} label="Deadline Time (IST)" name="dueTime" placeholder="18:00" type="time" defaultValue={state.values?.dueTime ?? "18:00"} />
               <FormSelect
                 icon={<FlagIcon />}
                 label="Priority"
@@ -370,7 +375,7 @@ function TaskCard({
   const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.PENDING;
   const pc = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.LOW;
 
-  const dueDateDisplay = task.dueDate && task.dueDate !== "—" ? task.dueDate : null;
+  const dueDateDisplay = task.deadlineAt ? formatTaskDeadline(task.deadlineAt) : task.dueDate;
 
   return (
     <div

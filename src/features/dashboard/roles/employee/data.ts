@@ -1,4 +1,5 @@
 import "server-only";
+import { taskDeadline, isTaskFinished } from "@/features/tasks/deadline";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
 import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
@@ -21,14 +22,18 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
   const [attendanceRow, pendingLeaves, openTasks, projectCount, dsrCount, taskRows] = await Promise.all([
     AttendanceModel.findOne({ userId: session.user.id, dateKey: today }).lean(),
     LeaveRequestModel.countDocuments({ userId: session.user.id, status: "PENDING" }),
-    TaskModel.countDocuments({ assignedUserId: session.user.id, status: { $ne: "COMPLETED" } }),
+    TaskModel.countDocuments({ assignedUserId: session.user.id, status: { $nin: ["COMPLETED", "CLOSED"] } }),
     ProjectModel.countDocuments({ assignedUserIds: session.user.id }),
     DailyUpdateModel.countDocuments({ userId: session.user.id, workDate: today }),
-    TaskModel.find({ assignedUserId: session.user.id }, { title: 1, dueDate: 1, status: 1, priority: 1 }).sort({ createdAt: -1 }).limit(5).lean(),
+    TaskModel.find({ assignedUserId: session.user.id }, { title: 1, description: 1, dueDate: 1, deadlineAt: 1, status: 1, priority: 1 }).sort({ dueDate: 1, deadlineAt: 1 }).lean(),
   ]);
 
   return {
     title: "My Workspace",
+    assignedTasks: taskRows.filter((task) => !isTaskFinished(task.status)).map((task) => ({
+      id: task._id.toString(), title: task.title, description: task.description,
+      priority: task.priority, status: task.status, deadlineAt: taskDeadline(task)?.toISOString() ?? "",
+    })).sort((a, b) => a.deadlineAt.localeCompare(b.deadlineAt)),
     description: "Quick access to attendance, tasks, DSR, and leave without duplicate widgets.",
     priorityAlert:
       !dsrCount && currentTime >= "19:00"

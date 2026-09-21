@@ -23,7 +23,7 @@ This feature follows a simple route -> server -> component -> action flow.
 
 - `router/render-page.tsx`
   Role-aware dashboard route dispatcher.
-  Every `/dashboard/*` page hits this layer before a role page is rendered.
+  Standard module pages use this layer before a role page is rendered. The dashboard overview and employee/project detail routes have their own page composition.
 
 ## Role pages
 
@@ -88,3 +88,7 @@ This feature follows a simple route -> server -> component -> action flow.
   `actions/*.ts`
 - "Where is the MongoDB schema?"
   `src/database/mongodb/models/**/*`
+
+## Standalone business features
+
+Payments lives in `../payments`, with its own components, types, actions and server data loader. Dashboard navigation and role dispatch link to that feature; payment implementation does not belong in the central dashboard data or UI files. See [Payments architecture](../payments/README.md).

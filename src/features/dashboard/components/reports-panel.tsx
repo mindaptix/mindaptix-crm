@@ -1,23 +1,14 @@
 "use client";
 
+import { EmployeeExcelDownload } from "@/features/reports/components/employee-excel-download";
+import { MonthlyTaskReport } from "@/features/tasks/components/monthly-task-report";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReportsPageData } from "@/features/dashboard/types";
 import { formatIndiaDateKey } from "@/shared/lib/india-time";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const PRIORITY_CFG: Record<string, { bg: string; text: string; border: string }> = {
-  HIGH:   { bg: "rgba(239,68,68,0.08)",   text: "#dc2626", border: "rgba(239,68,68,0.2)" },
-  MEDIUM: { bg: "rgba(245,158,11,0.08)",  text: "#d97706", border: "rgba(245,158,11,0.2)" },
-  LOW:    { bg: "rgba(100,116,139,0.08)", text: "#475569", border: "rgba(100,116,139,0.2)" },
-};
 
-const TASK_STATUS_CFG: Record<string, { bg: string; text: string }> = {
-  COMPLETED:   { bg: "rgba(16,185,129,0.1)",  text: "#059669" },
-  IN_PROGRESS: { bg: "rgba(99,102,241,0.1)",  text: "#4f46e5" },
-  PENDING:     { bg: "rgba(245,158,11,0.1)",  text: "#d97706" },
-  NOT_STARTED: { bg: "rgba(100,116,139,0.08)", text: "#475569" },
-};
 
 const ATTENDANCE_CFG: Record<string, { bg: string; text: string }> = {
   "Present + Checkout": { bg: "rgba(16,185,129,0.1)",  text: "#059669" },
@@ -214,6 +205,7 @@ function ExpandedEmployeeBanner({ emp, monthLabel }: { emp: MonthlyEmployeeRepor
           { label: "Present", value: String(emp.attendanceDays), color: "#10b981" },
           { label: "Leave", value: String(emp.leaveDays), color: "#f59e0b" },
           { label: "DSR", value: String(emp.dsrRows.length), color: "#6366f1" },
+          { label: "Missed Deadlines", value: String(emp.missedDeadlineCount), color: "#dc2626" },
           { label: "Tasks", value: `${emp.completedTaskCount}/${emp.taskCount}`, color: "#3b82f6" },
         ].map((chip) => (
           <div key={chip.label} className="rounded-xl border border-white bg-white/80 px-3 py-2 text-center shadow-sm">
@@ -267,8 +259,8 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
   const downloadCSV = useCallback(() => {
     triggerCSVDownload(
       [
-        ["Employee", "Email", "Attendance Days", "Completed Days", "Leave Days", "Tasks", "Completed Tasks"],
-        ...activeReport.monthlyEmployeeRows.map((r) => [r.employeeName, r.employeeEmail, r.attendanceDays, r.completedAttendanceDays, r.leaveDays, r.taskCount, r.completedTaskCount]),
+        ["Employee", "Email", "Attendance Days", "Completed Days", "Leave Days", "Tasks", "Completed Tasks", "Missed Deadlines"],
+        ...activeReport.monthlyEmployeeRows.map((r) => [r.employeeName, r.employeeEmail, r.attendanceDays, r.completedAttendanceDays, r.leaveDays, r.taskCount, r.completedTaskCount, r.missedDeadlineCount]),
       ],
       `employee-report-${activeReport.label}.csv`,
     );
@@ -413,40 +405,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
 
             {/* Tasks + DSR */}
             <div className="grid gap-5 md:grid-cols-2">
-              {/* Tasks */}
-              <div
-                className="overflow-hidden rounded-[1.8rem]"
-                style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}
-              >
-                <div className="px-6 py-5" style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
-                  <p className="text-[0.6rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Monthly Tasks</p>
-                  <h3 className="mt-0.5 text-xl font-bold text-slate-800">Assigned Tasks</h3>
-                  <p className="text-sm text-slate-500">{selectedMonthlyReport.taskRows.length} task{selectedMonthlyReport.taskRows.length !== 1 ? "s" : ""} this month</p>
-                </div>
-                <div className="space-y-2.5 p-5">
-                  {selectedMonthlyReport.taskRows.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-slate-400">No tasks assigned this month.</p>
-                  ) : selectedMonthlyReport.taskRows.map((task) => {
-                    const isOverdue = task.status !== "COMPLETED" && task.dueDate < new Date().toISOString().slice(0, 10);
-                    const pc = PRIORITY_CFG[task.priority] ?? PRIORITY_CFG.MEDIUM;
-                    const sc = isOverdue ? { bg: "rgba(239,68,68,0.1)", text: "#dc2626" } : TASK_STATUS_CFG[task.status] ?? TASK_STATUS_CFG.PENDING;
-                    return (
-                      <div key={task.id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/50">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-800">{task.title}</p>
-                          <p className="mt-0.5 text-[0.68rem] text-slate-400">{task.dueDate}</p>
-                        </div>
-                        <div className="flex shrink-0 gap-1.5">
-                          <span className="rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase" style={{ background: pc.bg, color: pc.text, border: `1px solid ${pc.border}` }}>{task.priority}</span>
-                          <span className="rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase" style={{ background: sc.bg, color: sc.text }}>
-                            {isOverdue ? "OVERDUE" : task.status.replace(/_/g, " ")}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <MonthlyTaskReport tasks={selectedMonthlyReport.taskRows} />
 
               {/* DSR */}
               <div
@@ -576,7 +535,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
         >
           <p className="text-[0.6rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Monthly Overview</p>
           <h2 className="mt-0.5 text-2xl font-bold text-slate-800">Employee Attendance &amp; DSR</h2>
-          <p className="text-sm text-slate-500">Click on an employee row to view their daily attendance log and DSR entries.</p>
+          <p className="text-sm text-slate-500">Click an employee to view details and download their monthly Excel report.</p>
         </div>
 
         {filteredMonthlyReports.length === 0 ? (
@@ -657,7 +616,12 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="border-t border-slate-100 bg-slate-50/40 px-6 pb-6 pt-5">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-slate-600">{emp.employeeName} · {activeReport.label} · Attendance, tasks and DSRs</p>
+                        <EmployeeExcelDownload employeeId={emp.id} employeeName={emp.employeeName} month={activeReport.key} />
+                      </div>
                       <ExpandedEmployeeBanner emp={emp} monthLabel={activeReport.label} />
+                      <div className="mb-5"><MonthlyTaskReport tasks={emp.taskRows} /></div>
                       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
 
                         {/* Daily attendance timeline */}

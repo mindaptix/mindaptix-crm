@@ -2,7 +2,6 @@ import { AdminDashboardOverview, EmployeeDashboardOverview } from "@/features/da
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import { getAdminDashboardOverview, getEmployeeDashboardOverview, getManagerDashboardOverview } from "@/features/dashboard/roles";
 import { getDisplayRoleLabel } from "@/features/dashboard/config";
-import { getPaymentsPageData } from "@/features/dashboard/data";
 import type { DashboardDateFilter } from "@/features/dashboard/types";
 
 // YYYY-MM-DD regex
@@ -34,16 +33,13 @@ export default async function DashboardPage({
   const params = await searchParams;
   const filter = parseFilter(params);
 
-  const isLeadership = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
-
-  const [overview, paymentsData] = await Promise.all([
+  const overview = await (
     session.user.role === "SUPER_ADMIN"
       ? getAdminDashboardOverview(session, filter)
       : session.user.role === "MANAGER"
         ? getManagerDashboardOverview(session, filter)
-        : getEmployeeDashboardOverview(session),
-    isLeadership ? getPaymentsPageData(session) : Promise.resolve(null),
-  ]);
+        : getEmployeeDashboardOverview(session)
+  );
 
   if (session.user.role === "EMPLOYEE") {
     return <EmployeeDashboardOverview overview={overview} roleBadge={getDisplayRoleLabel(session.user.role)} />;
@@ -51,7 +47,6 @@ export default async function DashboardPage({
 
   return (
     <AdminDashboardOverview
-      paymentsData={paymentsData ?? undefined}
       attendanceBreakdown={overview.attendanceBreakdown}
       attendanceTrend={overview.attendanceTrend}
       calendarItems={overview.calendarItems}

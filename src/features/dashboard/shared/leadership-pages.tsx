@@ -1,7 +1,8 @@
 import "server-only";
+import { getPaymentsPageData } from "@/features/payments/server/page-data";
 import { notFound } from "next/navigation";
 import { AnnouncementsPanel } from "@/features/dashboard/components/announcements-panel";
-import { ClientPaymentsPanel } from "@/features/dashboard/components/client-payments-panel";
+import { ClientPaymentsPanel } from "@/features/payments/components/client-payments-panel";
 import { AttendancePanel } from "@/features/dashboard/components/attendance-panel";
 import { DsrPanel } from "@/features/dashboard/components/dsr-panel";
 import { EmployeesManagementPanel } from "@/features/dashboard/components/employees-management-panel";
@@ -23,7 +24,6 @@ import {
   getEmployeesPageData,
   getExpensesPageData,
   getLeavesPageData,
-  getPaymentsPageData,
   getPayrollPageData,
   getProjectsPageData,
   getReportsPageData,

@@ -1,4 +1,5 @@
 import "server-only";
+import { taskDeadline, missedTaskDeadline, isTaskFinished } from "@/features/tasks/deadline";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
 import { STAFF_ATTENDANCE_ROLES, getVisibleUserIdsForSession } from "@/features/dashboard/team-scope";
@@ -36,7 +37,6 @@ import type {
   AnnouncementsPageData,
   AttendanceMonthlyRow,
   AttendancePageData,
-  ClientPaymentEntry,
   DashboardBreakdownSlice,
   DashboardOverviewData,
   DsrPageData,
@@ -55,7 +55,6 @@ import type {
   LeaveBalanceEntry,
   LeaveEmployeeSummary,
   LeavePageData,
-  PaymentsPageData,
   PayrollPageData,
   PerformanceScoreRow,
   ProjectsPageData,
@@ -133,8 +132,6 @@ export type {
   LeavePageData,
   LeaveTrendPoint,
   PerformanceScoreRow,
-  ClientPaymentEntry,
-  PaymentsPageData,
   ProjectsPageData,
   ReportsPageData,
   SalesCustomerEntry,
@@ -1250,6 +1247,7 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
 export async function getReportsPageData(session: AuthenticatedSession): Promise<ReportsPageData> {
   await connectDb();
 
+  const now = new Date();
   const today = getTodayDate();
   const weekStart = addDaysToDate(today, -6);
   const currentMonthKey = today.slice(0, 7);
@@ -1302,6 +1300,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
         leaveRequests: number;
         taskCount: number;
         completedTaskCount: number;
+        missedDeadlineCount: number;
         taskTitles: Set<string>;
         dailyRows: Array<{
           attendanceStatus: string;
@@ -1335,6 +1334,8 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
         }>;
         taskRows: Array<{
           dueDate: string;
+          deadlineAt: string;
+          deadlineMissed: boolean;
           id: string;
           priority: string;
           status: string;
@@ -1356,6 +1357,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
         leaveRequests: 0,
         taskCount: 0,
         completedTaskCount: 0,
+        missedDeadlineCount: 0,
         taskTitles: new Set<string>(),
         dailyRows: monthDates.map((date) => ({
           attendanceStatus: "Not Marked",
@@ -1430,12 +1432,16 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
     }
 
     item.taskCount += 1;
-      if (task.status === "COMPLETED") {
+      if (isTaskFinished(task.status)) {
         item.completedTaskCount += 1;
       }
+      const deadlineMissed = missedTaskDeadline(task, now);
+      if (deadlineMissed) item.missedDeadlineCount += 1;
       item.taskTitles.add(task.title);
       item.taskRows.push({
         dueDate: task.dueDate,
+        deadlineAt: taskDeadline(task)?.toISOString() ?? "",
+        deadlineMissed,
         id: task._id.toString(),
         priority: task.priority ?? "MEDIUM",
         status: task.status,
@@ -1478,6 +1484,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       attendanceDays: row.attendanceDays,
       completedAttendanceDays: row.completedAttendanceDays,
       completedTaskCount: row.completedTaskCount,
+        missedDeadlineCount: row.missedDeadlineCount,
       employeeEmail: row.employeeEmail,
       employeeName: row.employeeName,
       id: row.id,
@@ -1498,6 +1505,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
         attendanceDays: row.attendanceDays,
         completedAttendanceDays: row.completedAttendanceDays,
         completedTaskCount: row.completedTaskCount,
+        missedDeadlineCount: row.missedDeadlineCount,
         dailyRows: row.dailyRows.map((dailyRow) => ({
           attendanceStatus: dailyRow.attendanceStatus,
           checkInAt: dailyRow.checkInAt,
@@ -1522,6 +1530,7 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       key: monthKey,
       label: formatMonthYearLabel(monthKey),
       summaryCards: [
+        { label: "Missed Deadlines", value: String(monthlyReportRows.reduce((total, row) => total + row.missedDeadlineCount, 0)), detail: "Includes late completions and overdue tasks due this month." },
         { label: "Team Size", value: String(users.length), detail: "Employees included in this monthly report scope." },
         {
           label: "Attendance Days",
@@ -1898,158 +1907,6 @@ export async function getAnnouncementsPageData(session: AuthenticatedSession): P
       createdAt: formatDateTime(a.createdAt),
     })),
     canManage: session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER",
-  };
-}
-
-export async function getPaymentsPageData(session: AuthenticatedSession): Promise<PaymentsPageData> {
-  const canManage = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
-
-  await connectDb();
-
-  const today = getTodayDate();
-
-  // Fetch projects for client name / project name suggestions in the payment form
-  const projectsForSuggestions = await ProjectModel.find(
-    {},
-    { name: 1, clientName: 1 },
-  ).sort({ name: 1 }).lean();
-
-  // Include ALL named projects — even those without a client name
-  const projectSuggestions = projectsForSuggestions
-    .filter((p) => Boolean(p.name))
-    .map((p) => ({
-      clientName: String((p as unknown as { clientName?: string }).clientName ?? ""),
-      projectName: p.name,
-    }));
-
-  // Fetch all payment records — admin sees all, no scope filter
-  const rawPayments = await SalesPaymentModel.find(
-    {},
-    { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1, transactions: 1, isRecurring: 1, recurringDayOfMonth: 1, recurringEndDate: 1, recurringParentId: 1, recurringLastGenerated: 1 },
-  )
-    .sort({ dueDate: 1, createdAt: -1 })
-    .lean();
-
-  // Auto-generate this month's entries for recurring payment templates
-  const currentYearMonth = today.slice(0, 7); // "YYYY-MM"
-  const todayDay = new Date().getDate();
-  type RawPayment = typeof rawPayments[number];
-  const recurringTemplates = (rawPayments as unknown as (RawPayment & { isRecurring?: boolean; recurringDayOfMonth?: number | null; recurringEndDate?: string; recurringParentId?: string; recurringLastGenerated?: string })[])
-    .filter((p) =>
-      p.isRecurring &&
-      !p.recurringParentId &&
-      (!p.recurringLastGenerated || p.recurringLastGenerated < currentYearMonth) &&
-      todayDay >= (p.recurringDayOfMonth ?? 1) &&
-      (!p.recurringEndDate || p.recurringEndDate >= today),
-    );
-
-  if (recurringTemplates.length > 0) {
-    const newEntries = await Promise.all(
-      recurringTemplates.map(async (template) => {
-        const day = String(template.recurringDayOfMonth ?? 1).padStart(2, "0");
-        const dueDate = `${currentYearMonth}-${day}`;
-        const baseInvoice = template.invoiceNumber ?? "";
-        const newInvoice = baseInvoice ? `${baseInvoice}-${currentYearMonth}` : "";
-
-        const created = await SalesPaymentModel.create({
-          salesUserId: template.salesUserId,
-          clientName: (template as unknown as { clientName?: string }).clientName ?? "",
-          projectName: (template as unknown as { projectName?: string }).projectName ?? "",
-          invoiceNumber: newInvoice,
-          amount: template.amount ?? 0,
-          receivedAmount: 0,
-          dueDate,
-          receivedDate: "",
-          status: "PENDING",
-          note: template.note ?? "",
-          isRecurring: false,
-          recurringParentId: template._id.toString(),
-          recurringDayOfMonth: null,
-          recurringEndDate: "",
-          recurringLastGenerated: "",
-        });
-
-        await SalesPaymentModel.findByIdAndUpdate(template._id, {
-          recurringLastGenerated: currentYearMonth,
-        });
-
-        return created;
-      }),
-    );
-
-    // Add newly generated entries to rawPayments so they show up immediately
-    for (const entry of newEntries) {
-      (rawPayments as unknown as typeof rawPayments).push(entry as unknown as typeof rawPayments[number]);
-    }
-  }
-
-  // Auto-mark overdue in memory (don't save to DB on every read — that's done lazily)
-  const creatorIds = Array.from(new Set(rawPayments.map((p) => p.salesUserId).filter(Boolean)));
-  const creatorUsers = creatorIds.length
-    ? await UserModel.find({ _id: { $in: creatorIds } }, { fullName: 1 }).lean()
-    : [];
-  const creatorMap = new Map(creatorUsers.map((u) => [u._id.toString(), u.fullName]));
-
-  const payments: ClientPaymentEntry[] = (rawPayments as unknown as (typeof rawPayments[number] & { isRecurring?: boolean; recurringDayOfMonth?: number | null; recurringEndDate?: string; recurringParentId?: string })[]).map((p) => {
-    const amount = Number(p.amount ?? 0);
-    const receivedAmount = Number(p.receivedAmount ?? 0);
-    const balanceDue = Math.max(amount - receivedAmount, 0);
-    // Auto-resolve status for display
-    let status = p.status as string;
-    if (status === "PENDING" && p.dueDate && p.dueDate < today) {
-      status = "OVERDUE";
-    }
-
-    return {
-      id: p._id.toString(),
-      clientName: (p as unknown as { clientName?: string }).clientName ?? "",
-      projectName: (p as unknown as { projectName?: string }).projectName ?? "",
-      invoiceNumber: p.invoiceNumber ?? "",
-      totalAmount: amount,
-      receivedAmount,
-      balanceDue,
-      dueDate: p.dueDate ?? "",
-      receivedDate: p.receivedDate ?? "",
-      status,
-      note: p.note ?? "",
-      createdByUserId: p.salesUserId,
-      createdByName: creatorMap.get(p.salesUserId) ?? "Unknown",
-      createdAt: formatDateTime(p.createdAt),
-      transactions: ((p as unknown as { transactions?: { _id?: { toString(): string }; txDate?: string; txAmount?: number; note?: string; createdAt?: Date | null }[] }).transactions ?? []).map((t) => ({
-        id: t._id?.toString() ?? "",
-        txDate: t.txDate ?? "",
-        txAmount: Number(t.txAmount ?? 0),
-        note: t.note ?? "",
-        createdAt: t.createdAt ? formatDateTime(t.createdAt) : "",
-      })),
-      isRecurring: p.isRecurring ?? false,
-      recurringDayOfMonth: p.recurringDayOfMonth ?? null,
-      recurringEndDate: p.recurringEndDate ?? "",
-      recurringParentId: p.recurringParentId ?? "",
-    };
-  });
-
-  const totalCollected = payments.filter((p) => p.status === "PAID" || p.receivedAmount > 0).reduce((sum, p) => sum + p.receivedAmount, 0);
-  const totalPending = payments.filter((p) => p.status === "PENDING").reduce((sum, p) => sum + p.balanceDue, 0);
-  const totalOverdue = payments.filter((p) => p.status === "OVERDUE").reduce((sum, p) => sum + p.balanceDue, 0);
-  const totalBalance = payments.filter((p) => p.status !== "PAID").reduce((sum, p) => sum + p.balanceDue, 0);
-  const overdueCount = payments.filter((p) => p.status === "OVERDUE").length;
-  const paidCount = payments.filter((p) => p.status === "PAID").length;
-  const partialCount = payments.filter((p) => p.status === "PARTIAL").length;
-  const pendingCount = payments.filter((p) => p.status === "PENDING").length;
-
-  return {
-    payments,
-    canManage,
-    totalCollected,
-    totalPending,
-    totalOverdue,
-    totalBalance,
-    overdueCount,
-    paidCount,
-    partialCount,
-    pendingCount,
-    projectSuggestions,
   };
 }
 
@@ -2725,6 +2582,7 @@ function mapTaskRow(task: {
   assignedUserId: string;
   assignedByUserId: string;
   dueDate: string;
+  deadlineAt?: Date | null;
   status: string;
   priority?: string;
   labels?: string[];
@@ -2740,10 +2598,11 @@ function mapTaskRow(task: {
     assignedUserPhotoUrl: userMap.get(task.assignedUserId)?.profilePhotoUrl ?? "",
     assignedByName: userMap.get(task.assignedByUserId)?.fullName ?? "Unknown admin",
     dueDate: task.dueDate,
+    deadlineAt: taskDeadline(task)?.toISOString() ?? "",
     status: task.status,
     priority: task.priority ?? "MEDIUM",
     labels: task.labels ?? [],
-    isOverdue: !["COMPLETED", "CLOSED"].includes(task.status) && task.dueDate < getTodayDate(),
+    isOverdue: !isTaskFinished(task.status) && missedTaskDeadline(task),
     attachments: mapAttachments(task.attachments),
     comments: (task.comments ?? []).map((comment, index) => ({
       id: comment._id?.toString() ?? `${task._id.toString()}-${index}`,

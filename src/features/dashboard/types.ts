@@ -1,3 +1,4 @@
+import type { DashboardTask } from "@/features/tasks/deadline";
 export type SummaryCard = {
   label: string;
   value: string;
@@ -101,6 +102,7 @@ export type DashboardDateFilter =
 // ─── Dashboard Overview ──────────────────────────────────────────────────────
 
 export type DashboardOverviewData = {
+  assignedTasks?: DashboardTask[];
   title: string;
   description: string;
   filterLabel?: string;
@@ -410,6 +412,7 @@ export type TaskCommentView = {
 };
 
 export type TaskEntry = {
+  deadlineAt: string;
   id: string;
   title: string;
   description: string;
@@ -525,6 +528,7 @@ export type EmployeeMonthlyReportRow = {
   leaveRequests: number;
   taskCount: number;
   completedTaskCount: number;
+  missedDeadlineCount: number;
   taskTitles: string[];
 };
 
@@ -551,6 +555,8 @@ export type EmployeeMonthlyDsrReportRow = {
 };
 
 export type EmployeeMonthlyTaskReportRow = {
+  deadlineAt: string;
+  deadlineMissed: boolean;
   id: string;
   title: string;
   dueDate: string;
@@ -568,6 +574,7 @@ export type EmployeeMonthlyDetailReport = {
   leaveRequests: number;
   taskCount: number;
   completedTaskCount: number;
+  missedDeadlineCount: number;
   dailyRows: EmployeeMonthlyDailyStatus[];
   dsrRows: EmployeeMonthlyDsrReportRow[];
   taskRows: EmployeeMonthlyTaskReportRow[];
@@ -937,52 +944,6 @@ export type AuditLogEntry = {
 export type AuditLogPageData = {
   logs: AuditLogEntry[];
   summaryCards: SummaryCard[];
-};
-
-// ─── Client Payments ────────────────────────────────────────────────────────
-
-export type PaymentTransaction = {
-  id: string;
-  txDate: string;
-  txAmount: number;
-  note: string;
-  createdAt: string;
-};
-
-export type ClientPaymentEntry = {
-  id: string;
-  clientName: string;
-  projectName: string;
-  invoiceNumber: string;
-  totalAmount: number;
-  receivedAmount: number;
-  balanceDue: number;
-  dueDate: string;
-  receivedDate: string;
-  status: string; // PENDING | PARTIAL | PAID | OVERDUE
-  note: string;
-  createdByUserId: string;
-  createdByName: string;
-  createdAt: string;
-  transactions: PaymentTransaction[];
-  isRecurring: boolean;
-  recurringDayOfMonth: number | null;
-  recurringEndDate: string;
-  recurringParentId: string;
-};
-
-export type PaymentsPageData = {
-  payments: ClientPaymentEntry[];
-  canManage: boolean;
-  totalCollected: number;
-  totalPending: number;
-  totalOverdue: number;
-  totalBalance: number;
-  overdueCount: number;
-  paidCount: number;
-  partialCount: number;
-  pendingCount: number;
-  projectSuggestions: { clientName: string; projectName: string }[];
 };
 
 // ─── Attendance Regularization ──────────────────────────────────────────────

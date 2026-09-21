@@ -9,6 +9,8 @@ import { TASK_LABELS, TASK_PRIORITIES, TaskModel, type TaskLabel, type TaskPrior
 import { UserModel } from "@/database/mongodb/models/user";
 import { saveTaskAttachments } from "@/shared/storage/uploads/work-attachments";
 
+import { parseTaskDeadline, taskDeadline, missedTaskDeadline } from "@/features/tasks/deadline";
+
 const EMPLOYEE_ALLOWED_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED"] as const;
 
 type TaskState = {
@@ -19,6 +21,7 @@ type TaskState = {
     description?: string;
     assignedUserId?: string;
     dueDate?: string;
+    dueTime?: string;
     priority?: TaskPriority;
     labels?: string[];
   };
@@ -35,6 +38,8 @@ export async function createTask(_previousState: TaskState, formData: FormData):
   const description = String(formData.get("description") ?? "").trim();
   const assignedUserId = String(formData.get("assignedUserId") ?? "").trim();
   const dueDate = String(formData.get("dueDate") ?? "").trim();
+  const dueTime = String(formData.get("dueTime") ?? "23:59").trim();
+  const deadlineAt = parseTaskDeadline(dueDate, dueTime);
   const priority = String(formData.get("priority") ?? "MEDIUM");
   const labels = formData
     .getAll("labels")
@@ -48,12 +53,12 @@ export async function createTask(_previousState: TaskState, formData: FormData):
     title.length < 3 ||
     description.length < 6 ||
     !assignedUserId ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
+    !deadlineAt || deadlineAt.getTime() <= Date.now() ||
     !TASK_PRIORITIES.includes(priority as TaskPriority)
   ) {
     return {
-      error: "Fill title, description, employee, priority, and due date.",
-      values: { title, description, assignedUserId, dueDate, priority: "MEDIUM", labels },
+      error: "Fill all fields and choose a future deadline (IST).",
+      values: { title, description, assignedUserId, dueDate, dueTime, priority: "MEDIUM", labels },
     };
   }
 
@@ -63,7 +68,7 @@ export async function createTask(_previousState: TaskState, formData: FormData):
 
   const TASK_ASSIGNABLE_ROLES = ["EMPLOYEE", "SALES", "MANAGER", "SUPER_ADMIN"] as const;
   if (!employee || !TASK_ASSIGNABLE_ROLES.includes(employee.role as (typeof TASK_ASSIGNABLE_ROLES)[number])) {
-    return { error: "Please select a valid employee, sales user, admin, or super admin to assign this task.", values: { title, description, assignedUserId, dueDate } };
+    return { error: "Please select a valid employee, sales user, admin, or super admin to assign this task.", values: { title, description, assignedUserId, dueDate, dueTime } };
   }
 
   const attachments = await saveTaskAttachments(attachmentFiles);
@@ -74,7 +79,8 @@ export async function createTask(_previousState: TaskState, formData: FormData):
     assignedUserId,
     assignedByUserId: session.user.id,
     dueDate,
-    priority,
+    deadlineAt,
+    priority: priority as TaskPriority,
     labels,
     attachments,
   });
@@ -83,7 +89,7 @@ export async function createTask(_previousState: TaskState, formData: FormData):
     actorUserId: session.user.id,
     type: "TASK_ASSIGNED",
     title: "New task assigned",
-    message: `${title} was assigned with ${priority.toLowerCase()} priority and due on ${dueDate}.`,
+    message: `${title} was assigned with ${priority.toLowerCase()} priority and due on ${dueDate} at ${dueTime} IST.`,
     actionUrl: "/dashboard/tasks",
     sourceKey: `task-assigned:${createdTask._id.toString()}`,
   });
@@ -121,9 +127,12 @@ export async function updateTaskStatus(formData: FormData) {
     throw new Error("Only the assigned employee can update this task's status.");
   }
 
+  if (task.status === "CLOSED") throw new Error("Accepted tasks cannot be reopened.");
+  const now = new Date();
   await TaskModel.findByIdAndUpdate(taskId, {
     status,
-    completedAt: status === "COMPLETED" ? new Date() : null,
+    completedAt: status === "COMPLETED" ? (task.status === "COMPLETED" ? task.completedAt ?? now : now) : null,
+    ...(missedTaskDeadline(task, now) ? { deadlineMissedAt: task.deadlineMissedAt ?? taskDeadline(task) } : {}),
   });
 
   // When employee submits for review, notify the assigner (admin)
@@ -174,6 +183,7 @@ export async function reviewTask(formData: FormData) {
   await TaskModel.findByIdAndUpdate(taskId, {
     status: newStatus,
     reviewedAt: new Date(),
+    ...(missedTaskDeadline(task) ? { deadlineMissedAt: task.deadlineMissedAt ?? taskDeadline(task) } : {}),
   });
 
   const notifTitle = action === "ACCEPT" ? "Task accepted" : "Task rejected";

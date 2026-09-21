@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ClientPaymentsPanel } from "@/features/dashboard/components/client-payments-panel";
 import { useActionState, useEffect, useState } from "react";
 import {
   Area,
@@ -31,7 +30,6 @@ import type {
   EmployeeProjectSummaryRow,
   ExecutiveOverviewSection,
   LeaveTrendPoint,
-  PaymentsPageData,
   PerformanceScoreRow,
   SummaryCard,
   UnreadAssignment,
@@ -49,7 +47,6 @@ const INLINE_PITCH_PRIORITIES = ["HOT", "WARM", "COLD"];
 const INLINE_PITCH_SERVICES = ["Custom Website", "WordPress", "Shopify", "SEO", "Google Ads", "Meta Ads", "AI Chatbot", "Custom CRM", "React Native", "UI/UX Design"];
 
 type AdminDashboardOverviewProps = {
-  paymentsData?: PaymentsPageData;
   attendanceBreakdown?: DashboardBreakdownSlice[];
   attendanceTrend?: AttendanceTrendPoint[];
   calendarItems?: CalendarEventItem[];
@@ -86,7 +83,6 @@ type AdminDashboardOverviewProps = {
 };
 
 export function AdminDashboardOverview({
-  paymentsData,
   attendanceBreakdown,
   attendanceTrend,
   calendarItems,
@@ -205,13 +201,7 @@ export function AdminDashboardOverview({
           {activeExecutiveSection ? (
             <div className="mt-4">
               <FilterContextNote filterDate={filterDate} filterLabel={filterLabel} filterMonth={filterMonth} sectionTitle={activeExecutiveSection.title} />
-              {activeExecutiveSection.id === "payments" && paymentsData ? (
-                <div className="-mx-5">
-                  <ClientPaymentsPanel data={paymentsData} inline />
-                </div>
-              ) : (
-                <ExecutiveSectionPanel section={activeExecutiveSection} />
-              )}
+              <ExecutiveSectionPanel section={activeExecutiveSection} />
             </div>
           ) : null}
         </section>
@@ -461,103 +451,7 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
           ))}
         </div>
 
-        {section.id === "leads" ? null : section.id === "payments" ? (
-          <div className="mt-4 overflow-hidden rounded-[1.8rem] border border-amber-200/60"
-            style={{ background: "linear-gradient(135deg,#fffbeb 0%,#fff7ed 50%,#ffffff 100%)" }}>
-            <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3"
-              style={{ borderBottom: "1px solid rgba(245,158,11,0.15)" }}>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ background: "linear-gradient(135deg,#92400e,#d97706)" }}>
-                  <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="white" strokeLinecap="round" strokeWidth="2.2" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[0.62rem] font-black uppercase tracking-[0.28em] text-amber-700">Finance Module</p>
-                  <h5 className="text-lg font-black tracking-tight text-slate-950">Payment Pipeline</h5>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-amber-700">
-                  {section.items.length} record{section.items.length !== 1 ? "s" : ""}
-                </span>
-                <Link
-                  className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white transition hover:opacity-90"
-                  href="/dashboard/payments"
-                  style={{ background: "linear-gradient(135deg,#92400e 0%,#d97706 60%,#f59e0b 100%)", boxShadow: "0 4px 14px rgba(245,158,11,0.3)" }}
-                >
-                  <svg fill="none" height="13" viewBox="0 0 24 24" width="13">
-                    <path d="M12 5v14M5 12h14" stroke="white" strokeLinecap="round" strokeWidth="2.5" />
-                  </svg>
-                  Add Payment
-                </Link>
-                <Link
-                  className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-white px-4 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50"
-                  href="/dashboard/payments"
-                >
-                  View All →
-                </Link>
-              </div>
-            </div>
-
-            <div className="p-5 grid gap-3 sm:grid-cols-2">
-              {section.items.length ? (
-                section.items.map((item) => (
-                  <Link
-                    className="group block rounded-[1.4rem] border border-amber-100 bg-white p-4 shadow-[0_4px_14px_rgba(245,158,11,0.06)] transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_8px_24px_rgba(245,158,11,0.12)]"
-                    href="/dashboard/payments"
-                    key={item.id}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide"
-                        style={
-                          item.meta?.includes("PAID") ? { background: "#ecfdf5", color: "#065f46", borderColor: "#6ee7b7" }
-                          : item.meta?.includes("OVERDUE") ? { background: "#fff1f2", color: "#be123c", borderColor: "#fca5a5" }
-                          : item.meta?.includes("PARTIAL") ? { background: "#fffbeb", color: "#92400e", borderColor: "#fde68a" }
-                          : { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
-                        }>
-                        {item.meta?.split("||")[0] ?? "PENDING"}
-                      </span>
-                      <svg className="text-slate-300 transition group-hover:text-amber-400" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                        <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-                      </svg>
-                    </div>
-                    <p className="mt-3 font-bold text-slate-900">{item.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{item.description}</p>
-                    {(() => {
-                      const parts = item.meta?.split("||") ?? [];
-                      const total = parts[1], received = parts[2], balance = parts[3], due = parts[4];
-                      if (!total) return null;
-                      return (
-                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3">
-                          <span className="text-[0.65rem] font-bold text-slate-700">Total: {total}</span>
-                          {received && received !== "₹0" ? <span className="text-[0.65rem] font-semibold text-emerald-600">Rcvd: {received}</span> : null}
-                          {balance && balance !== "₹0" ? <span className="text-[0.65rem] font-semibold text-amber-600">Due: {balance}</span> : null}
-                          {due ? <span className="text-[0.65rem] text-slate-400">Due date: {due}</span> : null}
-                        </div>
-                      );
-                    })()}
-                  </Link>
-                ))
-              ) : (
-                <div className="sm:col-span-2 rounded-[1.4rem] border border-dashed border-amber-200 bg-amber-50/40 p-8 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100">
-                      <svg fill="none" height="22" viewBox="0 0 24 24" width="22">
-                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#d97706" strokeLinecap="round" strokeWidth="2" />
-                      </svg>
-                    </div>
-                    <p className="text-sm font-semibold text-amber-800">No payment records yet</p>
-                    <Link className="mt-1 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600 transition" href="/dashboard/payments">
-                      Add First Payment →
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
+        {section.id === "leads" ? null : (
         <div className="mt-5 rounded-[1.7rem] border border-slate-100 bg-slate-50/70 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1687,94 +1581,63 @@ function getExecutiveSectionAccent(sectionId: string, isActive: boolean) {
           activeBg: "bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_62%,#dbeafe_100%)]",
           activeBorder: "border-blue-300",
           activeTitle: "text-white",
-          activeDescription: "text-blue-50/90",
           activeEyebrow: "text-blue-100",
-          activePill: "border-white/20 bg-white/10 text-white",
           activeMetricShell: "border-white/10 bg-white/10",
           activeMetricLabel: "text-blue-100/80",
           activeMetricValue: "text-white",
           activeMetricHint: "text-blue-100/75",
           activeMetricDivider: "border-white/10",
-          activeFooter: "text-white",
         }
-      : sectionId === "payments"
+      : sectionId === "workforce"
         ? {
-            bar: "bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-300",
-            activeBg: "bg-[linear-gradient(135deg,#78350f_0%,#f59e0b_68%,#fef3c7_100%)]",
-            activeBorder: "border-amber-300",
+            bar: "bg-gradient-to-r from-emerald-700 via-teal-400 to-amber-300",
+            activeBg: "bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.32),transparent_34%),linear-gradient(135deg,#052e2b_0%,#047857_58%,#d1fae5_100%)]",
+            activeBorder: "border-emerald-200",
             activeTitle: "text-white",
-            activeDescription: "text-amber-50/90",
-            activeEyebrow: "text-amber-100",
-            activePill: "border-white/20 bg-white/10 text-white",
-            activeMetricShell: "border-white/10 bg-white/10",
-            activeMetricLabel: "text-amber-100/80",
+            activeEyebrow: "text-emerald-100",
+            activeMetricShell: "border-white/15 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]",
+            activeMetricLabel: "text-emerald-100/80",
             activeMetricValue: "text-white",
-            activeMetricHint: "text-amber-100/75",
+            activeMetricHint: "text-emerald-100/75",
             activeMetricDivider: "border-white/10",
-            activeFooter: "text-white",
           }
-        : sectionId === "workforce"
+        : sectionId === "leads"
           ? {
-              bar: "bg-gradient-to-r from-emerald-700 via-teal-400 to-amber-300",
-              activeBg: "bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.32),transparent_34%),linear-gradient(135deg,#052e2b_0%,#047857_58%,#d1fae5_100%)]",
-              activeBorder: "border-emerald-200",
+              bar: "bg-gradient-to-r from-fuchsia-500 via-violet-400 to-purple-300",
+              activeBg: "bg-[linear-gradient(135deg,#581c87_0%,#7c3aed_62%,#ede9fe_100%)]",
+              activeBorder: "border-violet-300",
               activeTitle: "text-white",
-              activeDescription: "text-emerald-50/90",
-              activeEyebrow: "text-emerald-100",
-              activePill: "border-white/20 bg-white/10 text-white",
-              activeMetricShell: "border-white/15 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]",
-              activeMetricLabel: "text-emerald-100/80",
+              activeEyebrow: "text-violet-100",
+              activeMetricShell: "border-white/10 bg-white/10",
+              activeMetricLabel: "text-violet-100/80",
               activeMetricValue: "text-white",
-              activeMetricHint: "text-emerald-100/75",
+              activeMetricHint: "text-violet-100/75",
               activeMetricDivider: "border-white/10",
-              activeFooter: "text-white",
             }
-          : sectionId === "leads"
-            ? {
-                bar: "bg-gradient-to-r from-fuchsia-500 via-violet-400 to-purple-300",
-                activeBg: "bg-[linear-gradient(135deg,#581c87_0%,#7c3aed_62%,#ede9fe_100%)]",
-                activeBorder: "border-violet-300",
-                activeTitle: "text-white",
-                activeDescription: "text-violet-50/90",
-                activeEyebrow: "text-violet-100",
-                activePill: "border-white/20 bg-white/10 text-white",
-                activeMetricShell: "border-white/10 bg-white/10",
-                activeMetricLabel: "text-violet-100/80",
-                activeMetricValue: "text-white",
-                activeMetricHint: "text-violet-100/75",
-                activeMetricDivider: "border-white/10",
-                activeFooter: "text-white",
-              }
-            : {
-                bar: "bg-gradient-to-r from-rose-500 via-pink-400 to-orange-300",
-                activeBg: "bg-[linear-gradient(135deg,#7f1d1d_0%,#e11d48_62%,#ffe4e6_100%)]",
-                activeBorder: "border-rose-300",
-                activeTitle: "text-white",
-                activeDescription: "text-rose-50/90",
-                activeEyebrow: "text-rose-100",
-                activePill: "border-white/20 bg-white/10 text-white",
-                activeMetricShell: "border-white/10 bg-white/10",
-                activeMetricLabel: "text-rose-100/80",
-                activeMetricValue: "text-white",
-                activeMetricHint: "text-rose-100/75",
-                activeMetricDivider: "border-white/10",
-                activeFooter: "text-white",
-              };
+          : {
+              bar: "bg-gradient-to-r from-rose-500 via-pink-400 to-orange-300",
+              activeBg: "bg-[linear-gradient(135deg,#7f1d1d_0%,#e11d48_62%,#ffe4e6_100%)]",
+              activeBorder: "border-rose-300",
+              activeTitle: "text-white",
+              activeEyebrow: "text-rose-100",
+              activeMetricShell: "border-white/10 bg-white/10",
+              activeMetricLabel: "text-rose-100/80",
+              activeMetricValue: "text-white",
+              activeMetricHint: "text-rose-100/75",
+              activeMetricDivider: "border-white/10",
+            };
 
   if (isActive) {
     return {
       bar: palette.bar,
       card: `${palette.activeBorder} ${palette.activeBg} shadow-[0_24px_44px_rgba(15,23,42,0.14)]`,
       eyebrow: palette.activeEyebrow,
-      pill: palette.activePill,
       title: palette.activeTitle,
-      description: palette.activeDescription,
       metricShell: palette.activeMetricShell,
       metricLabel: palette.activeMetricLabel,
       metricValue: palette.activeMetricValue,
       metricHint: palette.activeMetricHint,
       metricDivider: palette.activeMetricDivider,
-      footer: palette.activeFooter,
     };
   }
 
@@ -1782,15 +1645,12 @@ function getExecutiveSectionAccent(sectionId: string, isActive: boolean) {
     bar: palette.bar,
     card: "border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)] hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_18px_34px_rgba(15,23,42,0.08)]",
     eyebrow: "text-blue-600",
-    pill: "border-slate-200 bg-slate-50 text-slate-600",
     title: "text-slate-950",
-    description: "text-slate-600",
     metricShell: "border-slate-100 bg-slate-50",
     metricLabel: "text-slate-500",
     metricValue: "text-slate-950",
     metricHint: "text-slate-400",
     metricDivider: "border-slate-200",
-    footer: "text-blue-700",
   };
 }
 
@@ -2019,13 +1879,11 @@ function buildExecutiveMetricData(metrics: SummaryCard[], sectionId: string): Da
   const palette =
     sectionId === "projects"
       ? ["#2563eb", "#10b981", "#f59e0b", "#64748b"]
-      : sectionId === "payments"
-        ? ["#f59e0b", "#ef4444", "#8b5cf6", "#0ea5e9"]
-        : sectionId === "workforce"
-          ? ["#0f766e", "#2563eb", "#f59e0b", "#ef4444"]
-          : sectionId === "leads"
-            ? ["#7c3aed", "#10b981", "#f97316", "#64748b"]
-            : ["#e11d48", "#0ea5e9", "#10b981", "#64748b"];
+      : sectionId === "workforce"
+        ? ["#0f766e", "#2563eb", "#f59e0b", "#ef4444"]
+        : sectionId === "leads"
+          ? ["#7c3aed", "#10b981", "#f97316", "#64748b"]
+          : ["#e11d48", "#0ea5e9", "#10b981", "#64748b"];
 
   return metrics.map((metric, index) => ({
     label: metric.label,

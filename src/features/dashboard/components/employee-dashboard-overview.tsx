@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardTasks } from "@/features/tasks/components/dashboard-tasks";
 import Link from "next/link";
 import { useState } from "react";
 import { AssignmentAlertBanner } from "@/features/dashboard/components/assignment-alert-banner";
@@ -32,6 +33,7 @@ export function EmployeeDashboardOverview({ overview, roleBadge }: EmployeeDashb
   const topCards = overview.cards.slice(0, 5);
   return (
     <div className="space-y-4 px-3 pb-6 pt-1 sm:px-6 lg:px-7">
+      <DashboardTasks tasks={overview.assignedTasks ?? []} />
       {isAssignmentBannerOpen && overview.unreadAssignments && overview.unreadAssignments.length > 0 && (
         <AssignmentAlertBanner assignments={overview.unreadAssignments} onDismiss={() => setIsAssignmentBannerOpen(false)} />
       )}

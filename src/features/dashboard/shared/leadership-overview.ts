@@ -5,7 +5,6 @@ import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
 import { LeaveRequestModel } from "@/database/mongodb/models/leave-request";
 import { ProjectModel } from "@/database/mongodb/models/project";
 import { SalesLeadModel } from "@/database/mongodb/models/sales-lead";
-import { SalesPaymentModel } from "@/database/mongodb/models/sales-payment";
 import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
 import type { DashboardListItem, DashboardOverviewData, ExecutiveOverviewSection, SalesLeadEntry, UnreadAssignment } from "@/features/dashboard/types";
@@ -51,7 +50,7 @@ export async function buildLeadershipDashboardOverview(
     activeStaffUsers.map((employee) => [employee._id.toString(), { fullName: employee.fullName, email: employee.email }]),
   );
   const scope = inScope(employeeIds);
-  const [todaysAttendance, leaveRows, taskRows, weekAttendance, weekUpdates, projects, salesLeads, operationalTasks, allPayments, rawUnreadAssignments] = await Promise.all([
+  const [todaysAttendance, leaveRows, taskRows, weekAttendance, weekUpdates, projects, salesLeads, operationalTasks, rawUnreadAssignments] = await Promise.all([
     AttendanceModel.find({ userId: scope, dateKey: anchor }, { userId: 1 }).lean(),
     LeaveRequestModel.find({ userId: scope }, { userId: 1, leaveType: 1, startDate: 1, endDate: 1, status: 1, reason: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
     TaskModel.find({ assignedUserId: scope }, { title: 1, dueDate: 1, status: 1, assignedUserId: 1, priority: 1, completedAt: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean(),
@@ -96,10 +95,6 @@ export async function buildLeadershipDashboardOverview(
     )
       .sort({ createdAt: -1 })
       .lean(),
-    SalesPaymentModel.find(
-      {},
-      { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, createdAt: 1 },
-    ).lean(),
     getUnreadAssignmentsForUser(session.user.id),
   ]);
   const filteredAttendanceIds =
@@ -133,7 +128,6 @@ export async function buildLeadershipDashboardOverview(
   const filteredOperationalTasks = filter
     ? operationalTasks.filter((task) => isDateInRange(task.dueDate, rangeStart, anchor) || isDateLikeInRange(task.createdAt, rangeStart, anchor))
     : operationalTasks;
-  const filteredPayments = filter ? allPayments.filter((payment) => isPaymentInFilterWindow(payment, rangeStart, anchor)) : allPayments;
   const pendingProjects = filteredProjects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
   const inProgressProjects = filteredProjects.filter((project) => project.status === "IN_PROGRESS").length;
   const completedProjects = filteredProjects.filter((project) => project.status === "COMPLETED").length;
@@ -184,7 +178,6 @@ export async function buildLeadershipDashboardOverview(
           projects: filteredProjects,
           leaveRows,
           salesLeads: filteredSalesLeads,
-          allPayments: filteredPayments,
           salesUserMap: new Map<string, { _id: { toString(): string }; fullName: string; email: string }>([
             [session.user.id, { _id: { toString: () => session.user.id }, fullName: session.user.fullName, email: session.user.email }],
             ...activeSalesUsers.map((user) => [user._id.toString(), { _id: user._id, fullName: user.fullName, email: user.email }] as [string, { _id: { toString(): string }; fullName: string; email: string }]),
@@ -269,7 +262,6 @@ function buildExecutiveOverviewSections({
   activeEmployees,
   activeSalesUsers,
   absentToday,
-  allPayments,
   filterLabel,
   isFiltered,
   leaveRows,
@@ -286,7 +278,6 @@ function buildExecutiveOverviewSections({
   activeEmployees: Array<{ _id: { toString(): string }; fullName: string; email: string; phone?: string; joiningDate?: Date | null }>;
   activeSalesUsers: Array<{ _id: { toString(): string }; fullName: string; email: string }>;
   absentToday: number;
-  allPayments: Array<{ _id: { toString(): string }; salesUserId: string; clientName?: string; projectName?: string; invoiceNumber?: string; amount?: number; receivedAmount?: number; dueDate?: string; receivedDate?: string; status?: string; createdAt?: Date | null }>;
   filterLabel: string;
   isFiltered: boolean;
   leaveRows: Array<{ _id: { toString(): string }; userId: string; leaveType?: string; startDate: string; endDate: string; status?: string; reason?: string }>;
@@ -345,36 +336,6 @@ function buildExecutiveOverviewSections({
     ].join("||"),
     description: project.summary?.trim() || "No project description added.",
   }));
-
-  // ── Real payment aggregations ──
-  const paymentTotalCollected = allPayments.reduce((sum, p) => sum + Number(p.receivedAmount ?? 0), 0);
-  const paymentTotalAmount = allPayments.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
-  const paymentTotalBalance = Math.max(paymentTotalAmount - paymentTotalCollected, 0);
-  const overduePayments = allPayments.filter((p) => {
-    const status = p.status ?? "PENDING";
-    const isOverdue = status === "OVERDUE" || (status === "PENDING" && p.dueDate && p.dueDate < today);
-    return isOverdue;
-  });
-  const paidPayments = allPayments.filter((p) => p.status === "PAID");
-  const partialPayments = allPayments.filter((p) => p.status === "PARTIAL");
-  const pendingPayments = allPayments.filter((p) => {
-    const status = p.status ?? "PENDING";
-    return status === "PENDING" && (!p.dueDate || p.dueDate >= today);
-  });
-
-  const paymentItems: DashboardListItem[] = allPayments.slice(0, 8).map((p) => {
-    const amount = Number(p.amount ?? 0);
-    const received = Number(p.receivedAmount ?? 0);
-    const balance = Math.max(amount - received, 0);
-    const status = p.status ?? "PENDING";
-    const resolvedStatus = status === "PENDING" && p.dueDate && p.dueDate < today ? "OVERDUE" : status;
-    return {
-      id: p._id.toString(),
-      title: p.clientName || p.invoiceNumber || "Unnamed client",
-      meta: `${resolvedStatus}||${formatCurrency(amount)}||${formatCurrency(received)}||${formatCurrency(balance)}||${p.dueDate ?? ""}`,
-      description: p.projectName ? `Project: ${p.projectName}` : "No project name",
-    };
-  });
 
   const employeeItems: DashboardListItem[] = [
     ...activeEmployees.slice(0, 6).map((employee) => {
@@ -458,27 +419,6 @@ function buildExecutiveOverviewSections({
       ],
       items: projectItems,
       emptyMessage: isFiltered ? `No projects found for ${filterLabel}.` : "No projects are available yet.",
-    },
-    {
-      id: "payments",
-      badge: "Finance",
-      title: "Payment Pipeline",
-      description: isFiltered ? `Payment records matching ${filterLabel} by due, received, or created date.` : "Collected, pending, and partially received payment visibility for leadership review.",
-      note: overduePayments.length > 0
-        ? `⚠️ ${overduePayments.length} payment${overduePayments.length !== 1 ? "s are" : " is"} overdue. Review immediately from the Payments page.`
-        : allPayments.length === 0
-          ? isFiltered
-            ? `No payment records found for ${filterLabel}.`
-            : "No payment records added yet. Go to the Payments page to add client payment records."
-          : undefined,
-      metrics: [
-        { label: "Total Collected", value: formatCurrency(paymentTotalCollected), detail: `${paidPayments.length} fully paid + ${partialPayments.length} partial payments received.` },
-        { label: "Balance Due", value: formatCurrency(paymentTotalBalance), detail: "Total outstanding amount across all active records." },
-        { label: "Pending Records", value: String(pendingPayments.length), detail: "Payment records still awaiting receipt." },
-        { label: "Overdue", value: String(overduePayments.length), detail: "Past due date and still not fully paid." },
-      ],
-      items: paymentItems,
-      emptyMessage: isFiltered ? `No payment records found for ${filterLabel}.` : "No payment records added yet. Use the Payments page to track client invoices.",
     },
     {
       id: "workforce",
@@ -604,18 +544,6 @@ function isSalesLeadInFilterWindow(
     lead.expectedCloseDate,
     lead.deliveryDate,
     lead.createdAt ? formatDate(lead.createdAt) : "",
-  ].some((dateKey) => isDateInRange(dateKey, start, end));
-}
-
-function isPaymentInFilterWindow(
-  payment: { createdAt?: Date | null; dueDate?: string; receivedDate?: string },
-  start: string,
-  end: string,
-) {
-  return [
-    payment.dueDate,
-    payment.receivedDate,
-    payment.createdAt ? formatDate(payment.createdAt) : "",
   ].some((dateKey) => isDateInRange(dateKey, start, end));
 }
 

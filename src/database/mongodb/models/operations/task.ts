@@ -90,6 +90,8 @@ const taskSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    deadlineAt: { type: Date, default: null },
+    deadlineMissedAt: { type: Date, default: null },
     status: {
       type: String,
       enum: TASK_STATUSES,
