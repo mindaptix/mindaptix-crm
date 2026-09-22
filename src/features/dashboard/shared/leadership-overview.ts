@@ -324,7 +324,7 @@ function buildExecutiveOverviewSections({
   const closedByEmployeeProjects = projects.filter((project) => project.closedByEmployeeId).length;
 
   // Encode raw status + priority + closedByEmployee in meta for rich card rendering on frontend
-  const projectItems: DashboardListItem[] = projects.slice(0, 8).map((project) => ({
+  const projectItems: DashboardListItem[] = projects.map((project) => ({
     id: project._id.toString(),
     title: project.name,
     meta: [

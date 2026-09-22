@@ -121,6 +121,8 @@ export async function createClientMeeting(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/meetings");
+  revalidatePath("/dashboard/client-pitches");
 
   return {
     success: "Client meeting added successfully.",

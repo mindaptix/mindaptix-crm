@@ -26,7 +26,7 @@ export function reviewConfiguration() {
   return { missing };
 }
 
-export async function assessWithProvider(provider: ReviewProvider, input: DsrReviewInput, evidence: GithubEvidence): Promise<ProviderAssessment> {
+export async function assessWithProvider(provider: ReviewProvider, input: DsrReviewInput, evidence: GithubEvidence, signal?: AbortSignal): Promise<ProviderAssessment> {
   const key = provider === "groq" ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY;
   if (!key) throw new Error(`${provider} API key is not configured.`);
   const model = provider === "groq" ? process.env.GROQ_DSR_MODEL || "openai/gpt-oss-120b" : process.env.OPENAI_DSR_MODEL || "gpt-4o-mini";
@@ -34,12 +34,12 @@ export async function assessWithProvider(provider: ReviewProvider, input: DsrRev
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${key}` };
   let content: string;
   if (provider === "groq") {
-    const response = await fetchJson("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers, body: JSON.stringify({ model, messages: [{ role: "system", content: instructions }, { role: "user", content: payload }], response_format: { type: "json_schema", json_schema: { name: "dsr_review", strict: true, schema } }, max_completion_tokens: 6000 }) }, 300_000, 75_000) as { choices?: { finish_reason?: string; message?: { content?: string; refusal?: string } }[] };
+    const response = await fetchJson("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers, signal, body: JSON.stringify({ model, messages: [{ role: "system", content: instructions }, { role: "user", content: payload }], response_format: { type: "json_schema", json_schema: { name: "dsr_review", strict: true, schema } }, max_completion_tokens: 6000 }) }, 300_000, 75_000) as { choices?: { finish_reason?: string; message?: { content?: string; refusal?: string } }[] };
     const choice = response.choices?.[0];
     if (choice?.finish_reason !== "stop" || choice.message?.refusal || !choice.message?.content) throw new Error("Groq did not return a complete assessment.");
     content = choice.message.content;
   } else {
-    const response = await fetchJson("https://api.openai.com/v1/responses", { method: "POST", headers, body: JSON.stringify({ model, store: false, instructions, input: [{ role: "user", content: [{ type: "input_text", text: payload }] }], text: { format: { type: "json_schema", name: "dsr_review", strict: true, schema } }, max_output_tokens: 6000 }) }, 300_000, 75_000) as { status?: string; output?: { type?: string; content?: { type?: string; text?: string }[] }[] };
+    const response = await fetchJson("https://api.openai.com/v1/responses", { method: "POST", headers, signal, body: JSON.stringify({ model, store: false, instructions, input: [{ role: "user", content: [{ type: "input_text", text: payload }] }], text: { format: { type: "json_schema", name: "dsr_review", strict: true, schema } }, max_output_tokens: 6000 }) }, 300_000, 75_000) as { status?: string; output?: { type?: string; content?: { type?: string; text?: string }[] }[] };
     if (response.status !== "completed") throw new Error("OpenAI did not return a complete assessment.");
     content = (response.output ?? []).filter((item) => item.type === "message").flatMap((item) => item.content ?? []).filter((item) => item.type === "output_text").map((item) => item.text ?? "").join("");
     if (!content) throw new Error("OpenAI returned no assessment or refused the request.");

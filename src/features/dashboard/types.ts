@@ -300,6 +300,9 @@ export type FileAttachmentView = {
 };
 
 export type DsrFeedEntry = {
+  githubRepoUrl?: string;
+  githubUsername?: string;
+  githubBranch?: string;
   id: string;
   employeeName: string;
   employeeEmail: string;

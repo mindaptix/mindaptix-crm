@@ -1,6 +1,7 @@
 import type { ProviderAssessment, ReviewProvider } from "./types";
 
 export function parseGithubRepository(value: string) {
+  if (value.length > 300) return null;
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.hostname !== "github.com" || url.port || url.username || url.password || url.search || url.hash) return null;
@@ -46,5 +47,6 @@ export function validateAssessment(value: unknown, provider: ReviewProvider, mod
     if (claim.assessment !== "not_evidenced" && claim.commitShas.length === 0) throw new Error("AI supported a claim without a commit citation.");
     return { claim: text(claim.claim, 500), assessment: claim.assessment as "supported" | "partial" | "not_evidenced", commitShas: claim.commitShas as string[], evidence: text(claim.evidence, 1000) };
   });
+  if (typeof row.score === "number" && row.score > 0 && !claims.some((claim) => claim.assessment !== "not_evidenced" && claim.commitShas.length > 0)) throw new Error("AI score has no supporting commit citations.");
   return { provider, model, score: row.coverage === "insufficient_evidence" ? null : row.score as number | null, coverage: row.coverage as ProviderAssessment["coverage"], summary: text(row.summary, 1500), claims, limitations: row.limitations.map((item) => text(item, 500)) };
 }

@@ -35,6 +35,10 @@ const dailyUpdateSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    githubRepoUrl: { type: String, default: "", maxlength: 300 },
+    githubUsername: { type: String, default: "", maxlength: 39 },
+    githubBranch: { type: String, default: "", maxlength: 160 },
+    reviewRevision: { type: String, default: "" },
     summary: {
       type: String,
       required: true,

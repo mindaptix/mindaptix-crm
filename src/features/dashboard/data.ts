@@ -1162,7 +1162,10 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
           techStack: resolveProjectTechStack(project),
         })),
       updates: updates.map((update) => ({
-        id: update._id.toString(),
+        githubRepoUrl: update.githubRepoUrl ?? "",
+      githubUsername: update.githubUsername ?? "",
+      githubBranch: update.githubBranch ?? "",
+      id: update._id.toString(),
         workDate: update.workDate,
         summary: update.summary,
         accomplishments: update.accomplishments,
@@ -1223,6 +1226,9 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
       { label: "Review Scope", value: String(activeUsers.length), detail: "Active employees visible in this DSR review scope." },
     ],
     updates: updates.map((update) => ({
+      githubRepoUrl: update.githubRepoUrl ?? "",
+      githubUsername: update.githubUsername ?? "",
+      githubBranch: update.githubBranch ?? "",
       id: update._id.toString(),
       employeeName: userMap.get(update.userId)?.fullName ?? "Unknown employee",
       employeeEmail: userMap.get(update.userId)?.email ?? "",

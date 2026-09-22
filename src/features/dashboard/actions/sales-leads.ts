@@ -288,6 +288,8 @@ export async function createSalesLead(
 
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/client-pitches");
+  revalidatePath("/dashboard/meetings");
 
   return {
     success: "Sales record saved successfully.",
@@ -365,6 +367,8 @@ export async function updateSalesLeadCall(
 
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/client-pitches");
+  revalidatePath("/dashboard/meetings");
 
   return { success: "Call log updated." };
 }
@@ -395,6 +399,8 @@ export async function deleteSalesLead(
   ]);
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/client-pitches");
+  revalidatePath("/dashboard/meetings");
   revalidatePath("/dashboard/employees");
 
   return { success: "Client pitch deleted." };
@@ -508,6 +514,8 @@ export async function updateSalesLeadFull(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/client-pitches");
+  revalidatePath("/dashboard/meetings");
   revalidatePath("/dashboard/employees");
 
   return { success: "Client pitch updated." };

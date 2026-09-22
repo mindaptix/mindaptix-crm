@@ -284,7 +284,8 @@ function getServerHydrationSnapshot() {
 const NAV_GROUPS: { label: string | null; keys: DashboardNavKey[] }[] = [
   { label: null, keys: ["dashboard"] },
   { label: "People", keys: ["employees", "attendance", "leaves", "regularize"] },
-  { label: "Work", keys: ["projects", "tasks", "dsr"] },
+  { label: "Work", keys: ["portfolio", "projects", "tasks", "dsr"] },
+  { label: "Sales & Schedule", keys: ["client-pitches", "meetings"] },
   { label: "Finance", keys: ["reports", "payroll", "expenses", "payments"] },
   { label: "Resources", keys: ["assets", "documents", "alldocs"] },
   { label: "Communication", keys: ["announcements"] },
@@ -305,12 +306,15 @@ function getMenuIcon(key: DashboardNavKey) {
       return <GridIcon />;
     case "employees":
       return <UsersIcon />;
+    case "portfolio":
     case "projects":
       return <FolderIcon />;
+    case "meetings":
     case "attendance":
       return <CalendarIcon />;
     case "leaves":
       return <DocumentIcon />;
+    case "client-pitches":
     case "tasks":
       return <BriefcaseIcon />;
     case "dsr":

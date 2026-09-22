@@ -47,15 +47,19 @@ export async function runDsrReview(session: AuthenticatedSession, id: string, re
   if (existing?.finishedAt && existing.finishedAt.getTime() > Date.now() - 60_000) throw new ReviewError("Wait one minute before running another review.", 429);
   const leaseId = randomUUID();
   const startedAt = new Date();
-  const locked = await DsrAiReviewModel.findOneAndUpdate({ _id: id, $or: [{ status: { $ne: "running" } }, { startedAt: { $lt: new Date(Date.now() - 180_000) } }] }, { $set: { status: "running", sourceHash: hash, leaseId, startedAt, requestedBy: session.user.id, error: "" } }, { returnDocument: "after" }).lean();
+  const locked = await DsrAiReviewModel.findOneAndUpdate({ _id: id, $and: [
+    { $or: [{ status: { $ne: "running" } }, { startedAt: { $lt: new Date(Date.now() - 180_000) } }] },
+    { $or: [{ finishedAt: null }, { finishedAt: { $lt: new Date(Date.now() - 60_000) } }] },
+  ] }, { $set: { status: "running", sourceHash: hash, leaseId, startedAt, requestedBy: session.user.id, error: "" } }, { returnDocument: "after" }).lean();
   if (!locked) throw new ReviewError("Review is already running. Check again shortly.", 409);
   try {
-    const evidence = await collectGithubEvidence(dsr.githubRepoUrl, dsr.githubUsername, dsr.githubBranch ?? "", dsr.workDate);
+    const signal = AbortSignal.timeout(150_000);
+    const evidence = await collectGithubEvidence(dsr.githubRepoUrl, dsr.githubUsername, dsr.githubBranch ?? "", dsr.workDate, signal);
     const assessments: ProviderAssessment[] = [];
     const warnings = [...evidence.warnings];
     if (evidence.commits.length) {
       const providers = ["groq", "openai"] as const;
-      const outcomes = await Promise.allSettled(providers.map((provider) => assessWithProvider(provider, dsr, evidence)));
+      const outcomes = await Promise.allSettled(providers.map((provider) => assessWithProvider(provider, dsr, evidence, signal)));
       outcomes.forEach((outcome, index) => {
         if (outcome.status === "fulfilled") assessments.push(outcome.value);
         else warnings.push(`${providers[index]} assessment unavailable. Retry later or check the provider configuration.`);

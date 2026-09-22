@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 type DashboardFilterBarProps = {
@@ -12,6 +12,7 @@ type DashboardFilterBarProps = {
 
 export function DashboardFilterBar({ contextLabel, filterDate, filterLabel, filterMonth }: DashboardFilterBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const dateRef = useRef<HTMLInputElement>(null);
   const monthRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -21,20 +22,20 @@ export function DashboardFilterBar({ contextLabel, filterDate, filterLabel, filt
   function applyDate(value: string) {
     if (!value) return;
     setLoading(true);
-    router.push(`/dashboard?date=${value}`);
+    router.push(`${pathname}?date=${value}`);
   }
 
   function applyMonth(value: string) {
     if (!value) return;
     setLoading(true);
-    router.push(`/dashboard?month=${value}`);
+    router.push(`${pathname}?month=${value}`);
   }
 
   function reset() {
     setLoading(true);
     if (dateRef.current) dateRef.current.value = "";
     if (monthRef.current) monthRef.current.value = "";
-    router.push("/dashboard");
+    router.push(pathname);
   }
 
   return (

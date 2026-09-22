@@ -105,7 +105,6 @@ export function AdminDashboardOverview({
   primaryItems,
   primaryListTitle,
   projectStatusBreakdown,
-  roleBadge,
   secondaryEmptyMessage,
   secondaryItems,
   secondaryListTitle,
@@ -121,13 +120,13 @@ export function AdminDashboardOverview({
     Boolean(projectStatusBreakdown?.length) ||
     Boolean(leaveTrend?.length) ||
     Boolean(dsrTrend?.length);
-  const [activeExecutiveSectionId, setActiveExecutiveSectionId] = useState(executiveSections?.[0]?.id ?? "");
-  const activeExecutiveSection = executiveSections?.find((section) => section.id === activeExecutiveSectionId) ?? executiveSections?.[0];
+  const activeExecutiveSection = executiveSections?.[0];
   const [isAssignmentBannerOpen, setIsAssignmentBannerOpen] = useState(Boolean(unreadAssignments?.length));
 
   return (
     <div className="space-y-4 px-3 pb-4 pt-1 sm:px-7 sm:pb-6 sm:pt-1">
       <DashboardFilterBar
+        key={`${filterDate ?? ""}:${filterMonth ?? ""}`}
         contextLabel={activeExecutiveSection?.title}
         filterDate={filterDate}
         filterLabel={filterLabel}
@@ -142,70 +141,7 @@ export function AdminDashboardOverview({
         />
       )}
 
-      {executiveSections?.length ? (
-        <section className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),linear-gradient(180deg,#eff6ff_0%,#ffffff_42%,#f8fafc_100%)] p-2 shadow-[0_18px_42px_rgba(15,23,42,0.06)] sm:rounded-[2.2rem] sm:p-4">
-          <div className="rounded-[1.3rem] border border-white/70 bg-white/75 p-3 backdrop-blur sm:rounded-[1.8rem] sm:p-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600">Executive Summary</p>
-                <h3 className="mt-2 text-[1.45rem] font-semibold tracking-tight text-slate-950">Leadership Control Boxes</h3>
-              </div>
-              <div className="rounded-full border border-blue-200 bg-white px-5 py-2.5 text-[0.78rem] font-bold uppercase tracking-[0.24em] text-blue-700 shadow-[0_10px_26px_rgba(37,99,235,0.08)]">
-                {roleBadge ? `${roleBadge} View` : "Leadership View"}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {executiveSections.map((section) => {
-              const isActive = section.id === activeExecutiveSection?.id;
-              const leadMetric = section.metrics[0];
-              const supportMetric = section.metrics[1];
-              const accent = getExecutiveSectionAccent(section.id, isActive);
-              const cardClassName = `group relative shrink-0 w-[220px] overflow-hidden rounded-[1.7rem] border p-4 text-left transition duration-200 ${accent.card}`;
-              const cardContent = (
-                <>
-                  <div className={`absolute inset-x-0 top-0 h-1.5 ${accent.bar}`} />
-                  <div className="flex items-start justify-between gap-3">
-                    <p className={`text-[0.72rem] font-semibold uppercase tracking-[0.24em] ${accent.eyebrow}`}>{section.badge}</p>
-                  </div>
-                  <h4 className={`mt-4 text-[1.15rem] font-semibold tracking-tight ${accent.title}`}>{section.title}</h4>
-                  <div className="mt-2 grid gap-2 sm:mt-3">
-                    <div className={`rounded-[1.2rem] border px-4 py-3 ${accent.metricShell}`}>
-                      <p className={`text-[0.65rem] font-semibold uppercase tracking-[0.2em] ${accent.metricLabel}`}>{leadMetric?.label ?? "Overview"}</p>
-                      <p className={`mt-1.5 truncate text-[1.6rem] font-semibold leading-none ${accent.metricValue}`}>{leadMetric?.value ?? "-"}</p>
-                      {supportMetric ? (
-                        <div className={`mt-3 border-t pt-2.5 ${accent.metricDivider}`}>
-                          <p className={`text-[0.6rem] uppercase tracking-[0.16em] ${accent.metricHint}`}>{supportMetric.label}</p>
-                          <p className={`mt-0.5 truncate text-[0.9rem] font-semibold ${accent.metricValue}`}>{supportMetric.value}</p>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </>
-              );
-
-              return (
-                <button
-                  className={cardClassName}
-                  key={section.id}
-                  onClick={() => setActiveExecutiveSectionId(section.id)}
-                  type="button"
-                >
-                  {cardContent}
-                </button>
-              );
-            })}
-          </div>
-
-          {activeExecutiveSection ? (
-            <div className="mt-4">
-              <FilterContextNote filterDate={filterDate} filterLabel={filterLabel} filterMonth={filterMonth} sectionTitle={activeExecutiveSection.title} />
-              <ExecutiveSectionPanel section={activeExecutiveSection} />
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+      {activeExecutiveSection ? <ExecutiveSectionPanel section={activeExecutiveSection} /> : null}
 
       {executiveSections?.length && activeExecutiveSection ? (
         <section className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
@@ -506,37 +442,6 @@ function ExecutiveSectionPanel({ section }: { section: ExecutiveOverviewSection 
         )}
       </div>
     </section>
-  );
-}
-
-function FilterContextNote({
-  filterDate,
-  filterLabel,
-  filterMonth,
-  sectionTitle,
-}: {
-  filterDate?: string;
-  filterLabel?: string;
-  filterMonth?: string;
-  sectionTitle: string;
-}) {
-  const isFiltered = Boolean(filterDate || filterMonth);
-  const rawValue = filterDate ?? filterMonth;
-
-  return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[1.1rem] border border-blue-100 bg-blue-50/80 px-4 py-3 text-xs text-blue-800">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${isFiltered ? "bg-blue-600" : "bg-emerald-500"}`} />
-        <span className="truncate font-semibold">
-          {sectionTitle} data {isFiltered ? `filtered by ${filterLabel ?? rawValue}` : "showing today's live view"}
-        </span>
-      </div>
-      {rawValue ? (
-        <span className="shrink-0 rounded-full border border-blue-200 bg-white px-3 py-1 font-bold text-blue-700">
-          {filterDate ? "Date" : "Month"}: {rawValue}
-        </span>
-      ) : null}
-    </div>
   );
 }
 

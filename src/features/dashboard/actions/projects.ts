@@ -114,6 +114,7 @@ export async function createManagedProject(
 
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/portfolio");
   revalidatePath("/dashboard/dsr");
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/projects");
@@ -226,6 +227,7 @@ export async function updateManagedProject(
 
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/portfolio");
   revalidatePath("/dashboard/dsr");
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/projects");
@@ -283,6 +285,7 @@ export async function assignProjectToUser(formData: FormData) {
 
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/portfolio");
   revalidatePath("/dashboard/dsr");
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/projects");
@@ -350,6 +353,7 @@ export async function markProjectClosedByEmployee(
 
   revalidatePath("/dashboard/projects");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/portfolio");
   revalidatePath("/dashboard/dsr");
   revalidatePath("/dashboard/tasks");
 
@@ -386,6 +390,7 @@ export async function deleteManagedProject(formData: FormData) {
 
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/portfolio");
   revalidatePath("/dashboard/dsr");
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/projects");

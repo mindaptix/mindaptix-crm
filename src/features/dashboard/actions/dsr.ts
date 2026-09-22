@@ -1,5 +1,8 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { parseGithubRepository, validGithubUsername, validGithubBranch, workDateWindow } from "@/features/dsr-review/validation";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 import { isValidObjectId } from "mongoose";
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
@@ -19,6 +22,9 @@ type DailyUpdateState = {
     nextPlan?: string;
     projectId?: string;
     workDate?: string;
+    githubRepoUrl?: string;
+    githubUsername?: string;
+    githubBranch?: string;
   };
 };
 
@@ -42,6 +48,16 @@ export async function submitDailyUpdate(
   const nextPlan = String(formData.get("nextPlan") ?? "").trim();
   const projectId = String(formData.get("projectId") ?? "").trim();
   const workDate = String(formData.get("workDate") ?? "").trim();
+  const githubRepoUrl = String(formData.get("githubRepoUrl") ?? "").trim();
+  const githubUsername = String(formData.get("githubUsername") ?? "").trim();
+  const githubBranch = String(formData.get("githubBranch") ?? "").trim();
+  const values = { summary, accomplishments, blockers, nextPlan, projectId, workDate, githubRepoUrl, githubUsername, githubBranch };
+  const repo = parseGithubRepository(githubRepoUrl);
+  if (!repo || !validGithubUsername(githubUsername) || !validGithubBranch(githubBranch)) {
+    return { error: "Enter a valid https://github.com/owner/repository link, your GitHub username and a valid branch (optional).", values };
+  }
+  try { workDateWindow(workDate); } catch { return { error: "Choose a valid work date.", values }; }
+  if (workDate > formatIndiaDateKey()) return { error: "Work date cannot be in the future.", values };
   const attachmentFiles = formData
     .getAll("attachments")
     .filter((value): value is File => value instanceof File && value.size > 0);
@@ -49,28 +65,23 @@ export async function submitDailyUpdate(
   if (summary.length < 6 || summary.length > 200) {
     return {
       error: "Update title must be between 6 and 200 characters.",
-      values: { summary, accomplishments, blockers, nextPlan, projectId, workDate },
+      values,
     };
   }
 
   if (accomplishments.length < 8 || accomplishments.length > 1200) {
     return {
       error: "Work details must be between 8 and 1200 characters.",
-      values: { summary, accomplishments, blockers, nextPlan, projectId, workDate },
+      values,
     };
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
-    return {
-      error: "Choose a valid work date.",
-      values: { summary, accomplishments, blockers, nextPlan, projectId, workDate },
-    };
-  }
+  if (blockers.length > 600 || nextPlan.length > 600) return { error: "Blockers and tomorrow's plan must each be 600 characters or fewer.", values };
 
   if (projectId && !session.user.projectIds.includes(projectId)) {
     return {
       error: "You can only submit updates for projects assigned to you.",
-      values: { summary, accomplishments, blockers, nextPlan, projectId, workDate },
+      values,
     };
   }
 
@@ -88,6 +99,10 @@ export async function submitDailyUpdate(
       blockers,
       nextPlan,
       attachments,
+      githubRepoUrl: repo.url,
+      githubUsername,
+      githubBranch,
+      reviewRevision: randomUUID(),
     },
     { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
   );
@@ -120,7 +135,7 @@ export async function submitDailyUpdate(
 
   return {
     success: "Daily update saved.",
-    values: { workDate, projectId },
+    values: { workDate, projectId, githubRepoUrl: repo.url, githubUsername, githubBranch },
   };
 }
 

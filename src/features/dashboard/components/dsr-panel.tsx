@@ -1,5 +1,7 @@
 "use client";
 
+import { DsrAiReview } from "@/features/dsr-review/components/dsr-ai-review";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 import React, { type ReactNode, useActionState, useEffect, useState } from "react";
 import { submitDailyUpdate } from "@/features/dashboard/actions/dsr";
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
@@ -13,7 +15,7 @@ type DsrPanelProps = {
 
 const INITIAL_DSR_STATE = {
   values: {
-    workDate: new Date().toISOString().slice(0, 10),
+    workDate: formatIndiaDateKey(),
     projectId: "",
   },
 };
@@ -123,6 +125,16 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
                 includePlaceholder placeholder="General Update"
                 options={data.projects.map((p) => p.id)}
                 labels={Object.fromEntries(data.projects.map((p) => [p.id, p.name]))} />
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-3 text-sm font-semibold text-slate-800">GitHub work evidence</p>
+              <DsrField label="GitHub repository URL" name="githubRepoUrl" type="url" placeholder="https://github.com/company/project" defaultValue={state.values?.githubRepoUrl} />
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <DsrField label="Your GitHub username" name="githubUsername" placeholder="Your commit author username" defaultValue={state.values?.githubUsername} />
+                <DsrField label="Branch (optional)" name="githubBranch" placeholder="Default branch if blank" defaultValue={state.values?.githubBranch} required={false} />
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-500">Admin can compare this DSR with your commits on the work date (IST). DSR text and limited code diffs from approved repositories are sent to Groq and OpenAI for review. Add non-code work and blockers in your report too.</p>
             </div>
 
             {/* Summary */}
@@ -459,6 +471,7 @@ function AdminDsrCard({ entry }: { entry: Extract<DsrPageData, { mode: "review" 
           <DSRBlock icon="✅" label="What They Completed" text={entry.accomplishments} />
           <DSRBlock icon="⚠️" label="Blockers Reported" text={entry.blockers || "No blockers"} />
           <DSRBlock icon="📅" label="Tomorrow's Plan" text={entry.nextPlan || "Not added"} />
+          <div className="sm:col-span-3"><DsrAiReview dsrId={entry.id} githubRepoUrl={entry.githubRepoUrl ?? ""} githubUsername={entry.githubUsername ?? ""} githubBranch={entry.githubBranch ?? ""} /></div>
           {entry.attachments.length > 0 && (
             <div className="sm:col-span-3">
               <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Proof Files</p>
@@ -560,8 +573,8 @@ function ReminderBanner({ message }: { message: string }) {
 }
 
 /* ── Form helpers ── */
-function DsrField({ icon, label, name, placeholder, type = "text", defaultValue }: {
-  icon?: ReactNode; label: string; name: string; placeholder: string; type?: string; defaultValue?: string;
+function DsrField({ icon, label, name, placeholder, type = "text", defaultValue, required = true }: {
+  icon?: ReactNode; label: string; name: string; placeholder: string; type?: string; defaultValue?: string; required?: boolean;
 }) {
   return (
     <div>
@@ -574,7 +587,7 @@ function DsrField({ icon, label, name, placeholder, type = "text", defaultValue 
           id={name}
           name={name}
           placeholder={placeholder}
-          required={type !== "date" || name === "workDate"}
+          required={required}
           type={type}
         />
       </div>

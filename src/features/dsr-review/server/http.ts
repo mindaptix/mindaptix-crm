@@ -2,7 +2,7 @@ import "server-only";
 
 /** Bounded responses, fixed hosts at each call site, and no redirects or credential forwarding. */
 export async function fetchJson(url: string, init: RequestInit, maxBytes = 2_000_000, timeout = 20_000): Promise<unknown> {
-  const response = await fetch(url, { ...init, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(timeout) });
+  const response = await fetch(url, { ...init, redirect: "error", cache: "no-store", signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout) });
   if (!response.ok) {
     if ([401, 403, 404].includes(response.status)) throw new Error(`Service access failed (${response.status}). Check API credentials and repository permissions.`);
     if (response.status === 429) throw new Error("Service rate limit reached. Try again later.");

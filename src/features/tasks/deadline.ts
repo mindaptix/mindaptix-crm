@@ -52,3 +52,26 @@ export type DashboardTask = {
   status: string;
   deadlineAt: string;
 };
+
+/** Mutually exclusive deadline groups, using the workspace's India calendar. */
+export function groupDashboardTasks(tasks: DashboardTask[], now: number) {
+  const dateKey = (time: number) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(time);
+  const today = dateKey(now);
+  const groups: Record<"today" | "overdue" | "upcoming" | "unscheduled", DashboardTask[]> = {
+    today: [], overdue: [], upcoming: [], unscheduled: [],
+  };
+  for (const task of tasks) {
+    if (isTaskFinished(task.status)) continue;
+    const deadline = new Date(task.deadlineAt).getTime();
+    if (!Number.isFinite(deadline)) groups.unscheduled.push(task);
+    else if (deadline < now) groups.overdue.push(task);
+    else if (dateKey(deadline) === today) groups.today.push(task);
+    else groups.upcoming.push(task);
+  }
+  for (const group of Object.values(groups)) {
+    group.sort((a, b) => a.deadlineAt.localeCompare(b.deadlineAt));
+  }
+  return groups;
+}

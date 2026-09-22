@@ -4,6 +4,9 @@ export type DashboardNavKey =
   | "dashboard"
   | "employees"
   | "projects"
+  | "portfolio"
+  | "client-pitches"
+  | "meetings"
   | "attendance"
   | "leaves"
   | "tasks"
@@ -33,7 +36,10 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     href: "/dashboard",
     allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"],
   },
-  { key: "employees", label: "Employees", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
+  { key: "employees", label: "Employee Management", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
+  { key: "portfolio", label: "Project Portfolio", href: "/dashboard/portfolio", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
+  { key: "client-pitches", label: "Client Pitch Tracker", href: "/dashboard/client-pitches", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
+  { key: "meetings", label: "Meetings", href: "/dashboard/meetings", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
   { key: "projects", label: "Projects", href: "/dashboard/projects", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "attendance", label: "Attendance", href: "/dashboard/attendance", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
   { key: "leaves", label: "Leaves", href: "/dashboard/leaves", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
