@@ -18,9 +18,12 @@ import {
 type DashboardShellProps = {
   children: ReactNode;
   session: AuthenticatedSession;
+  employeeSessionControl?: ReactNode;
+  adminAssistant?: ReactNode;
+  announcementPopup?: ReactNode;
 };
 
-export function DashboardShell({ children, session }: DashboardShellProps) {
+export function DashboardShell({ children, session, employeeSessionControl, adminAssistant, announcementPopup }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -123,7 +126,11 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
                   <div className="space-y-0.5">
                     {groupItems.map((item) => {
                       const active = isItemActive(activePathname, item);
-                      const itemLabel = session.user.role === "SALES" && item.key === "employees" ? "Leads" : item.label;
+                      const itemLabel = session.user.role === "SALES" && item.key === "employees"
+                        ? "Leads"
+                        : session.user.role === "EMPLOYEE" && item.key === "tasks"
+                          ? "My Work"
+                          : item.label;
                       return (
                         <Link
                           className={`group flex w-full items-center gap-3 rounded-[1.2rem] px-3 py-2.5 transition-all duration-150 ${
@@ -155,6 +162,8 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
               );
             })}
           </nav>
+
+          {employeeSessionControl}
 
           <div className="crm-account mt-3 shrink-0 overflow-hidden rounded-[1.45rem] border border-white/10 bg-[linear-gradient(145deg,rgba(15,35,65,0.95)_0%,rgba(10,50,90,0.92)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-8px_24px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-3 px-3.5 pt-3.5">
@@ -225,6 +234,8 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
           </div>
         </section>
       </div>
+      {adminAssistant}
+      {announcementPopup}
     </main>
   );
 }
@@ -241,7 +252,11 @@ function ActivePageTitle({
   const active = navItems.find((item) => isItemActive(pathname, item));
   if (!active) return null;
 
-  const label = role === "SALES" && active.key === "employees" ? "Leads" : active.label;
+  const label = role === "SALES" && active.key === "employees"
+    ? "Leads"
+    : role === "EMPLOYEE" && active.key === "tasks"
+      ? "My Work"
+      : active.label;
   const icon = getMenuIcon(active.key);
 
   return (
@@ -517,6 +532,3 @@ function MegaphoneIcon() {
     </svg>
   );
 }
-
-
-

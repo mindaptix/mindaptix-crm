@@ -1,5 +1,6 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 import { baseSchemaOptions } from "@/database/mongodb/models/shared/schema-options";
+import { TASK_DESCRIPTION_MAX_LENGTH } from "@/features/tasks/constants";
 
 export const TASK_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED", "CLOSED", "REJECTED"] as const;
 export const TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
@@ -75,7 +76,7 @@ const taskSchema = new mongoose.Schema(
       required: true,
       trim: true,
       minlength: 6,
-      maxlength: 1000,
+      maxlength: TASK_DESCRIPTION_MAX_LENGTH,
     },
     assignedUserId: {
       type: String,

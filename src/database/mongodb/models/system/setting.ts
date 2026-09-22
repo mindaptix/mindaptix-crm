@@ -71,6 +71,31 @@ const settingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    aiChatProvider: {
+      type: String,
+      enum: ["GROQ", "OPENAI"],
+      default: "GROQ",
+    },
+    groqChatModel: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: "openai/gpt-oss-120b",
+    },
+    openAiChatModel: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: "gpt-4o-mini",
+    },
+    groqApiKeyEncrypted: {
+      type: String,
+      default: "",
+    },
+    openAiApiKeyEncrypted: {
+      type: String,
+      default: "",
+    },
   },
   baseSchemaOptions,
 );

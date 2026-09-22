@@ -1,18 +1,18 @@
 # DSR AI evidence review
 
-Employees submit a GitHub repository URL, their GitHub username and an optional branch with each DSR. Existing reports remain readable; reports without these fields need to be updated before review. The author account is self-reported, so the admin must confirm its attribution before running a review.
+Employees submit a GitHub repository URL, their GitHub username and an optional branch with each code DSR. For non-code work, they must upload at least one screenshot instead. Screenshot-only DSRs remain available for manual admin review; GitHub evidence is required for commit verification. The author account is self-reported, so the admin must confirm its attribution before running a review.
 
-In **DSR → employee report → AI evidence review**, an admin or super admin can run or refresh the assessment. Groq and OpenAI evaluate the same bounded evidence independently. Each produces an evidence-alignment score and claim-by-claim commit citations. Scores are advisory, are not used for payroll or disciplinary automation, and do not measure hours worked. The UI explicitly states that a full day of effort cannot be established from commits alone.
+In **DSR → employee report → AI evidence review**, an admin or super admin can run or refresh the assessment. Groq evaluates bounded GitHub evidence and produces an evidence-alignment score with claim-by-claim commit citations. OpenAI can be configured as an optional second reviewer. Scores are advisory, are not used for payroll or disciplinary automation, and do not measure hours worked. The UI explicitly states that a full day of effort cannot be established from commits alone.
 
 ## Server configuration
 
 Copy the DSR settings from the root `.env.example` into the deployment environment or an ignored `.env.local` file:
 
 - `GROQ_API_KEY`
-- `OPENAI_API_KEY`
+- `OPENAI_API_KEY` (optional second reviewer)
 - `GROQ_DSR_MODEL` (default `openai/gpt-oss-120b`)
 - `OPENAI_DSR_MODEL` (default `gpt-4o-mini`)
-- `DSR_GITHUB_ALLOWED_REPOS`: comma-separated `owner/repository` names approved to share bounded diffs with both providers. Exact matching; no wildcard.
+- `DSR_GITHUB_ALLOWED_REPOS`: comma-separated `owner/repository` names approved to share bounded diffs with Groq. Exact matching; no wildcard.
 - `GITHUB_TOKEN`: optional for public repositories; required for private ones. Prefer a fine-grained GitHub token restricted to approved repositories with Contents read permission.
 
 Keys are server-only. Never put them into `NEXT_PUBLIC_*`, client forms, commits or logs. Restart the app after configuring environment values. The feature fails clearly when credentials, model access or repository permissions are missing. It does not silently invent a score or bypass failed access checks.

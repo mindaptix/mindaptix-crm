@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState, useActionState } from "react";
 import { createPortal } from "react-dom";
-import { updateAccountPassword, updateAccountProfile, updateBankDetails, updateCompanySettings, uploadProfilePhoto } from "@/features/dashboard/actions/settings";
+import { updateAccountPassword, updateAccountProfile, updateAiSettings, updateBankDetails, updateCompanySettings, uploadProfilePhoto } from "@/features/dashboard/actions/settings";
 import { addHoliday, deleteHoliday } from "@/features/dashboard/actions/holidays";
 import { Feedback } from "@/shared/ui/feedback";
 import { Button } from "@/shared/ui/button";
@@ -133,6 +133,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       geoFenceEnabled: String(data.geoFenceEnabled ?? false),
     },
   });
+  const [aiSettingsState, aiSettingsAction, aiSettingsPending] = useActionState(updateAiSettings, {});
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAccountPassword, INITIAL_PASSWORD_STATE);
   const [profileState, profileAction, profilePending] = useActionState(updateAccountProfile, {
     values: {
@@ -596,6 +597,35 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       {/* Company Settings — admin only */}
       {data.canManageCompany ? (
         <>
+        {data.canManageAi ? (
+          <section className="rounded-[1.8rem] border border-indigo-100 bg-[linear-gradient(135deg,#f8faff_0%,#f5f3ff_100%)] p-6 shadow-[0_16px_40px_rgba(79,70,229,0.08)]">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-indigo-100 bg-indigo-50 text-indigo-600">
+                <svg fill="none" height="20" viewBox="0 0 24 24" width="20"><path d="M12 3a9 9 0 1 0 9 9" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8"/><path d="M12 7v5l3 2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8"/></svg>
+              </div>
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-indigo-600">AI workspace</p>
+                <h3 className="text-lg font-semibold leading-tight text-slate-950">Chatbot &amp; DSR Review Provider</h3>
+              </div>
+            </div>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Groq is the default. Select OpenAI when you want the super-admin DSR chatbot to use OpenAI. When both keys are configured, DSR code verification uses Groq and OpenAI as separate evidence reviewers.</p>
+            <form action={aiSettingsAction} className="mt-5 space-y-4">
+              {aiSettingsState.error ? <Feedback>{aiSettingsState.error}</Feedback> : null}
+              {aiSettingsState.success ? <Feedback tone="success">{aiSettingsState.success}</Feedback> : null}
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="block"><span className="mb-2 block text-sm font-medium text-slate-700">Chatbot Provider</span><select defaultValue={data.aiChatProvider} name="aiChatProvider" className="w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"><option value="GROQ">Groq (default)</option><option value="OPENAI">OpenAI</option></select></label>
+                <InputField defaultValue={data.groqChatModel} label="Groq Model" name="groqChatModel" placeholder="openai/gpt-oss-120b" />
+                <InputField defaultValue={data.openAiChatModel} label="OpenAI Model" name="openAiChatModel" placeholder="gpt-4o-mini" />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block"><span className="mb-2 block text-sm font-medium text-slate-700">Groq API Key {data.hasGroqApiKey ? <span className="text-emerald-600">(configured)</span> : <span className="text-amber-600">(required for Groq)</span>}</span><input autoComplete="off" className="w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" name="groqApiKey" placeholder={data.hasGroqApiKey ? "Leave blank to keep current key" : "gsk_..."} type="password" /></label>
+                <label className="block"><span className="mb-2 block text-sm font-medium text-slate-700">OpenAI API Key {data.hasOpenAiApiKey ? <span className="text-emerald-600">(configured)</span> : <span className="text-slate-400">(optional)</span>}</span><input autoComplete="off" className="w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" name="openAiApiKey" placeholder={data.hasOpenAiApiKey ? "Leave blank to keep current key" : "sk-..."} type="password" /></label>
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600"><label className="flex items-center gap-2"><input name="clearGroqApiKey" type="checkbox" value="true" /> Remove saved Groq key</label><label className="flex items-center gap-2"><input name="clearOpenAiApiKey" type="checkbox" value="true" /> Remove saved OpenAI key</label><span>Keys are encrypted at rest and are never displayed after saving.</span></div>
+              <Button className="sm:w-auto" disabled={aiSettingsPending} type="submit">{aiSettingsPending ? "Saving..." : "Save AI Settings"}</Button>
+            </form>
+          </section>
+        ) : null}
         <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-emerald-100 bg-emerald-50 text-emerald-600">

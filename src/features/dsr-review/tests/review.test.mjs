@@ -76,7 +76,7 @@ test('sensitive/generated files and truncated diffs mark evidence incomplete', a
   assert.equal(result.commits[0].files[0].patch.length, 4000);
 });
 function providers(fetchJson) {
-  return load('src/features/dsr-review/server/providers.ts', { '../validation': validation, './http': { fetchJson } }, { process: { env: { OPENAI_API_KEY: 'openai-test', GROQ_API_KEY: 'groq-test' } } });
+  return load('src/features/dsr-review/server/providers.ts', { '../validation': validation, './http': { fetchJson }, '@/features/ai-settings/server/config': { getAiRuntimeConfig: async () => ({ groq: { key: 'groq-test', model: 'groq-test-model' }, openai: { key: 'openai-test', model: 'openai-test-model' } }) } }, { process: { env: { OPENAI_API_KEY: 'openai-test', GROQ_API_KEY: 'groq-test' } } });
 }
 test('both providers use structured output; OpenAI storage disabled; limited evidence has no score', async () => {
   const client = providers(async (url, options) => {
@@ -109,6 +109,7 @@ function reviewService({ stored = null, commits = [], changed = false, locked = 
     '@/database/mongodb/models/operations/dsr-ai-review': { DsrAiReviewModel: { findById: () => ({ lean: async () => stored }), updateOne: async (...args) => { saved.push(args); return { matchedCount: 1 }; }, findOneAndUpdate: () => ({ lean: async () => locked ? {} : null }) } },
     './github': { collectGithubEvidence: async () => ({ ...evidence, commits }) },
     './providers': { reviewConfiguration: () => ({ missing: [] }), assessWithProvider: async (provider) => { providerCalls++; if (outcomes?.[provider] === 'fail') throw new Error('Provider failure'); return { ...assessment, provider, model: 'test' }; } },
+    '@/features/ai-settings/server/config': { getAiRuntimeConfig: async () => ({ openai: { key: '', model: 'openai-test' }, groq: { key: 'groq-test', model: 'groq-test' } }) },
   });
   return { ...service, saved, dsr, providerCalls: () => providerCalls };
 }
@@ -132,12 +133,10 @@ test('busy review locks prevent duplicate provider requests', async () => {
   await assert.rejects(service.runDsrReview(admin, dsrId, false), /already running/);
   assert.equal(service.providerCalls(), 0);
 });
-test('one provider failure remains explicitly partial', async () => {
+test('a Groq-only review does not invent a score when Groq fails', async () => {
   const service = reviewService({ commits: evidence.commits, outcomes: { groq: 'fail' } });
-  const result = await service.runDsrReview(admin, dsrId, false);
-  assert.equal(result.status, 'partial');
-  assert.equal(result.assessments.length, 1);
-  assert.equal(result.assessments[0].provider, 'openai');
+  await assert.rejects(service.runDsrReview(admin, dsrId, false), /Groq did not return a valid assessment/);
+  assert.equal(service.providerCalls(), 1);
 });
 test('stored review from an older DSR revision is not shown', async () => {
   const service = reviewService({ stored: { sourceHash: 'old-hash', status: 'ready', result: { score: 100 } } });

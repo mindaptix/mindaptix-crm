@@ -52,16 +52,20 @@ export async function submitDailyUpdate(
   const githubUsername = String(formData.get("githubUsername") ?? "").trim();
   const githubBranch = String(formData.get("githubBranch") ?? "").trim();
   const values = { summary, accomplishments, blockers, nextPlan, projectId, workDate, githubRepoUrl, githubUsername, githubBranch };
-  const repo = parseGithubRepository(githubRepoUrl);
-  if (!repo || !validGithubUsername(githubUsername) || !validGithubBranch(githubBranch)) {
-    return { error: "Enter a valid https://github.com/owner/repository link, your GitHub username and a valid branch (optional).", values };
-  }
-  try { workDateWindow(workDate); } catch { return { error: "Choose a valid work date.", values }; }
-  if (workDate > formatIndiaDateKey()) return { error: "Work date cannot be in the future.", values };
   const attachmentFiles = formData
     .getAll("attachments")
     .filter((value): value is File => value instanceof File && value.size > 0);
-
+  const hasGithubEvidence = Boolean(githubRepoUrl || githubUsername || githubBranch);
+  const repo = hasGithubEvidence ? parseGithubRepository(githubRepoUrl) : null;
+  if (hasGithubEvidence && (!repo || !validGithubUsername(githubUsername) || !validGithubBranch(githubBranch))) {
+    return { error: "For GitHub verification, enter a valid repository link, your GitHub username and an optional valid branch.", values };
+  }
+  const screenshotFiles = attachmentFiles.filter((file) => file.type.startsWith("image/"));
+  if (!repo && screenshotFiles.length === 0) {
+    return { error: "Add GitHub repository evidence or upload at least one work screenshot before submitting the DSR.", values };
+  }
+  try { workDateWindow(workDate); } catch { return { error: "Choose a valid work date.", values }; }
+  if (workDate > formatIndiaDateKey()) return { error: "Work date cannot be in the future.", values };
   if (summary.length < 6 || summary.length > 200) {
     return {
       error: "Update title must be between 6 and 200 characters.",
@@ -99,9 +103,9 @@ export async function submitDailyUpdate(
       blockers,
       nextPlan,
       attachments,
-      githubRepoUrl: repo.url,
-      githubUsername,
-      githubBranch,
+      githubRepoUrl: repo?.url ?? "",
+      githubUsername: repo ? githubUsername : "",
+      githubBranch: repo ? githubBranch : "",
       reviewRevision: randomUUID(),
     },
     { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
@@ -135,9 +139,8 @@ export async function submitDailyUpdate(
 
   return {
     success: "Daily update saved.",
-    values: { workDate, projectId, githubRepoUrl: repo.url, githubUsername, githubBranch },
+    values: { workDate, projectId, githubRepoUrl: repo?.url ?? "", githubUsername: repo ? githubUsername : "", githubBranch: repo ? githubBranch : "" },
   };
 }
-
 
 

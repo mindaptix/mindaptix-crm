@@ -128,13 +128,14 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="mb-3 text-sm font-semibold text-slate-800">GitHub work evidence</p>
-              <DsrField label="GitHub repository URL" name="githubRepoUrl" type="url" placeholder="https://github.com/company/project" defaultValue={state.values?.githubRepoUrl} />
+              <p className="mb-1 text-sm font-semibold text-slate-800">Work evidence <span className="text-red-600">*</span></p>
+              <p className="mb-3 text-xs leading-5 text-slate-500">Add GitHub evidence for an automatic code review, or upload at least one screenshot below for non-code work.</p>
+              <DsrField label="GitHub repository URL" name="githubRepoUrl" type="url" placeholder="https://github.com/company/project" defaultValue={state.values?.githubRepoUrl} required={false} />
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <DsrField label="Your GitHub username" name="githubUsername" placeholder="Your commit author username" defaultValue={state.values?.githubUsername} />
+                <DsrField label="Your GitHub username" name="githubUsername" placeholder="Your commit author username" defaultValue={state.values?.githubUsername} required={false} />
                 <DsrField label="Branch (optional)" name="githubBranch" placeholder="Default branch if blank" defaultValue={state.values?.githubBranch} required={false} />
               </div>
-              <p className="mt-3 text-xs leading-5 text-slate-500">Admin can compare this DSR with your commits on the work date (IST). DSR text and limited code diffs from approved repositories are sent to Groq and OpenAI for review. Add non-code work and blockers in your report too.</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">GitHub evidence lets the admin compare this DSR with your commits on the work date (IST). Bounded code diffs from approved repositories are sent to Groq for an evidence-alignment review.</p>
             </div>
 
             {/* Summary */}
@@ -170,14 +171,14 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
 
             {/* Proof files */}
             <div>
-              <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500">Proof Files (optional)</p>
+              <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500">Work screenshots <span className="text-red-600">*</span> when GitHub is not provided</p>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
                 style={{ borderColor: "rgba(99,102,241,0.2)" }}>
                 <svg fill="none" height="18" stroke="#6366f1" strokeWidth="2" viewBox="0 0 24 24" width="18">
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                 </svg>
-                <span className="text-sm text-slate-500">Click to attach proof (screenshots, documents…)</span>
-                <input className="hidden" multiple name="attachments" type="file" />
+                <span className="text-sm text-slate-500">Attach screenshots of completed work</span>
+                <input accept="image/png,image/jpeg,image/webp" className="hidden" multiple name="attachments" type="file" />
               </label>
             </div>
 

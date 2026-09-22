@@ -407,14 +407,11 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
 
   const hasAdminLikeAccess = session?.user.role === "SUPER_ADMIN" || session?.user.role === "MANAGER";
   const isSalesSelfView = session?.user.role === "SALES";
-  const isEmployeeDirectoryView = session?.user.role === "EMPLOYEE";
   const userFilter = hasAdminLikeAccess
     ? { role: { $ne: "SUPER_ADMIN" as const } }
     : isSalesSelfView
       ? { _id: session.user.id }
-      : isEmployeeDirectoryView
-        ? { status: "ACTIVE" as const, role: { $in: ["EMPLOYEE" as const, "SALES" as const] } }
-        : { _id: { $in: [] } };
+      : { _id: { $in: [] } };
 
   const users = await UserModel.find(
     userFilter,
@@ -718,39 +715,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
 
   const hasLeadershipAccess = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
 
-  if (!hasLeadershipAccess) {
-    // Employee: return only projects assigned to them
-    const myProjects = await ProjectModel.find(
-      { assignedUserIds: session.user.id },
-      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1 },
-    ).sort({ updatedAt: -1 }).lean();
-
-    return {
-      summaryCards: [
-        { label: "My Projects", value: String(myProjects.length), detail: "Projects you have been assigned to." },
-        { label: "In Progress", value: String(myProjects.filter((p) => p.status === "IN_PROGRESS").length), detail: "Currently active projects." },
-        { label: "Completed", value: String(myProjects.filter((p) => p.status === "COMPLETED").length), detail: "Projects you have completed." },
-      ],
-      projects: myProjects.map((project) => ({
-        id: project._id.toString(),
-        name: project.name,
-        summary: project.summary,
-        status: project.status,
-        priority: project.priority,
-        dueDate: formatDate(project.dueDate),
-        techStack: resolveProjectTechStack(project),
-        assignedUserIds: project.assignedUserIds ?? [],
-        assignedUserNames: [],
-        createdByUserId: "",
-        closedByEmployeeId: project.closedByEmployeeId ?? "",
-        closedByEmployeeAt: formatDate(project.closedByEmployeeAt ?? null),
-        clientName: String((project as { clientName?: string }).clientName ?? ""),
-        clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
-      })),
-      employeeOptions: [],
-      technologyOptions: [...SALES_TECH_OPTIONS],
-    };
-  }
+  if (!hasLeadershipAccess) throw new Error("Project management is only available to admins.");
 
   const [projects, assignableUsers] = await Promise.all([
     ProjectModel.find(
@@ -1633,6 +1598,7 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
 
   return {
     canManageCompany: session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER",
+    canManageAi: session.user.role === "SUPER_ADMIN",
     companyName: settings?.companyName ?? "Mindaptix CRM",
     currentUserEmail: session.user.email,
     currentUserName: session.user.fullName,
@@ -1664,6 +1630,11 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     officeLongitude: readNumberLike(toRecord(settings).officeLongitude) ?? null,
     geoFenceRadiusMeters: readNumberLike(toRecord(settings).geoFenceRadiusMeters) ?? 1000,
     geoFenceEnabled: Boolean(toRecord(settings).geoFenceEnabled ?? true),
+    aiChatProvider: toRecord(settings).aiChatProvider === "OPENAI" ? "OPENAI" : "GROQ",
+    groqChatModel: readString(toRecord(settings).groqChatModel) ?? process.env.GROQ_DSR_MODEL ?? "openai/gpt-oss-120b",
+    openAiChatModel: readString(toRecord(settings).openAiChatModel) ?? process.env.OPENAI_DSR_MODEL ?? "gpt-4o-mini",
+    hasGroqApiKey: Boolean(readString(toRecord(settings).groqApiKeyEncrypted) || process.env.GROQ_API_KEY),
+    hasOpenAiApiKey: Boolean(readString(toRecord(settings).openAiApiKeyEncrypted) || process.env.OPENAI_API_KEY),
     holidays: holidays.map((h) => ({
       id: h._id.toString(),
       name: h.name,

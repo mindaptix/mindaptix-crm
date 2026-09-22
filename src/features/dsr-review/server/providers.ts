@@ -2,6 +2,7 @@ import "server-only";
 import type { DsrReviewInput, GithubEvidence, ProviderAssessment, ReviewProvider } from "../types";
 import { validateAssessment } from "../validation";
 import { fetchJson } from "./http";
+import { getAiRuntimeConfig } from "@/features/ai-settings/server/config";
 
 const schema = {
   type: "object", additionalProperties: false,
@@ -21,15 +22,17 @@ Assess each substantive accomplishment against actual changed code, not just com
 Score 0-100 measures ONLY evidence alignment: 0-24 little of the claimed code work matches; 25-49 some matches; 50-74 partial support with material gaps; 75-100 most code claims supported by cited changes. Return null and insufficient_evidence when evidence is missing or limited, or no assessable code claim exists. Never score employee performance or infer hours worked. Never recommend employment, pay, discipline, or other consequential decisions. Commits alone cannot establish a full day of effort. Explicitly mention this limitation. Admin must review non-code work and context.
 Output <=15 claims, <=12 limitations, summary <=1500 characters, claim <=500, evidence <=1000, limitation <=500. Supported or partial claims must cite at least one supplied commit. Give concise evidence-based explanations, not hidden reasoning. Return the required JSON object.`;
 
-export function reviewConfiguration() {
-  const missing = ["GROQ_API_KEY", "OPENAI_API_KEY"].filter((key) => !process.env[key]);
+export async function reviewConfiguration() {
+  const config = await getAiRuntimeConfig();
+  const missing = config.groq.key ? [] : ["Groq API key"];
   return { missing };
 }
 
 export async function assessWithProvider(provider: ReviewProvider, input: DsrReviewInput, evidence: GithubEvidence, signal?: AbortSignal): Promise<ProviderAssessment> {
-  const key = provider === "groq" ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY;
+  const config = await getAiRuntimeConfig();
+  const key = provider === "groq" ? config.groq.key : config.openai.key;
   if (!key) throw new Error(`${provider} API key is not configured.`);
-  const model = provider === "groq" ? process.env.GROQ_DSR_MODEL || "openai/gpt-oss-120b" : process.env.OPENAI_DSR_MODEL || "gpt-4o-mini";
+  const model = provider === "groq" ? config.groq.model : config.openai.model;
   const payload = JSON.stringify({ dsr: { workDate: input.workDate, summary: input.summary, accomplishments: input.accomplishments, blockers: input.blockers ?? "" }, evidence });
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${key}` };
   let content: string;

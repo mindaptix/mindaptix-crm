@@ -60,7 +60,7 @@ export function DsrAiReview({ dsrId, githubRepoUrl, githubUsername, githubBranch
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4">
       <h4 className="font-semibold text-slate-900">AI evidence review</h4>
-      <p className="mt-1 text-sm text-slate-600">Groq and OpenAI independently compare this DSR with GitHub changes on the same work date (IST).</p>
+      <p className="mt-1 text-sm text-slate-600">Groq compares this DSR with GitHub changes on the same work date (IST).</p>
       <p className="mt-2 break-all text-xs text-slate-500">{githubRepoUrl || "Repository not supplied"} · Author: {githubUsername || "Not supplied"} · Branch: {githubBranch || "Repository default"}</p>
       {!githubRepoUrl || !githubUsername ? <p className="mt-3 text-sm text-amber-800">Ask the employee to update this DSR with a repository and GitHub username.</p> : (
         <>
@@ -68,7 +68,7 @@ export function DsrAiReview({ dsrId, githubRepoUrl, githubUsername, githubBranch
             <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1 accent-blue-700" />
             <span>I have checked that this GitHub account belongs to this employee.</span>
           </label>
-          <p className="mt-2 text-xs text-slate-500">Running a review sends DSR text and bounded commit diffs to both configured providers. Results are advisory; review non-code work separately.</p>
+          <p className="mt-2 text-xs text-slate-500">Running a review sends DSR text and bounded commit diffs to Groq. Results are advisory; review non-code work separately.</p>
           <button type="button" disabled={loading || busy || !confirmed || state.missingConfiguration.length > 0} onClick={run} className="mt-3 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             {loading ? "Loading review…" : busy ? "Reviewing commits…" : result ? "Run fresh AI review" : "Run AI review"}
           </button>

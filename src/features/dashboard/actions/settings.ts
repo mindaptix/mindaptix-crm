@@ -10,6 +10,7 @@ import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { UserSessionModel } from "@/database/mongodb/models/user-session";
 import { headers } from "next/headers";
 import { saveUploadedFile } from "@/shared/storage/uploads/shared";
+import { encryptApiKey } from "@/features/ai-settings/server/credentials";
 
 type SettingsState = {
   error?: string;
@@ -30,6 +31,62 @@ type SettingsState = {
     geoFenceEnabled?: string;
   };
 };
+
+type AiSettingsState = { error?: string; success?: string };
+
+function validModelName(value: string) {
+  return value.length > 0 && value.length <= 120 && /^[a-zA-Z0-9._/-]+$/.test(value);
+}
+
+export async function updateAiSettings(
+  _previousState: AiSettingsState,
+  formData: FormData,
+): Promise<AiSettingsState> {
+  const session = await getCurrentSession();
+  if (!session || session.user.role !== "SUPER_ADMIN") {
+    return { error: "Only the super admin can manage AI providers." };
+  }
+
+  const provider = String(formData.get("aiChatProvider") ?? "GROQ");
+  const groqModel = String(formData.get("groqChatModel") ?? "").trim();
+  const openAiModel = String(formData.get("openAiChatModel") ?? "").trim();
+  const groqApiKey = String(formData.get("groqApiKey") ?? "").trim();
+  const openAiApiKey = String(formData.get("openAiApiKey") ?? "").trim();
+  const clearGroq = formData.get("clearGroqApiKey") === "true";
+  const clearOpenAi = formData.get("clearOpenAiApiKey") === "true";
+
+  if ((provider !== "GROQ" && provider !== "OPENAI") || !validModelName(groqModel) || !validModelName(openAiModel)) {
+    return { error: "Choose a provider and enter valid model names." };
+  }
+  if (groqApiKey.length > 500 || openAiApiKey.length > 500) {
+    return { error: "API keys are too long." };
+  }
+
+  await connectDb();
+  const existing = await SettingModel.findOne({ key: "company" }, { groqApiKeyEncrypted: 1, openAiApiKeyEncrypted: 1 }).lean();
+  const groqKeyAvailable = Boolean(groqApiKey || (!clearGroq && (existing?.groqApiKeyEncrypted || process.env.GROQ_API_KEY)));
+  const openAiKeyAvailable = Boolean(openAiApiKey || (!clearOpenAi && (existing?.openAiApiKeyEncrypted || process.env.OPENAI_API_KEY)));
+  if (provider === "GROQ" && !groqKeyAvailable) return { error: "Add a Groq API key before choosing Groq for the chatbot." };
+  if (provider === "OPENAI" && !openAiKeyAvailable) return { error: "Add an OpenAI API key before choosing OpenAI for the chatbot." };
+
+  const update: Record<string, string> = { aiChatProvider: provider, groqChatModel: groqModel, openAiChatModel: openAiModel };
+  if (groqApiKey) update.groqApiKeyEncrypted = encryptApiKey(groqApiKey);
+  else if (clearGroq) update.groqApiKeyEncrypted = "";
+  if (openAiApiKey) update.openAiApiKeyEncrypted = encryptApiKey(openAiApiKey);
+  else if (clearOpenAi) update.openAiApiKeyEncrypted = "";
+  await SettingModel.findOneAndUpdate({ key: "company" }, update, { upsert: true, new: true });
+
+  const headerStore = await headers();
+  await AuditLogModel.create({
+    actorUserId: session.user.id, actorName: session.user.fullName, actorRole: session.user.role,
+    action: "SETTINGS_UPDATED", targetName: "AI provider settings",
+    detail: `chatProvider=${provider}, groqModel=${groqModel}, openAiModel=${openAiModel}`,
+    ipAddress: headerStore.get("x-forwarded-for") ?? "",
+  });
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+  return { success: "AI provider settings saved. API keys are encrypted and never shown again." };
+}
 
 export async function updateCompanySettings(
   _previousState: SettingsState,
@@ -396,4 +453,3 @@ export async function uploadProfilePhoto(
 
   return { success: "Profile photo updated successfully.", photoUrl: result.fileUrl };
 }
-

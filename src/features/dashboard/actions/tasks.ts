@@ -6,6 +6,7 @@ import connectDb from "@/database/mongodb/connect";
 import { createNotificationsForUsers } from "@/features/notifications/service";
 import { NotificationModel } from "@/database/mongodb/models/notification";
 import { TASK_LABELS, TASK_PRIORITIES, TaskModel, type TaskLabel, type TaskPriority } from "@/database/mongodb/models/task";
+import { TASK_DESCRIPTION_MAX_LENGTH } from "@/features/tasks/constants";
 import { UserModel } from "@/database/mongodb/models/user";
 import { saveTaskAttachments } from "@/shared/storage/uploads/work-attachments";
 import { formatIndiaDateKey } from "@/shared/lib/india-time";
@@ -40,7 +41,7 @@ export async function createTask(_previousState: TaskState, formData: FormData):
   const selfTask = session.user.role === "EMPLOYEE";
   const workDate = formatIndiaDateKey(new Date());
   const assignedUserId = selfTask ? session.user.id : String(formData.get("assignedUserId") ?? "").trim();
-  const dueDate = String(formData.get("dueDate") || workDate).trim();
+  const dueDate = String(formData.get("dueDate") || formatIndiaDateKey(new Date(Date.now() + 86_400_000))).trim();
   const dueTime = String(formData.get("dueTime") || "23:59").trim();
   const deadlineAt = parseTaskDeadline(dueDate, dueTime);
   const priority = String(formData.get("priority") ?? "MEDIUM");
@@ -52,18 +53,22 @@ export async function createTask(_previousState: TaskState, formData: FormData):
     .getAll("attachments")
     .filter((value): value is File => value instanceof File && value.size > 0);
 
-  if (
-    title.length < 3 || title.length > 160 ||
-    description.length < 6 || description.length > 1000 ||
-    !assignedUserId ||
-    !deadlineAt || deadlineAt.getTime() <= Date.now() ||
-    !TASK_PRIORITIES.includes(priority as TaskPriority)
-  ) {
+  if (title.length < 3 || title.length > 160) {
+    return { error: "Task title must be between 3 and 160 characters.", values: { title, description, assignedUserId, dueDate, dueTime, priority: "MEDIUM", labels } };
+  }
+  if (description.length < 6 || description.length > TASK_DESCRIPTION_MAX_LENGTH) {
+    return { error: `Description must be between 6 and ${TASK_DESCRIPTION_MAX_LENGTH.toLocaleString("en-IN")} characters.`, values: { title, description, assignedUserId, dueDate, dueTime, priority: "MEDIUM", labels } };
+  }
+  if (!assignedUserId) {
+    return { error: "Select the employee this task is for.", values: { title, description, assignedUserId, dueDate, dueTime, priority: "MEDIUM", labels } };
+  }
+  if (!deadlineAt || deadlineAt.getTime() <= Date.now()) {
     return {
-      error: "Fill all fields and choose a future deadline (IST).",
+      error: "Choose a future deadline in IST. If you select today, choose a time later than the current time.",
       values: { title, description, assignedUserId, dueDate, dueTime, priority: "MEDIUM", labels },
     };
   }
+  if (!TASK_PRIORITIES.includes(priority as TaskPriority)) return { error: "Select a valid priority.", values: { title, description, assignedUserId, dueDate, dueTime, priority: "MEDIUM", labels } };
 
   await connectDb();
 
@@ -295,5 +300,3 @@ export async function addTaskComment(formData: FormData) {
   revalidatePath("/dashboard/reports");
   revalidatePath("/dashboard");
 }
-
-

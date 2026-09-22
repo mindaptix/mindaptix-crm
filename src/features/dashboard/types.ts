@@ -586,6 +586,7 @@ export type EmployeeMonthlyDetailReport = {
 
 export type SettingsPageData = {
   canManageCompany: boolean;
+  canManageAi: boolean;
   companyName: string;
   currentUserEmail: string;
   currentUserName: string;
@@ -616,6 +617,11 @@ export type SettingsPageData = {
   officeLongitude: number | null;
   geoFenceRadiusMeters: number;
   geoFenceEnabled: boolean;
+  aiChatProvider: "GROQ" | "OPENAI";
+  groqChatModel: string;
+  openAiChatModel: string;
+  hasGroqApiKey: boolean;
+  hasOpenAiApiKey: boolean;
 };
 
 // ─── Salary & Payroll ───────────────────────────────────────────────────────

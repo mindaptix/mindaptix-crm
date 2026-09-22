@@ -12,6 +12,7 @@ import { Feedback } from "@/shared/ui/feedback";
 import { FormActionButton } from "@/shared/ui/form-action-button";
 import type { TaskEntry, TaskPageData } from "@/features/dashboard/types";
 import type { TaskPriority } from "@/database/mongodb/models/task";
+import { TASK_DESCRIPTION_MAX_LENGTH } from "@/features/tasks/constants";
 
 type TasksPanelProps = {
   canAssign: boolean;
@@ -24,7 +25,7 @@ const INITIAL_TASK_STATE = {
     title: "",
     description: "",
     assignedUserId: "",
-    dueDate: formatIndiaDateKey(),
+    dueDate: formatIndiaDateKey(new Date(Date.now() + 86_400_000)),
     dueTime: "18:00",
     priority: "MEDIUM" as TaskPriority,
     labels: [] as string[],
@@ -92,57 +93,52 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
   const rejected_count       = data.tasks.filter((t) => t.status === "REJECTED").length;
 
   return (
-    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
-
-      {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        <StatCard gradient="linear-gradient(135deg,#f59e0b,#fbbf24)" shadow="rgba(245,158,11,0.3)"  icon={<ClockIcon />}  label="Pending"          value={pending_count} />
-        <StatCard gradient="linear-gradient(135deg,#6366f1,#818cf8)" shadow="rgba(99,102,241,0.3)"  icon={<PlayIcon />}   label="In Progress"      value={inprogress_count} />
-        <StatCard gradient="linear-gradient(135deg,#f97316,#fb923c)" shadow="rgba(249,115,22,0.3)"  icon={<ReviewIcon />} label="Awaiting Review"  value={awaiting_review_count} />
-        <StatCard gradient="linear-gradient(135deg,#10b981,#34d399)" shadow="rgba(16,185,129,0.3)"  icon={<CheckIcon />}  label="Closed"           value={closed_count} />
-        <StatCard gradient="linear-gradient(135deg,#ef4444,#f87171)" shadow="rgba(239,68,68,0.3)"   icon={<AlertIcon />}  label="Rejected"         value={rejected_count} />
-      </div>
+    <div className="space-y-4 px-3 py-3 sm:px-7 sm:py-6">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 text-sm">
+          <span className="font-semibold text-slate-800">Task summary</span>
+          <SummaryCount label="Open" value={pending_count + inprogress_count + rejected_count} tone="text-slate-700" />
+          <SummaryCount label="In progress" value={inprogress_count} tone="text-violet-700" />
+          <SummaryCount label="For review" value={awaiting_review_count} tone="text-amber-700" />
+          <SummaryCount label="Done" value={closed_count} tone="text-emerald-700" />
+        </div>
+      </section>
 
       {/* ── Task board (full width) ── */}
-      <div className="overflow-hidden rounded-[1.8rem]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.08)" }}>
-        <div className="px-6 py-5"
-          style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Task Board</p>
-              <h2 className="mt-1 text-2xl font-bold text-slate-800">
+              <p className="text-xs font-medium text-slate-500">Workspace / Work board</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
                 {canAssign ? "All Tasks" : "My Tasks"}
               </h2>
             </div>
             <div className="flex items-center gap-3">
               {canAssign && (
                 <button
-                  className="rounded-xl px-4 py-2.5 text-sm font-bold text-white transition-all hover:brightness-110 active:scale-[0.97]"
-                  style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 6px 18px rgba(99,102,241,0.35)" }}
+                  className="crm-primary"
                   onClick={() => setIsCreateOpen(true)}
                   type="button"
                 >
-                  + Create Task
+                  + New task
                 </button>
               )}
-              <div className="flex items-center gap-2 rounded-full px-3 py-1.5"
-                style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}>
-                <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />
-                <span className="text-[0.65rem] font-bold text-indigo-600">{filteredTasks.length} task{filteredTasks.length !== 1 ? "s" : ""}</span>
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600">
+                {filteredTasks.length} task{filteredTasks.length !== 1 ? "s" : ""}
               </div>
             </div>
           </div>
         </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 border-b border-slate-100 px-6 py-4">
+          <div className="flex flex-wrap gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3 sm:px-6">
             <div className="relative flex min-w-[180px] flex-1 items-center">
               <span className="pointer-events-none absolute left-3.5 text-slate-400">
                 <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
               </span>
               <input
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50 placeholder:text-slate-400"
+                className="w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100 placeholder:text-slate-400"
                 placeholder="Search tasks…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -159,7 +155,11 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
             <FilterPill label="Label"    value={labelFilter}    options={["ALL",...data.labelOptions]}                onChange={setLabelFilter} />
           </div>
 
-          {/* Task cards */}
+          <div className="hidden grid-cols-[minmax(260px,2fr)_150px_175px_130px_110px] gap-4 border-b border-slate-200 bg-slate-50 px-6 py-2.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500 lg:grid">
+            <span>Task</span><span>Status</span><span>Owner</span><span>Due date</span><span>Priority</span>
+          </div>
+
+          {/* Task rows */}
           {filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl"
@@ -174,14 +174,13 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
               </p>
             </div>
           ) : (
-            <div className="space-y-0">
-              {filteredTasks.map((task, i) => (
+            <div className="divide-y divide-slate-200">
+              {filteredTasks.map((task) => (
                 <TaskCard
                   key={task.id}
                   canAssign={canAssign}
                   task={task}
                   readOnly={readOnly}
-                  isLast={i === filteredTasks.length - 1}
                   onTaskUpdated={refreshView}
                 />
               ))}
@@ -251,15 +250,14 @@ function CreateTaskModal({
       role="dialog"
     >
       <div
-        className="flex h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-[0_32px_80px_rgba(15,23,42,0.3)]"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.24)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="relative shrink-0 px-6 pb-5 pt-6"
-          style={{ background: "linear-gradient(135deg,#6366f1 0%,#4f46e5 100%)" }}>
+        <div className="relative shrink-0 border-b border-slate-200 bg-white px-6 py-5">
           <button
             aria-label="Close"
-            className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+            className="absolute right-5 top-5 grid h-8 w-8 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
             onClick={onClose}
             type="button"
           >
@@ -268,47 +266,34 @@ function CreateTaskModal({
             </svg>
           </button>
           <div className="flex items-center gap-4">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[1rem] bg-white/20">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-indigo-600 shadow-sm">
               <svg fill="none" height="22" viewBox="0 0 24 24" width="22">
                 <path d="M12 5v14M5 12h14" stroke="white" strokeLinecap="round" strokeWidth="2.2" />
               </svg>
             </div>
             <div>
-              <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em] text-white/70">Assign Task</p>
-              <h4 className="mt-0.5 text-xl font-bold text-white">Create Task</h4>
-              <p className="mt-0.5 text-sm text-white/60">Assign a task to yourself, an admin, or a team member with priority and due date.</p>
+              <p className="text-xs font-medium text-slate-500">Work management</p>
+              <h4 className="mt-0.5 text-lg font-semibold text-slate-900">Create task</h4>
+              <p className="mt-0.5 text-sm text-slate-500">Set an owner, due date, and priority.</p>
             </div>
           </div>
         </div>
 
         {/* Scrollable form */}
         <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <form action={formAction} className="space-y-4 px-6 py-5" ref={formRef}>
+          <form action={formAction} className="space-y-5 px-6 py-5" ref={formRef}>
             {state.error && <Feedback>{state.error}</Feedback>}
             {state.success && <Feedback tone="success">{state.success}</Feedback>}
 
-            <FormField icon={<TitleIcon />} label="Task Title" name="title" placeholder="Enter task title" defaultValue={state.values?.title} />
-            <FormTextArea label="Description" name="description" placeholder="Describe the work clearly" defaultValue={state.values?.description} />
-            <FormSelect
-              icon={<UserIcon />}
-              label="Assign To"
-              name="assignedUserId"
-              defaultValue={state.values?.assignedUserId ?? ""}
-              includePlaceholder
-              options={data.employeeOptions.map((e) => e.id)}
-              labels={Object.fromEntries(data.employeeOptions.map((e) => [e.id, e.label]))}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-[1.25fr_.75fr]">
+              <FormField icon={<TitleIcon />} label="Task title" name="title" placeholder="e.g. Prepare client presentation" defaultValue={state.values?.title} />
+              <FormSelect icon={<FlagIcon />} label="Priority" name="priority" defaultValue={state.values?.priority ?? "MEDIUM"} options={["LOW", "MEDIUM", "HIGH"]} labels={{ LOW: "Low", MEDIUM: "Medium", HIGH: "High" }} />
+            </div>
+            <FormTextArea label="Description" name="description" placeholder="Add context, deliverables, and acceptance criteria" defaultValue={state.values?.description} maxLength={TASK_DESCRIPTION_MAX_LENGTH} />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <FormSelect icon={<UserIcon />} label="Owner" name="assignedUserId" defaultValue={state.values?.assignedUserId ?? ""} includePlaceholder options={data.employeeOptions.map((e) => e.id)} labels={Object.fromEntries(data.employeeOptions.map((e) => [e.id, e.label]))} />
               <FormField icon={<CalIcon />} label="Deadline Date (IST)" name="dueDate" placeholder="Due date" type="date" defaultValue={state.values?.dueDate} />
               <FormField icon={<CalIcon />} label="Deadline Time (IST)" name="dueTime" placeholder="18:00" type="time" defaultValue={state.values?.dueTime ?? "18:00"} />
-              <FormSelect
-                icon={<FlagIcon />}
-                label="Priority"
-                name="priority"
-                defaultValue={state.values?.priority ?? "MEDIUM"}
-                options={["LOW", "MEDIUM", "HIGH"]}
-                labels={{ LOW: "Low", MEDIUM: "Medium", HIGH: "High" }}
-              />
             </div>
 
             {/* Labels */}
@@ -318,8 +303,7 @@ function CreateTaskModal({
                 {data.labelOptions.map((lbl) => (
                   <label
                     key={lbl}
-                    className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-[0.72rem] font-semibold transition-all"
-                    style={{ borderColor: "rgba(99,102,241,0.2)", background: "rgba(99,102,241,0.05)", color: "#4f46e5" }}
+                    className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[0.72rem] font-semibold text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
                   >
                     <input className="accent-indigo-500" defaultChecked={state.values?.labels?.includes(lbl)} name="labels" type="checkbox" value={lbl} />
                     {lbl}
@@ -331,8 +315,7 @@ function CreateTaskModal({
             {/* Attachment */}
             <div>
               <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500">Attachments</p>
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50/40"
-                style={{ borderColor: "rgba(99,102,241,0.2)" }}>
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50/40">
                 <svg fill="none" height="18" stroke="#6366f1" strokeWidth="2" viewBox="0 0 24 24" width="18">
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                 </svg>
@@ -341,14 +324,10 @@ function CreateTaskModal({
               </label>
             </div>
 
-            <button
-              className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 8px 24px rgba(99,102,241,0.35)" }}
-              disabled={pending}
-              type="submit"
-            >
-              {pending ? "Assigning…" : "✓ Assign Task"}
-            </button>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5">
+              <button className="rounded-md px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100" onClick={onClose} type="button">Cancel</button>
+              <button className="rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={pending} type="submit">{pending ? "Creating…" : "Create task"}</button>
+            </div>
           </form>
         </div>
       </div>
@@ -362,13 +341,11 @@ function TaskCard({
   canAssign,
   task,
   readOnly,
-  isLast,
   onTaskUpdated,
 }: {
   canAssign: boolean;
   task: TaskEntry;
   readOnly: boolean;
-  isLast: boolean;
   onTaskUpdated: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -378,20 +355,14 @@ function TaskCard({
   const dueDateDisplay = task.deadlineAt ? formatTaskDeadline(task.deadlineAt) : task.dueDate;
 
   return (
-    <div
-      className="transition-colors hover:bg-slate-50/60"
-      style={{ borderBottom: isLast ? "none" : "1px solid rgba(241,245,249,1)" }}
-    >
-      <div className="px-6 py-4">
-        <div className="flex flex-wrap items-start gap-3">
-          {/* Left accent bar */}
-          <div className="mt-1 h-full w-1 shrink-0 self-stretch rounded-full" style={{ background: sc.gradient, minHeight: 48 }} />
-
-          <div className="min-w-0 flex-1">
+    <article className="transition-colors hover:bg-slate-50/70">
+      <div className="px-5 py-4 sm:px-6">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(260px,2fr)_150px_175px_130px_110px] lg:items-start lg:gap-4">
+          <div className="min-w-0">
             {/* Title row */}
             <div className="flex flex-wrap items-start justify-between gap-2">
               <h3 className="text-[0.95rem] font-bold text-slate-800">{task.title}</h3>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 lg:hidden">
                 {/* Status badge */}
                 <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wider"
                   style={{ background: sc.chip, color: sc.chipText }}>
@@ -418,7 +389,7 @@ function TaskCard({
             <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500 line-clamp-2">{task.description}</p>
 
             {/* Meta row */}
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-[0.72rem] text-slate-500">
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-[0.72rem] text-slate-500 lg:hidden">
               {/* Assigned by */}
               <span className="flex items-center gap-1">
                 <svg fill="none" height="12" stroke="#6366f1" strokeWidth="2" viewBox="0 0 24 24" width="12">
@@ -641,29 +612,27 @@ function TaskCard({
               </div>
             )}
           </div>
+          <div className="hidden lg:block">
+            <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold" style={{ background: sc.chip, color: sc.chipText }}>
+              <span className={`h-1.5 w-1.5 rounded-full ${task.status === "IN_PROGRESS" ? "animate-pulse" : ""}`} style={{ background: sc.dot }} />
+              {sc.label}
+            </span>
+            {task.isOverdue && <p className="mt-1.5 text-xs font-medium text-red-700">Overdue</p>}
+          </div>
+          <div className="hidden min-w-0 items-center gap-2 lg:flex">
+            {task.assignedUserPhotoUrl ? <Image alt={task.assignedUserName} className="h-7 w-7 shrink-0 rounded-full object-cover" height={28} src={task.assignedUserPhotoUrl} width={28} /> : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-semibold text-violet-700">{task.assignedUserName.slice(0, 1).toUpperCase()}</span>}
+            <span className="truncate text-sm text-slate-700">{task.assignedUserName}</span>
+          </div>
+          <div className={`hidden text-sm lg:block ${task.isOverdue ? "font-medium text-red-700" : "text-slate-600"}`}>{dueDateDisplay || "No deadline"}</div>
+          <div className="hidden lg:block"><span className="inline-flex rounded-md border px-2 py-1 text-xs font-semibold" style={{ background: pc.bg, color: pc.text, borderColor: pc.border }}>{pc.label}</span></div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
-/* ─── Stat Card ─── */
-function StatCard({ gradient, shadow, icon, label, value }: {
-  gradient: string; shadow: string; icon: ReactNode; label: string; value: number;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-[1.5rem] p-4 text-white"
-      style={{ background: gradient, boxShadow: `0 8px 24px ${shadow}` }}>
-      <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">{icon}</div>
-        <div>
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em] text-white/70">{label}</p>
-          <p className="text-2xl font-black leading-none text-white">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
+function SummaryCount({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return <span className="flex items-center gap-2 text-xs text-slate-500"><span className={`text-sm font-semibold tabular-nums ${tone}`}>{value}</span>{label}</span>;
 }
 
 /* ─── Filter pill ─── */
@@ -697,11 +666,11 @@ function FormField({ icon, label, name, placeholder, type = "text", defaultValue
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>{label}</label>
-      <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
-        {icon && <span className="pointer-events-none absolute left-3.5 text-indigo-400">{icon}</span>}
+      <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={name}>{label}</label>
+      <div className="relative flex items-center rounded-md border border-slate-300 bg-white transition-all focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+        {icon && <span className="pointer-events-none absolute left-3.5 text-slate-400">{icon}</span>}
         <input
-          className={`min-w-0 flex-1 bg-transparent py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 ${icon ? "pl-9 pr-4" : "px-4"} ${type === "date" ? "scheme-light" : ""}`}
+          className={`min-w-0 flex-1 bg-transparent py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 ${icon ? "pl-9 pr-4" : "px-3"} ${type === "date" ? "scheme-light" : ""}`}
           defaultValue={defaultValue}
           id={name}
           name={name}
@@ -714,24 +683,25 @@ function FormField({ icon, label, name, placeholder, type = "text", defaultValue
   );
 }
 
-function FormTextArea({ label, name, placeholder, defaultValue }: {
-  label: string; name: string; placeholder: string; defaultValue?: string;
+function FormTextArea({ label, name, placeholder, defaultValue, maxLength }: {
+  label: string; name: string; placeholder: string; defaultValue?: string; maxLength?: number;
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>{label}</label>
-      <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
-        <span className="pointer-events-none absolute left-3.5 top-3.5 text-indigo-400">
+      <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={name}>{label}</label>
+      <div className="relative rounded-md border border-slate-300 bg-white transition-all focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+        <span className="pointer-events-none absolute left-3.5 top-3.5 text-slate-400">
           <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </span>
         <textarea
-          className="min-h-24 w-full bg-transparent py-3 pl-9 pr-4 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+          className="min-h-28 w-full bg-transparent py-2.5 pl-9 pr-4 text-sm text-slate-800 outline-none placeholder:text-slate-400"
           defaultValue={defaultValue}
           id={name}
           name={name}
           placeholder={placeholder}
+          maxLength={maxLength}
           required
         />
       </div>
@@ -745,11 +715,11 @@ function FormSelect({ icon, label, name, defaultValue, includePlaceholder = fals
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>{label}</label>
-      <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
-        {icon && <span className="pointer-events-none absolute left-3.5 text-indigo-400">{icon}</span>}
+      <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={name}>{label}</label>
+      <div className="relative flex items-center rounded-md border border-slate-300 bg-white transition-all focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+        {icon && <span className="pointer-events-none absolute left-3.5 text-slate-400">{icon}</span>}
         <select
-          className={`w-full appearance-none bg-transparent py-3 pr-8 text-sm text-slate-800 outline-none ${icon ? "pl-9" : "pl-4"}`}
+          className={`w-full appearance-none bg-transparent py-2.5 pr-8 text-sm text-slate-800 outline-none ${icon ? "pl-9" : "pl-3"}`}
           defaultValue={defaultValue}
           id={name}
           name={name}
@@ -768,21 +738,6 @@ function FormSelect({ icon, label, name, defaultValue, includePlaceholder = fals
 }
 
 /* ─── Icons ─── */
-function ClockIcon() {
-  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
-}
-function PlayIcon() {
-  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><polygon points="5 3 19 12 5 21 5 3" /></svg>;
-}
-function CheckIcon() {
-  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24" width="18"><polyline points="20 6 9 17 4 12" /></svg>;
-}
-function AlertIcon() {
-  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>;
-}
-function ReviewIcon() {
-  return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>;
-}
 function TitleIcon() {
   return <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14"><line x1="21" x2="3" y1="6" y2="6" /><line x1="15" x2="3" y1="12" y2="12" /><line x1="17" x2="3" y1="18" y2="18" /></svg>;
 }

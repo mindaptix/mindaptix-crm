@@ -49,6 +49,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline
 .crm-sidebar nav a > span:first-child { background: transparent; border: 0; }
 .crm-sidebar .crm-avatar { background: #ede9f9; color: #6252ab; box-shadow: none; }
 .crm-sidebar form button { border-color: var(--line); background: #f7f5fb; color: #6252ab; }
+.crm-sidebar form button.crm-primary { border-color: var(--brand); background: var(--brand); color: white; }
+.crm-sidebar form button.crm-primary:hover { background: var(--brand-strong); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; animation-iteration-count: 1 !important; }

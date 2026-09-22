@@ -7,6 +7,7 @@ import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import type { AiReviewResult, DsrReviewInput, ProviderAssessment } from "../types";
 import { collectGithubEvidence } from "./github";
 import { assessWithProvider, reviewConfiguration } from "./providers";
+import { getAiRuntimeConfig } from "@/features/ai-settings/server/config";
 
 export class ReviewError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -30,7 +31,7 @@ export async function getDsrReview(session: AuthenticatedSession, id: string) {
     result: record?.sourceHash === currentHash && record.status === "ready" ? record.result as AiReviewResult : null,
     running: record?.status === "running" && record.sourceHash === currentHash && Boolean(record.startedAt && record.startedAt.getTime() > Date.now() - 180_000),
     error: record?.status === "error" && record.sourceHash === currentHash ? record.error : "",
-    missingConfiguration: reviewConfiguration().missing,
+    missingConfiguration: (await reviewConfiguration()).missing,
   };
 }
 
@@ -38,7 +39,7 @@ export async function runDsrReview(session: AuthenticatedSession, id: string, re
   const dsr = await loadDsr(session, id);
   const hash = sourceHash(dsr);
   if (!dsr.githubRepoUrl || !dsr.githubUsername) throw new ReviewError("This DSR has no repository or GitHub username. Ask the employee to update it.");
-  const missing = reviewConfiguration().missing;
+  const missing = (await reviewConfiguration()).missing;
   if (missing.length) throw new ReviewError(`Configure ${missing.join(" and ")} on the server before running a review.`, 503);
   try { await DsrAiReviewModel.updateOne({ _id: id }, { $setOnInsert: { status: "idle" } }, { upsert: true }); }
   catch (error) { if ((error as { code?: number }).code !== 11000) throw error; }
@@ -58,18 +59,19 @@ export async function runDsrReview(session: AuthenticatedSession, id: string, re
     const assessments: ProviderAssessment[] = [];
     const warnings = [...evidence.warnings];
     if (evidence.commits.length) {
-      const providers = ["groq", "openai"] as const;
+      const aiConfig = await getAiRuntimeConfig();
+      const providers = aiConfig.openai.key ? ["groq", "openai"] as const : ["groq"] as const;
       const outcomes = await Promise.allSettled(providers.map((provider) => assessWithProvider(provider, dsr, evidence, signal)));
       outcomes.forEach((outcome, index) => {
         if (outcome.status === "fulfilled") assessments.push(outcome.value);
         else warnings.push(`${providers[index]} assessment unavailable. Retry later or check the provider configuration.`);
       });
-      if (!assessments.length) throw new ReviewError("Both AI providers failed to return valid assessments. Check credentials, model support and quota, then retry.", 502);
+      if (!assessments.length) throw new ReviewError("Groq did not return a valid assessment. Check the API key, model access and quota, then retry.", 502);
     } else warnings.push("No attributed commits found for this author, branch and IST work date. This does not prove no work was done; no zero score was assigned.");
     if (assessments.length === 2 && assessments.every((row) => row.score !== null) && Math.abs(assessments[0].score! - assessments[1].score!) > 20) warnings.push("The two AI scores differ by more than 20 points. Admin review is needed to resolve the disagreement.");
     const result: AiReviewResult = {
       reviewedAt: new Date().toISOString(), reviewedBy: session.user.fullName, sourceHash: hash,
-      status: !evidence.commits.length || evidence.limited ? "inconclusive" : assessments.length === 2 ? "complete" : "partial",
+      status: !evidence.commits.length || evidence.limited ? "inconclusive" : assessments.length ? "complete" : "partial",
       repository: evidence.repository, branch: evidence.branch, author: evidence.author, workDate: dsr.workDate,
       commits: evidence.commits.map((commit) => ({ sha: commit.sha, url: commit.url, message: commit.message, committedAt: commit.committedAt, fileCount: commit.files.length })),
       assessments, warnings, fullDayAssessment: "Not verifiable from commits alone. Admin review required.",
