@@ -18,6 +18,7 @@ const salesPaymentSchema = new mongoose.Schema(
       maxlength: 160,
       default: "",
     },
+    projectId: { type: String, default: "", index: true },
     projectName: {
       type: String,
       trim: true,

@@ -14,6 +14,9 @@ import { PayrollPanel } from "@/features/dashboard/components/payroll-panel";
 import { ReportsPanel } from "@/features/dashboard/components/reports-panel";
 import { SettingsPanel } from "@/features/dashboard/components/settings-panel";
 import { TasksPanel } from "@/features/dashboard/components/tasks-panel";
+import { DailyPlanner } from "@/features/tasks/components/daily-planner";
+import { getDailyPlan } from "@/features/tasks/server/daily-plan";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import {
   getAnnouncementsPageData,
@@ -53,7 +56,8 @@ export async function renderEmployeeDashboardPage(page: DashboardPageKey, sessio
     }
     case "tasks": {
       const data = await getTasksPageData(session);
-      return <TasksPanel canAssign={false} readOnly={false} data={data} />;
+      const plan = await getDailyPlan(session.user.id, formatIndiaDateKey(new Date()));
+      return <><div className="px-3 sm:px-7"><DailyPlanner plan={plan} /></div><TasksPanel canAssign={false} readOnly={false} data={data} /></>;
     }
     case "dsr": {
       const data = await getDsrPageData(session);
@@ -95,5 +99,4 @@ export async function renderEmployeeDashboardPage(page: DashboardPageKey, sessio
       notFound();
   }
 }
-
 

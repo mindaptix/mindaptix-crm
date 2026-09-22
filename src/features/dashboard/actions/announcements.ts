@@ -1,9 +1,11 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
-import { AnnouncementModel } from "@/database/mongodb/models/system/announcement";
+import { AnnouncementModel, ANNOUNCEMENT_TYPES } from "@/database/mongodb/models/system/announcement";
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { headers } from "next/headers";
 
@@ -24,6 +26,7 @@ export async function createAnnouncement(_prev: AnnouncementState, formData: For
   if (!title || title.length < 3) return { error: "Title must be at least 3 characters." };
   if (!body || body.length < 5) return { error: "Announcement body is required." };
 
+  if (!isEnumValue(ANNOUNCEMENT_TYPES, type)) return { error: "Invalid announcement type." };
   await connectDb();
 
   await AnnouncementModel.create({

@@ -1,5 +1,7 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import { assertAdminOrManager } from "@/features/auth/lib/user-admin";
@@ -24,10 +26,10 @@ export async function addAsset(_prev: AssetState, formData: FormData): Promise<A
   const notes    = String(formData.get("notes") ?? "").trim();
   const purchasePrice = Number(purchasePriceRaw || 0);
 
-  if (!name || !ASSET_CATEGORIES.includes(category as never)) {
+  if (!name || !isEnumValue(ASSET_CATEGORIES, category)) {
     return { error: "Asset name and a valid category are required." };
   }
-  if (!ASSET_CONDITIONS.includes(condition as never)) {
+  if (!isEnumValue(ASSET_CONDITIONS, condition)) {
     return { error: "Invalid condition value." };
   }
   if (!Number.isFinite(purchasePrice) || purchasePrice < 0) {
@@ -91,10 +93,10 @@ export async function updateAsset(_prev: AssetState, formData: FormData): Promis
   const purchasePrice = Number(purchasePriceRaw || 0);
 
   if (!assetId) return { error: "Asset is required." };
-  if (!name || !ASSET_CATEGORIES.includes(category as never)) {
+  if (!name || !isEnumValue(ASSET_CATEGORIES, category)) {
     return { error: "Asset name and a valid category are required." };
   }
-  if (!ASSET_CONDITIONS.includes(condition as never)) {
+  if (!isEnumValue(ASSET_CONDITIONS, condition)) {
     return { error: "Invalid condition value." };
   }
   if (!Number.isFinite(purchasePrice) || purchasePrice < 0) {

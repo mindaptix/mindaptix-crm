@@ -356,6 +356,7 @@ export type AttendanceMonthlyRow = {
 };
 
 export type AttendancePageData = {
+  dailyPlan?: import("@/features/tasks/daily-plan").DailyPlan;
   canMarkAttendance: boolean;
   canViewLocation: boolean;
   canManageOthers: boolean;

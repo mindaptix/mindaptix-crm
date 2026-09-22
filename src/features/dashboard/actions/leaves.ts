@@ -1,5 +1,7 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
@@ -31,11 +33,11 @@ export async function applyLeaveRequest(_previousState: LeaveState, formData: Fo
   const endDate = String(formData.get("endDate") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
 
-  if (!LEAVE_TYPES.includes(leaveType as LeaveType) || !isValidDateKey(startDate) || !isValidDateKey(endDate) || reason.length < 6) {
+  if (!isEnumValue(LEAVE_TYPES, leaveType) || !isValidDateKey(startDate) || !isValidDateKey(endDate) || reason.length < 6) {
     return {
       error: "Fill leave type, valid dates, and a proper reason.",
       values: {
-        leaveType: LEAVE_TYPES.includes(leaveType as LeaveType) ? (leaveType as LeaveType) : "PAID",
+        leaveType: isEnumValue(LEAVE_TYPES, leaveType) ? (leaveType as LeaveType) : "PAID",
         startDate,
         endDate,
         reason,
@@ -182,6 +184,5 @@ export async function deleteLeaveRequest(formData: FormData) {
 function isValidDateKey(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
-
 
 

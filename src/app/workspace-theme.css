@@ -1,0 +1,55 @@
+/* Shared workspace palette: lavender actions, mint success, amber pending,
+   red overdue/destructive. All modules use the same system font stack. */
+@theme inline {
+  --font-sans: var(--font-body);
+  --color-blue-50: #f6f4fc;
+  --color-blue-100: #ede9f9;
+  --color-blue-200: #dbd4f2;
+  --color-blue-300: #c2b7e8;
+  --color-blue-400: #a79ada;
+  --color-blue-500: #8b7ccf;
+  --color-blue-600: #7868c5;
+  --color-blue-700: #6252ab;
+  --color-blue-800: #50438e;
+  --color-blue-900: #423976;
+  --color-indigo-50: #f6f4fc;
+  --color-indigo-100: #ede9f9;
+  --color-indigo-200: #dbd4f2;
+  --color-indigo-500: #8b7ccf;
+  --color-indigo-600: #7868c5;
+  --color-indigo-700: #6252ab;
+  --color-violet-50: #f6f4fc;
+  --color-violet-100: #ede9f9;
+  --color-violet-200: #dbd4f2;
+  --color-violet-500: #8b7ccf;
+  --color-violet-600: #7868c5;
+  --color-violet-700: #6252ab;
+}
+
+.crm-surface { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.crm-input { width: 100%; border: 1px solid #ddd9e8; border-radius: 7px; background: white; padding: 10px 12px; color: var(--foreground); font-size: 14px; }
+.crm-input:focus { outline: 2px solid #dbd4f2; outline-offset: 1px; border-color: var(--brand); }
+.crm-primary { display: inline-flex; align-items: center; border-radius: 7px; background: var(--brand); color: white; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.crm-primary:hover { background: var(--brand-strong); }
+.crm-primary:disabled { opacity: .5; cursor: not-allowed; }
+button, input, select, textarea { font-family: var(--font-body); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.crm-app { background: var(--background); font-size: 14px; }
+.crm-app :is(h1,h2,h3,h4,h5,h6) { font-family: var(--font-body); letter-spacing: -.025em; }
+.crm-app .font-black { font-weight: 600; }
+.crm-app [class*="shadow-["] { box-shadow: none; }
+.crm-app [class*="rounded-[1."], .crm-app [class*="rounded-[2."] { border-radius: 14px; }
+.crm-app aside.crm-sidebar { background: #fbfaff; color: var(--foreground); border-color: var(--line); }
+.crm-sidebar .crm-brand, .crm-sidebar .crm-account { background: white; border-color: var(--line); box-shadow: none; }
+.crm-sidebar [class*="text-white"], .crm-sidebar [class*="text-blue-"], .crm-sidebar [class*="text-slate-100"] { color: #696478; }
+.crm-sidebar h2, .crm-sidebar .crm-account p:first-child { color: var(--foreground); }
+.crm-sidebar .crm-nav-active { background: #ede9f9; color: #6252ab; box-shadow: none; }
+.crm-sidebar .crm-nav-active span { color: #6252ab; }
+.crm-sidebar nav a:hover { background: #f2eefb; }
+.crm-sidebar nav a > span:first-child { background: transparent; border: 0; }
+.crm-sidebar .crm-avatar { background: #ede9f9; color: #6252ab; box-shadow: none; }
+.crm-sidebar form button { border-color: var(--line); background: #f7f5fb; color: #6252ab; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

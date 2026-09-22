@@ -1,10 +1,12 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import { assertSuperAdmin } from "@/features/auth/lib/user-admin";
 import connectDb from "@/database/mongodb/connect";
-import { HolidayModel } from "@/database/mongodb/models/system/holiday";
+import { HolidayModel, HOLIDAY_TYPES } from "@/database/mongodb/models/system/holiday";
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { headers } from "next/headers";
 
@@ -24,6 +26,7 @@ export async function addHoliday(_prev: HolidayState, formData: FormData): Promi
 
   const year = parseInt(date.split("-")[0], 10);
 
+  if (!isEnumValue(HOLIDAY_TYPES, type)) return { error: "Invalid holiday type." };
   await connectDb();
 
   await HolidayModel.create({

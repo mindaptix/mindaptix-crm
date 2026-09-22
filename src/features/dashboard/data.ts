@@ -5,6 +5,7 @@ import connectDb from "@/database/mongodb/connect";
 import { STAFF_ATTENDANCE_ROLES, getVisibleUserIdsForSession } from "@/features/dashboard/team-scope";
 import { syncWorkflowNotifications, getNotificationsForUser, getUnreadAssignmentsForUser } from "@/features/notifications/service";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
+import { getDailyPlan } from "@/features/tasks/server/daily-plan";
 import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
 import { LeaveRequestModel } from "@/database/mongodb/models/leave-request";
 import { ProjectModel } from "@/database/mongodb/models/project";
@@ -19,6 +20,7 @@ import {
   SalesLeadModel,
 } from "@/database/mongodb/models/sales-lead";
 import { SalesPaymentModel } from "@/database/mongodb/models/sales-payment";
+import { linkLegacyPayments } from "@/features/payments/server/project-mapping";
 import { SalesTargetModel } from "@/database/mongodb/models/sales-target";
 import { SettingModel } from "@/database/mongodb/models/setting";
 import { HolidayModel } from "@/database/mongodb/models/system/holiday";
@@ -407,11 +409,11 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
   const isSalesSelfView = session?.user.role === "SALES";
   const isEmployeeDirectoryView = session?.user.role === "EMPLOYEE";
   const userFilter = hasAdminLikeAccess
-    ? { role: { $ne: "SUPER_ADMIN" } }
+    ? { role: { $ne: "SUPER_ADMIN" as const } }
     : isSalesSelfView
       ? { _id: session.user.id }
       : isEmployeeDirectoryView
-        ? { status: "ACTIVE", role: { $in: ["EMPLOYEE", "SALES"] } }
+        ? { status: "ACTIVE" as const, role: { $in: ["EMPLOYEE" as const, "SALES" as const] } }
         : { _id: { $in: [] } };
 
   const users = await UserModel.find(
@@ -881,6 +883,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
 
   return {
     canMarkAttendance: session.user.role === "EMPLOYEE" || session.user.role === "SALES",
+    dailyPlan: session.user.role === "EMPLOYEE" ? await getDailyPlan(session.user.id, today) : undefined,
     canViewLocation,
     canManageOthers: session.user.role === "SUPER_ADMIN",
     monthlyWorkingDays,
@@ -1077,7 +1080,7 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
       ? {}
       : { $or: [{ assignedUserId: session.user.id }, { assignedByUserId: session.user.id }] };
   // Tasks can be assigned to staff, managers, and super admins (self-assign supported).
-  const assignableRoleFilter = { role: { $in: ["EMPLOYEE", "SALES", "MANAGER", "SUPER_ADMIN"] }, status: "ACTIVE" };
+  const assignableRoleFilter = { role: { $in: ["EMPLOYEE" as const, "SALES" as const, "MANAGER" as const, "SUPER_ADMIN" as const] }, status: "ACTIVE" as const };
 
   const [tasks, employees, users, assignedProjects] = await Promise.all([
     TaskModel.find(taskFilter).sort({ createdAt: -1 }).lean(),
@@ -1966,6 +1969,7 @@ export async function getEmployeeDetailData(
   await connectDb();
 
   const canViewSensitive = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  if (canViewSensitive) await linkLegacyPayments();
   const today = getTodayDate();
   const monthStart = `${today.slice(0, 7)}-01`;
   const currentYear = today.slice(0, 4);
@@ -1993,7 +1997,7 @@ export async function getEmployeeDetailData(
       .lean(),
     SalesPaymentModel.find(
       {},
-      { clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, status: 1 },
+      { projectId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, status: 1 },
     ).lean(),
     UserModel.find({ role: "MANAGER", status: "ACTIVE" }, { fullName: 1 }).sort({ fullName: 1 }).lean(),
   ]);
@@ -2070,7 +2074,6 @@ export async function getEmployeeDetailData(
 
   const projectEntries: EmployeeDetailProjectEntry[] = projects.map((project) => {
     const projectId = project._id.toString();
-    const projectName = project.name.toLowerCase();
 
     const projectDsr = dsrEntries
       .filter((d) => d.projectId === projectId)
@@ -2085,7 +2088,7 @@ export async function getEmployeeDetailData(
       }));
 
     const projectPayments = allPayments
-      .filter((p) => String((p as Record<string, unknown>).projectName ?? "").toLowerCase() === projectName)
+      .filter((p) => p.projectId === project._id.toString())
       .map((p) => {
         const amount = Number(p.amount ?? 0);
         const received = Number(p.receivedAmount ?? 0);
@@ -2253,6 +2256,7 @@ export async function getProjectDetailData(
 
   const canView = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
   if (!canView) throw new Error("Unauthorized");
+  await linkLegacyPayments();
 
   const today = getTodayDate();
 
@@ -2285,7 +2289,7 @@ export async function getProjectDetailData(
       : Promise.resolve([]),
     SalesPaymentModel.find(
       {},
-      { clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, salesUserId: 1 },
+      { projectId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, salesUserId: 1 },
     ).lean(),
     assignedIds.length
       ? AttendanceModel.find({ userId: { $in: assignedIds }, dateKey: today }, { userId: 1 }).lean()
@@ -2342,10 +2346,9 @@ export async function getProjectDetailData(
     };
   });
 
-  // Match payments by project name
-  const projectNameLower = project.name.toLowerCase();
+  // Stable IDs keep payment history attached when a project is renamed.
   const payments: ProjectDetailPaymentEntry[] = allPayments
-    .filter((p) => String((p as Record<string, unknown>).projectName ?? "").toLowerCase() === projectNameLower)
+    .filter((p) => p.projectId === projectId)
     .map((p) => {
       const amount = Number(p.amount ?? 0);
       const received = Number(p.receivedAmount ?? 0);
@@ -3152,7 +3155,3 @@ export async function getEmployeeDocumentsData(
     targetUserName: targetUser?.fullName ?? session.user.fullName,
   };
 }
-
-
-
-

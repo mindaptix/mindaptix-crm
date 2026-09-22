@@ -10,6 +10,7 @@ export type PaymentTransaction = {
 
 export type ClientPaymentEntry = {
   id: string;
+  projectId: string;
   clientName: string;
   projectName: string;
   invoiceNumber: string;
@@ -41,7 +42,7 @@ export type PaymentsPageData = {
   paidCount: number;
   partialCount: number;
   pendingCount: number;
-  projectSuggestions: { clientName: string; projectName: string }[];
+  projectSuggestions: { id: string; clientName: string; projectName: string }[];
 };
 
 export type ClientPaymentFormState = {
@@ -51,6 +52,7 @@ export type ClientPaymentFormState = {
     id?: string;
     clientName?: string;
     projectName?: string;
+    projectId?: string;
     invoiceNumber?: string;
     amount?: string;
     receivedAmount?: string;
@@ -63,4 +65,3 @@ export type ClientPaymentFormState = {
     recurringEndDate?: string;
   };
 };
-

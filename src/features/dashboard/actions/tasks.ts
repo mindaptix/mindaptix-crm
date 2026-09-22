@@ -8,6 +8,7 @@ import { NotificationModel } from "@/database/mongodb/models/notification";
 import { TASK_LABELS, TASK_PRIORITIES, TaskModel, type TaskLabel, type TaskPriority } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
 import { saveTaskAttachments } from "@/shared/storage/uploads/work-attachments";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 
 import { parseTaskDeadline, taskDeadline, missedTaskDeadline } from "@/features/tasks/deadline";
 
@@ -30,15 +31,17 @@ type TaskState = {
 export async function createTask(_previousState: TaskState, formData: FormData): Promise<TaskState> {
   const session = await getCurrentSession();
 
-  if (!session || (session.user.role !== "MANAGER" && session.user.role !== "SUPER_ADMIN")) {
+  if (!session || !["EMPLOYEE", "MANAGER", "SUPER_ADMIN"].includes(session.user.role)) {
     return { error: "Only admin can assign tasks." };
   }
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const assignedUserId = String(formData.get("assignedUserId") ?? "").trim();
-  const dueDate = String(formData.get("dueDate") ?? "").trim();
-  const dueTime = String(formData.get("dueTime") ?? "23:59").trim();
+  const selfTask = session.user.role === "EMPLOYEE";
+  const workDate = formatIndiaDateKey(new Date());
+  const assignedUserId = selfTask ? session.user.id : String(formData.get("assignedUserId") ?? "").trim();
+  const dueDate = String(formData.get("dueDate") || workDate).trim();
+  const dueTime = String(formData.get("dueTime") || "23:59").trim();
   const deadlineAt = parseTaskDeadline(dueDate, dueTime);
   const priority = String(formData.get("priority") ?? "MEDIUM");
   const labels = formData
@@ -50,8 +53,8 @@ export async function createTask(_previousState: TaskState, formData: FormData):
     .filter((value): value is File => value instanceof File && value.size > 0);
 
   if (
-    title.length < 3 ||
-    description.length < 6 ||
+    title.length < 3 || title.length > 160 ||
+    description.length < 6 || description.length > 1000 ||
     !assignedUserId ||
     !deadlineAt || deadlineAt.getTime() <= Date.now() ||
     !TASK_PRIORITIES.includes(priority as TaskPriority)
@@ -78,6 +81,7 @@ export async function createTask(_previousState: TaskState, formData: FormData):
     description,
     assignedUserId,
     assignedByUserId: session.user.id,
+    workDate,
     dueDate,
     deadlineAt,
     priority: priority as TaskPriority,
@@ -95,6 +99,7 @@ export async function createTask(_previousState: TaskState, formData: FormData):
   });
 
   revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/attendance");
   revalidatePath("/dashboard/reports");
   revalidatePath("/dashboard");
 
@@ -290,6 +295,5 @@ export async function addTaskComment(formData: FormData) {
   revalidatePath("/dashboard/reports");
   revalidatePath("/dashboard");
 }
-
 
 

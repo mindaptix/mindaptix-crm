@@ -39,6 +39,7 @@ export async function getCurrentWork(session: AuthenticatedSession) {
     };
   });
   return {
+    generatedAt: new Date().toISOString(),
     today, people,
     projects: projects.filter((project) => project.status === "IN_PROGRESS").map((project) => ({
       id: String(project._id), name: project.name, summary: project.summary,

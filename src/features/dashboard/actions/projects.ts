@@ -1,5 +1,7 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import { assertAdminOrManager } from "@/features/auth/lib/user-admin";
@@ -69,7 +71,7 @@ export async function createManagedProject(
     };
   }
 
-  if (!PROJECT_STATUSES.includes(status as ProjectStatus) || !PROJECT_PRIORITIES.includes(priority as ProjectPriority)) {
+  if (!isEnumValue(PROJECT_STATUSES, status) || !isEnumValue(PROJECT_PRIORITIES, priority)) {
     return { error: "Project status or priority is invalid.", values: { name, summary, dueDate, assignedUserIds, techStack } };
   }
 
@@ -170,7 +172,7 @@ export async function updateManagedProject(
     };
   }
 
-  if (!PROJECT_STATUSES.includes(status as ProjectStatus) || !PROJECT_PRIORITIES.includes(priority as ProjectPriority)) {
+  if (!isEnumValue(PROJECT_STATUSES, status) || !isEnumValue(PROJECT_PRIORITIES, priority)) {
     return { error: "Project status or priority is invalid.", values: { id, name, summary, dueDate, assignedUserIds, techStack } };
   }
 
@@ -467,6 +469,5 @@ async function notifyProjectAssignments({
     sourceKey: `project-assigned:${projectId}`,
   });
 }
-
 
 

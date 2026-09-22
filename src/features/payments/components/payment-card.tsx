@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import { useState } from "react";
 import { deleteClientPayment } from "../actions";
@@ -52,7 +53,7 @@ export function PaymentCard({
                 </span>
               ) : null}
             </div>
-            <p className="mt-0.5 truncate text-[0.72rem] text-slate-500">{payment.projectName || "—"}</p>
+            <p className="mt-0.5 truncate text-[0.72rem] text-slate-500">{payment.projectId ? <Link href={`/dashboard/projects/${payment.projectId}`} className="text-violet-700 hover:underline">{payment.projectName}</Link> : `${payment.projectName || "No project"} · Link required`}</p>
           </div>
           <StatusBadge status={payment.status} />
         </div>

@@ -17,6 +17,9 @@ export function CurrentWorkDashboard({ work }: { work: CurrentWork }) {
   }, [router]);
   const [query, setQuery] = useState("");
   const [projectId, setProjectId] = useState("");
+  const allTasks = work.people.flatMap((person) => person.tasks.map((task) => ({ ...task, employeeName: person.name })));
+  const overdue = allTasks.filter((task) => task.deadlineAt && task.deadlineAt < work.generatedAt);
+  const priorities = allTasks.filter((task) => task.priority === "HIGH" || (task.deadlineAt && task.deadlineAt < work.generatedAt)).sort((a, b) => a.deadlineAt.localeCompare(b.deadlineAt)).slice(0, 5);
   const people = work.people.filter((person) =>
     (!projectId || person.projects.some((project) => project.id === projectId)) &&
     [person.name, ...person.projects.map((project) => project.name), ...person.tasks.map((task) => task.title)].join(" ").toLowerCase().includes(query.toLowerCase().trim()),
@@ -28,6 +31,13 @@ export function CurrentWorkDashboard({ work }: { work: CurrentWork }) {
         <div><p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Work overview · {work.today}</p><h1 className="mt-2 text-2xl font-semibold text-slate-950">Projects & team activity</h1><p className="mt-2 text-sm text-slate-500">Current assignments, task status and today’s reported work.</p></div>
         <Link href="/dashboard/tasks" className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Assign task</Link>
       </header>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[{ label: "Active work", value: allTasks.length, detail: "Open tasks across your team" }, { label: "Checked in", value: work.people.filter((person) => person.presence === "Checked in").length, detail: "Employees currently checked in" }, { label: "Overdue", value: overdue.length, detail: "Tasks requiring attention" }].map((metric) => <article key={metric.label} className="crm-surface p-5"><p className="text-sm font-medium text-slate-600">{metric.label}</p><p className={`mt-5 text-3xl font-semibold tracking-tight ${metric.label === "Overdue" && metric.value ? "text-red-600" : "text-slate-900"}`}>{metric.value}</p><p className="mt-2 text-xs text-slate-400">{metric.detail}</p></article>)}
+      </div>
+      <section className="crm-surface p-5" aria-label="Priority work">
+        <div className="flex items-center justify-between"><h2 className="text-base font-semibold">Priority tasks</h2><Link href="/dashboard/tasks" className="text-xs font-medium text-violet-700">See all →</Link></div>
+        {priorities.length ? <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{priorities.map((task) => <Link key={task.id} href="/dashboard/tasks" className="rounded-lg bg-violet-50/70 p-4"><p className="text-sm font-medium text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.employeeName}</p><p className="mt-3 text-xs text-violet-700">{task.deadlineAt ? formatTaskDeadline(task.deadlineAt) : "No deadline"}</p></Link>)}</div> : <p className="mt-4 text-sm text-slate-500">No high-priority or overdue work.</p>}
+      </section>
       <section aria-labelledby="ongoing-projects" className="space-y-4">
         <div className="flex items-center justify-between gap-3"><h2 id="ongoing-projects" className="text-lg font-semibold">Ongoing projects <span className="ml-2 rounded-full bg-blue-50 px-2.5 py-1 text-sm text-blue-700">{work.projects.length}</span></h2><Link href="/dashboard/portfolio" className={`text-sm ${linkStyle}`}>View portfolio →</Link></div>
         {work.projects.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">No projects are currently in progress.</p> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{work.projects.map((project) => <article key={project.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

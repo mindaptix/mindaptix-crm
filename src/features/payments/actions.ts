@@ -11,6 +11,15 @@ import {
 } from "@/database/mongodb/models/sales-payment";
 
 import type { ClientPaymentFormState } from "./types";
+import { ProjectModel } from "@/database/mongodb/models/project";
+import { isValidObjectId } from "mongoose";
+
+async function selectedProject(formData: FormData) {
+  const id = String(formData.get("projectId") ?? "");
+  if (!isValidObjectId(id)) return null;
+  await connectDb();
+  return ProjectModel.findById(id, { name: 1 }).lean();
+}
 
 function safeStatus(value: string): SalesPaymentStatus {
   return SALES_PAYMENT_STATUSES.includes(value as SalesPaymentStatus)
@@ -31,7 +40,10 @@ export async function createClientPayment(
   }
 
   const clientName = String(formData.get("clientName") ?? "").trim();
-  const projectName = String(formData.get("projectName") ?? "").trim();
+  const project = await selectedProject(formData);
+  if (!project) return { error: "Select an existing project to link this payment." };
+  const projectId = String(project._id);
+  const projectName = project.name;
   const invoiceNumber = String(formData.get("invoiceNumber") ?? "").trim();
   const amountStr = String(formData.get("amount") ?? "0").trim();
   const receivedAmountStr = String(formData.get("receivedAmount") ?? "0").trim();
@@ -105,6 +117,7 @@ export async function createClientPayment(
   await connectDb();
 
   await SalesPaymentModel.create({
+    projectId,
     salesUserId: session.user.id,
     clientName,
     projectName,
@@ -123,6 +136,8 @@ export async function createClientPayment(
   });
 
   revalidatePath("/dashboard/payments");
+  revalidatePath("/dashboard/projects", "layout");
+  revalidatePath("/dashboard/employees", "layout");
   revalidatePath("/dashboard");
 
   return {
@@ -145,7 +160,10 @@ export async function updateClientPayment(
 
   const id = String(formData.get("paymentId") ?? "").trim();
   const clientName = String(formData.get("clientName") ?? "").trim();
-  const projectName = String(formData.get("projectName") ?? "").trim();
+  const project = await selectedProject(formData);
+  if (!project) return { error: "Select an existing project to link this payment." };
+  const projectId = String(project._id);
+  const projectName = project.name;
   const invoiceNumber = String(formData.get("invoiceNumber") ?? "").trim();
   const amountStr = String(formData.get("amount") ?? "0").trim();
   const receivedAmountStr = String(formData.get("receivedAmount") ?? "0").trim();
@@ -207,6 +225,7 @@ export async function updateClientPayment(
   }
 
   await SalesPaymentModel.findByIdAndUpdate(id, {
+    projectId,
     clientName,
     projectName,
     invoiceNumber,
@@ -219,6 +238,8 @@ export async function updateClientPayment(
   });
 
   revalidatePath("/dashboard/payments");
+  revalidatePath("/dashboard/projects", "layout");
+  revalidatePath("/dashboard/employees", "layout");
   revalidatePath("/dashboard");
 
   return {
@@ -253,6 +274,8 @@ export async function deleteClientPayment(formData: FormData) {
   await SalesPaymentModel.findByIdAndDelete(paymentId);
 
   revalidatePath("/dashboard/payments");
+  revalidatePath("/dashboard/projects", "layout");
+  revalidatePath("/dashboard/employees", "layout");
   revalidatePath("/dashboard");
 }
 
@@ -301,6 +324,8 @@ export async function markPaymentReceived(
   });
 
   revalidatePath("/dashboard/payments");
+  revalidatePath("/dashboard/projects", "layout");
+  revalidatePath("/dashboard/employees", "layout");
   revalidatePath("/dashboard");
 
   return { success: newStatus === "PAID" ? "Payment marked as fully paid." : "Partial payment recorded." };
@@ -364,6 +389,8 @@ export async function addPaymentInstallment(
   });
 
   revalidatePath("/dashboard/payments");
+  revalidatePath("/dashboard/projects", "layout");
+  revalidatePath("/dashboard/employees", "layout");
   revalidatePath("/dashboard");
 
   const remaining = totalAmount - newTotal;

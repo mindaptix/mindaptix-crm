@@ -90,14 +90,14 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
   }, [refreshDashboardView]);
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[#f4f7fb] text-slate-900 lg:h-screen lg:overflow-hidden">
+    <main className="crm-app relative min-h-screen overflow-x-hidden bg-[#f4f7fb] text-slate-900 lg:h-screen lg:overflow-hidden">
       <div className="relative mx-auto flex min-h-screen max-w-[1680px] gap-4 px-1 py-1 sm:px-3 sm:py-3 lg:h-screen lg:max-w-none lg:gap-0 lg:px-0 lg:py-0">
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex h-screen w-[308px] flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#061227_0%,#0b1730_30%,#0b2040_68%,#0a4e87_100%)] px-4 py-4 text-white shadow-[28px_0_80px_rgba(2,6,23,0.3)] transition duration-300 lg:w-[320px] lg:px-5 lg:py-5 ${desktopSidebarClasses} ${
+          className={`crm-sidebar fixed inset-y-0 left-0 z-40 flex h-screen w-[260px] flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#061227_0%,#0b1730_30%,#0b2040_68%,#0a4e87_100%)] px-4 py-4 text-white shadow-[28px_0_80px_rgba(2,6,23,0.3)] transition duration-300 lg:w-[260px] lg:px-5 lg:py-5 ${desktopSidebarClasses} ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="shrink-0 rounded-[1.85rem] border border-white/10 bg-[linear-gradient(180deg,rgba(11,28,53,0.98)_0%,rgba(10,54,94,0.94)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_36px_rgba(2,12,27,0.24)]">
+          <div className="crm-brand shrink-0 rounded-[1.85rem] border border-white/10 bg-[linear-gradient(180deg,rgba(11,28,53,0.98)_0%,rgba(10,54,94,0.94)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_36px_rgba(2,12,27,0.24)]">
             <div className="flex items-center gap-3">
               <div className="overflow-hidden rounded-[1rem] shadow-[0_16px_32px_rgba(16,185,129,0.28)]">
                 <Image alt="Dashboard icon" className="h-12 w-12 object-cover" height={48} src="/3.png" width={48} />
@@ -128,7 +128,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
                         <Link
                           className={`group flex w-full items-center gap-3 rounded-[1.2rem] px-3 py-2.5 transition-all duration-150 ${
                             active
-                              ? "bg-white text-slate-900 shadow-[0_8px_24px_rgba(255,255,255,0.12)]"
+                              ? "crm-nav-active bg-white text-slate-900 shadow-[0_8px_24px_rgba(255,255,255,0.12)]"
                               : "text-slate-200/92 hover:bg-white/10 hover:text-white"
                           }`}
                           href={item.href}
@@ -156,7 +156,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
             })}
           </nav>
 
-          <div className="mt-3 shrink-0 overflow-hidden rounded-[1.45rem] border border-white/10 bg-[linear-gradient(145deg,rgba(15,35,65,0.95)_0%,rgba(10,50,90,0.92)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-8px_24px_rgba(0,0,0,0.2)]">
+          <div className="crm-account mt-3 shrink-0 overflow-hidden rounded-[1.45rem] border border-white/10 bg-[linear-gradient(145deg,rgba(15,35,65,0.95)_0%,rgba(10,50,90,0.92)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-8px_24px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-3 px-3.5 pt-3.5">
               {session.user.profilePhotoUrl ? (
                 <Image
@@ -167,7 +167,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
                   width={40}
                 />
               ) : (
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-[linear-gradient(135deg,#1d4ed8,#0f172a)] text-sm font-bold text-white shadow-[0_8px_20px_rgba(29,78,216,0.4)]">
+                <div className="crm-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-[linear-gradient(135deg,#1d4ed8,#0f172a)] text-sm font-bold text-white shadow-[0_8px_20px_rgba(29,78,216,0.4)]">
                   {session.user.fullName.trim().split(" ").filter(Boolean).slice(0, 2).map((p: string) => p[0]).join("").toUpperCase()}
                 </div>
               )}
@@ -517,7 +517,6 @@ function MegaphoneIcon() {
     </svg>
   );
 }
-
 
 
 

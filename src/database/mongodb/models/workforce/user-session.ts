@@ -9,6 +9,8 @@ const userSessionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    impersonatedUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    impersonationExpiresAt: { type: Date, default: null },
     sessionTokenHash: {
       type: String,
       required: true,

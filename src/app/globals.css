@@ -1,14 +1,15 @@
 @import "tailwindcss";
+@import "./workspace-theme.css";
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --card: rgba(15, 23, 42, 0.84);
-  --line: rgba(148, 163, 184, 0.2);
-  --brand: #3b82f6;
-  --brand-strong: #1d4ed8;
-  --font-heading: "Trebuchet MS", "Gill Sans", "Segoe UI", sans-serif;
-  --font-body: "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", sans-serif;
+  --background: #f2f0f8;
+  --foreground: #242235;
+  --card: #ffffff;
+  --line: #e8e6ef;
+  --brand: #7868c5;
+  --brand-strong: #6252ab;
+  --font-body: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-heading: var(--font-body);
 }
 
 * {
@@ -16,16 +17,14 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
   color: var(--foreground);
-  background:
-    radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 24%),
-    linear-gradient(180deg, #09090b 0%, #030712 100%);
+  background: var(--background);
   font-family: var(--font-body);
 }
 
@@ -102,22 +101,6 @@ input:-webkit-autofill:focus {
   50%       { transform: translateY(-10px); }
 }
 
-@keyframes logo-enter {
-  0%   { opacity: 0; transform: translateY(18px) scale(0.88); filter: brightness(0.6); }
-  60%  { opacity: 1; transform: translateY(-4px) scale(1.04); filter: brightness(1.1); }
-  100% { opacity: 1; transform: translateY(0px) scale(1); filter: brightness(1); }
-}
-
-@keyframes logo-glow {
-  0%, 100% { filter: drop-shadow(0 0 8px rgba(45,212,191,0.35)) drop-shadow(0 0 20px rgba(45,212,191,0.15)); }
-  50%       { filter: drop-shadow(0 0 18px rgba(45,212,191,0.65)) drop-shadow(0 0 40px rgba(13,148,136,0.3)); }
-}
-
-@keyframes logo-float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-12px); }
-}
-
 @keyframes float-slow {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-14px); }
@@ -143,12 +126,6 @@ input:-webkit-autofill:focus {
   animation: float 3.2s ease-in-out infinite;
 }
 
-.animate-logo {
-  animation:
-    logo-enter 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-    logo-float 3.6s ease-in-out 0.85s infinite,
-    logo-glow  3.6s ease-in-out 0.85s infinite;
-}
 
 .animate-float-slow {
   animation: float-slow 4.2s ease-in-out infinite;

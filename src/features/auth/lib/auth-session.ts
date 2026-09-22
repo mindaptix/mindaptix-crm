@@ -11,6 +11,7 @@ const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 export type AuthenticatedSession = {
   sessionId: string;
+  impersonator?: { id: string; fullName: string };
   user: {
     id: string;
     fullName: string;
@@ -149,21 +150,35 @@ async function getSessionByToken(token: string): Promise<AuthenticatedSession | 
   // Step 1: find session
   const sessionRecord = await UserSessionModel.findOne(
     { sessionTokenHash: tokenHash, expiresAt: { $gt: now } },
-    { _id: 1, userId: 1 },
+    { _id: 1, userId: 1, impersonatedUserId: 1, impersonationExpiresAt: 1 },
   ).lean();
 
   if (!sessionRecord) return null;
 
   // Step 2: fetch only the fields we need from user (projection = faster)
-  const user = await UserModel.findById(
+  let user = await UserModel.findById(
     sessionRecord.userId,
     { fullName: 1, email: 1, role: 1, managerId: 1, projectIds: 1, leadIds: 1, profilePhotoUrl: 1, status: 1 },
   ).lean<UserRecord | null>();
 
   if (!user || user.status === "SUSPENDED") return null;
 
+  let impersonator: AuthenticatedSession["impersonator"];
+  if (sessionRecord.impersonatedUserId && sessionRecord.impersonationExpiresAt && sessionRecord.impersonationExpiresAt > now) {
+    // Every request rechecks the real owner and target; employee sessions never
+    // inherit super-admin permissions while impersonating.
+    if (user.role !== "SUPER_ADMIN" || user.status !== "ACTIVE") return null;
+    const target = await UserModel.findOne({ _id: sessionRecord.impersonatedUserId, role: "EMPLOYEE", status: "ACTIVE" },
+      { fullName: 1, email: 1, role: 1, managerId: 1, projectIds: 1, leadIds: 1, profilePhotoUrl: 1, status: 1 }).lean<UserRecord | null>();
+    if (target) {
+      impersonator = { id: String(user._id), fullName: user.fullName };
+      user = target;
+    }
+  }
+
   return {
     sessionId: sessionRecord._id.toString(),
+    impersonator,
     user: {
       id: user._id.toString(),
       fullName: user.fullName,
@@ -176,5 +191,4 @@ async function getSessionByToken(token: string): Promise<AuthenticatedSession | 
     },
   };
 }
-
 

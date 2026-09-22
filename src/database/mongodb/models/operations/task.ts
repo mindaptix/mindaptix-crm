@@ -86,6 +86,7 @@ const taskSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    workDate: { type: String, default: "", index: true },
     dueDate: {
       type: String,
       required: true,

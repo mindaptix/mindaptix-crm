@@ -1,5 +1,7 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
@@ -142,19 +144,19 @@ export async function createSalesLead(
     return { error: "Enter a valid client email address.", values };
   }
 
-  if (!SALES_LEAD_SOURCES.includes(source as (typeof SALES_LEAD_SOURCES)[number])) {
+  if (!isEnumValue(SALES_LEAD_SOURCES, source)) {
     return { error: "Select a valid lead source.", values };
   }
 
-  if (!isAdminOrManager && callStatus && !SALES_CALL_STATUSES.includes(callStatus as (typeof SALES_CALL_STATUSES)[number])) {
+  if (callStatus !== "" && !isEnumValue(SALES_CALL_STATUSES, callStatus)) {
     return { error: "Select a valid call status.", values };
   }
 
-  if (isAdminOrManager && !SALES_LEAD_STATUSES.includes(status as (typeof SALES_LEAD_STATUSES)[number])) {
+  if (!isEnumValue(SALES_LEAD_STATUSES, status)) {
     return { error: "Select a valid lead status.", values };
   }
 
-  if (!SALES_LEAD_PRIORITIES.includes(priority as (typeof SALES_LEAD_PRIORITIES)[number])) {
+  if (!isEnumValue(SALES_LEAD_PRIORITIES, priority)) {
     return { error: "Select a valid lead priority.", values };
   }
 
@@ -341,7 +343,7 @@ export async function updateSalesLeadCall(
 
   if (!leadId) return { error: "Lead ID is required." };
 
-  if (callStatus && !SALES_CALL_STATUSES.includes(callStatus as (typeof SALES_CALL_STATUSES)[number])) {
+  if (callStatus !== "" && !isEnumValue(SALES_CALL_STATUSES, callStatus)) {
     return { error: "Invalid call status." };
   }
 
@@ -461,9 +463,9 @@ export async function updateSalesLeadFull(
   if (clientName.length < 2 || clientName.length > 120) return { error: "Client name must be between 2 and 120 characters.", values };
   if (clientPhone && !/^[0-9+\-()\s]{7,20}$/.test(clientPhone)) return { error: "Enter a valid client phone number.", values };
   if (clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) return { error: "Enter a valid client email address.", values };
-  if (!SALES_LEAD_SOURCES.includes(source as (typeof SALES_LEAD_SOURCES)[number])) return { error: "Select a valid lead source.", values };
-  if (!SALES_LEAD_STATUSES.includes(status as (typeof SALES_LEAD_STATUSES)[number])) return { error: "Select a valid lead status.", values };
-  if (!SALES_LEAD_PRIORITIES.includes(priority as (typeof SALES_LEAD_PRIORITIES)[number])) return { error: "Select a valid lead priority.", values };
+  if (!isEnumValue(SALES_LEAD_SOURCES, source)) return { error: "Select a valid lead source.", values };
+  if (!isEnumValue(SALES_LEAD_STATUSES, status)) return { error: "Select a valid lead status.", values };
+  if (!isEnumValue(SALES_LEAD_PRIORITIES, priority)) return { error: "Select a valid lead priority.", values };
   if (technologies.length === 0) return { error: "Select at least one service.", values };
   if (technologies.some((item) => !SALES_TECH_OPTIONS.includes(item as (typeof SALES_TECH_OPTIONS)[number]))) return { error: "One or more selected services are invalid.", values };
 

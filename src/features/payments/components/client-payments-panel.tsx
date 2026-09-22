@@ -19,8 +19,9 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
   const [activeFilter, setActiveFilter] = useState<Filter>("ALL");
   const [editTarget, setEditTarget] = useState<ClientPaymentEntry | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [projectFilter, setProjectFilter] = useState("");
 
-  const filtered = data.payments.filter((p) => activeFilter === "ALL" || p.status === activeFilter);
+  const filtered = data.payments.filter((p) => (activeFilter === "ALL" || p.status === activeFilter) && (!projectFilter || (projectFilter === "unlinked" ? !p.projectId : p.projectId === projectFilter)));
 
   const filterCounts: Record<Filter, number> = {
     ALL: data.payments.length,
@@ -47,6 +48,7 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
 
   return (
     <div className="space-y-5 px-3 pb-3 pt-2 sm:px-7 sm:pb-6">
+      <label className="block text-sm font-medium text-slate-600">Filter by project<select className="crm-input mt-2 max-w-sm" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="">All projects</option><option value="unlinked">Needs project link</option>{suggestions.map((project) => <option value={project.id} key={project.id}>{project.projectName}</option>)}</select></label>
 
       {/* ── Page header ── */}
       <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">

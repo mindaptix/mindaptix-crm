@@ -7,11 +7,14 @@ import { UserModel } from "@/database/mongodb/models/user";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import { formatIndiaDateKey, formatIndiaDateTime } from "@/shared/lib/india-time";
 import type { ClientPaymentEntry, PaymentsPageData } from "../types";
+import { linkLegacyPayments } from "./project-mapping";
 
 export async function getPaymentsPageData(session: AuthenticatedSession): Promise<PaymentsPageData> {
   const canManage = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
 
   await connectDb();
+  if (!canManage) throw new Error("Payment access requires admin permissions.");
+  await linkLegacyPayments();
 
   const today = formatIndiaDateKey();
 
@@ -25,6 +28,7 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
   const projectSuggestions = projectsForSuggestions
     .filter((p) => Boolean(p.name))
     .map((p) => ({
+      id: String(p._id),
       clientName: String((p as unknown as { clientName?: string }).clientName ?? ""),
       projectName: p.name,
     }));
@@ -32,7 +36,7 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
   // Fetch all payment records — admin sees all, no scope filter
   const rawPayments = await SalesPaymentModel.find(
     {},
-    { salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1, transactions: 1, isRecurring: 1, recurringDayOfMonth: 1, recurringEndDate: 1, recurringParentId: 1, recurringLastGenerated: 1 },
+    { projectId: 1, salesUserId: 1, clientName: 1, projectName: 1, invoiceNumber: 1, amount: 1, receivedAmount: 1, dueDate: 1, receivedDate: 1, status: 1, note: 1, createdAt: 1, transactions: 1, isRecurring: 1, recurringDayOfMonth: 1, recurringEndDate: 1, recurringParentId: 1, recurringLastGenerated: 1 },
   )
     .sort({ dueDate: 1, createdAt: -1 })
     .lean();
@@ -59,6 +63,7 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
         const newInvoice = baseInvoice ? `${baseInvoice}-${currentYearMonth}` : "";
 
         const created = await SalesPaymentModel.create({
+          projectId: template.projectId,
           salesUserId: template.salesUserId,
           clientName: (template as unknown as { clientName?: string }).clientName ?? "",
           projectName: (template as unknown as { projectName?: string }).projectName ?? "",
@@ -109,8 +114,9 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
 
     return {
       id: p._id.toString(),
+      projectId: p.projectId ?? "",
       clientName: (p as unknown as { clientName?: string }).clientName ?? "",
-      projectName: (p as unknown as { projectName?: string }).projectName ?? "",
+      projectName: projectsForSuggestions.find((project) => String(project._id) === p.projectId)?.name ?? p.projectName ?? "",
       invoiceNumber: p.invoiceNumber ?? "",
       totalAmount: amount,
       receivedAmount,
@@ -159,4 +165,3 @@ export async function getPaymentsPageData(session: AuthenticatedSession): Promis
     projectSuggestions,
   };
 }
-

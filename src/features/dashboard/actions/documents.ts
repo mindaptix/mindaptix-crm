@@ -1,5 +1,7 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
@@ -24,7 +26,7 @@ export async function uploadEmployeeDocument(_prev: DocumentState, formData: For
   const isAdminOrManager = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
   const resolvedUserId   = isAdminOrManager && targetUserId ? targetUserId : session.user.id;
 
-  if (!DOCUMENT_TYPES.includes(documentType as never)) {
+  if (!isEnumValue(DOCUMENT_TYPES, documentType)) {
     return { error: "Select a valid document type." };
   }
 

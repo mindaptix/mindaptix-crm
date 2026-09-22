@@ -16,7 +16,7 @@ export function PaymentModal({
   initial?: ClientPaymentEntry;
   onSuccess: () => void;
   onClose: () => void;
-  suggestions: { clientName: string; projectName: string }[];
+  suggestions: { id: string; clientName: string; projectName: string }[];
 }) {
   const isEdit = Boolean(initial?.id);
   const action = isEdit ? updateClientPayment : createClientPayment;
@@ -43,6 +43,7 @@ export function PaymentModal({
   const v = state.values ?? {};
   const [clientName, setClientName] = useState(v.clientName ?? initial?.clientName ?? "");
   const [projectName, setProjectName] = useState(v.projectName ?? initial?.projectName ?? "");
+  const [projectId, setProjectId] = useState(initial?.projectId ?? "");
 
   useEffect(() => {
     if (v.clientName !== undefined) setClientName(v.clientName);
@@ -62,14 +63,10 @@ export function PaymentModal({
     () => Array.from(new Set(suggestions.map((s) => s.clientName).filter(Boolean))).sort(),
     [suggestions],
   );
-  const allProjectNames = useMemo(
-    () => Array.from(new Set(suggestions.map((s) => s.projectName).filter(Boolean))).sort(),
-    [suggestions],
-  );
-
   function handleProjectChange(value: string) {
-    setProjectName(value);
-    const match = suggestions.find((s) => s.projectName === value);
+    setProjectId(value);
+    const match = suggestions.find((s) => s.id === value);
+    setProjectName(match?.projectName ?? "");
     if (match?.clientName) setClientName(match.clientName);
   }
 
@@ -174,15 +171,14 @@ export function PaymentModal({
                   required
                   value={clientName}
                 />
-                <ComboField
-                  label="Project Name"
-                  name="projectName"
-                  onChange={handleProjectChange}
-                  options={allProjectNames}
-                  placeholder="Type or select project…"
-                  required
-                  value={projectName}
-                />
+                <label className="text-xs font-medium text-slate-600">Project
+                  <select name="projectId" required value={projectId} onChange={(event) => handleProjectChange(event.target.value)} className="crm-input mt-2">
+                    <option value="">Select a project</option>
+                    {suggestions.map((project) => <option key={project.id} value={project.id}>{project.projectName}{project.clientName ? ` — ${project.clientName}` : ""}</option>)}
+                  </select>
+                  <input type="hidden" name="projectName" value={projectName} />
+                  {initial && !projectId && <span className="mt-1 block text-amber-700">This older payment needs a project link.</span>}
+                </label>
               </div>
             </div>
 

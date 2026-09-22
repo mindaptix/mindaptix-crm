@@ -1,9 +1,11 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
-import { ExpenseModel } from "@/database/mongodb/models/workforce/expense";
+import { ExpenseModel, EXPENSE_CATEGORIES } from "@/database/mongodb/models/workforce/expense";
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { headers } from "next/headers";
 
@@ -25,6 +27,7 @@ export async function submitExpense(_prev: ExpenseState, formData: FormData): Pr
     return { error: "Title, category, amount and date are required." };
   }
 
+  if (!isEnumValue(EXPENSE_CATEGORIES, category) || !Number.isFinite(amount)) return { error: "Invalid category or amount." };
   await connectDb();
   await ExpenseModel.create({
     userId: session.user.id,

@@ -1,5 +1,7 @@
 "use server";
 
+import { isEnumValue } from "@/shared/lib/enum-value";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import { hashPassword } from "@/features/auth/lib/password";
@@ -57,7 +59,7 @@ export async function createManagedUser(
     };
   }
 
-  if (!isMvpRole(role) || !USER_STATUSES.includes(status as UserStatus)) {
+  if (!isMvpRole(role) || !isEnumValue(USER_STATUSES, status)) {
     return { error: "Selected role or status is invalid.", values: { fullName, email, phone, joiningDate, managerId, techStack } };
   }
 
@@ -149,7 +151,7 @@ export async function updateManagedUserAccess(
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
     (phone && !/^[0-9+\-()\s]{7,20}$/.test(phone)) ||
     !isMvpRole(role) ||
-    !USER_STATUSES.includes(status as UserStatus)
+    !isEnumValue(USER_STATUSES, status)
   ) {
     return {
       error: "Invalid user update payload.",
@@ -294,5 +296,4 @@ async function resolveManagerId(managerId: string, role: UserRole, currentUserId
 
   return { value: managerId };
 }
-
 
