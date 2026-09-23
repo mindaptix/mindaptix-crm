@@ -45,13 +45,12 @@ export function CurrentWorkDashboard({ work }: { work: CurrentWork }) {
       </section>
       <section aria-labelledby="ongoing-projects" className="space-y-4">
         <div className="flex items-center justify-between gap-3"><h2 id="ongoing-projects" className="text-lg font-semibold">Ongoing projects <span className="ml-2 rounded-full bg-blue-50 px-2.5 py-1 text-sm text-blue-700">{work.projects.length}</span></h2><Link href="/dashboard/portfolio" className={`text-sm ${linkStyle}`}>View portfolio →</Link></div>
-        {work.projects.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">No projects are currently in progress.</p> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{work.projects.map((project) => <article key={project.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">In progress</span>
-          <h3 className="mt-3 text-lg font-semibold"><Link className="hover:text-blue-700" href={`/dashboard/projects/${project.id}`}>{project.name}</Link></h3>
+        {work.projects.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">No projects are currently in progress.</p> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{work.projects.map((project) => <article key={project.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-indigo-200 hover:shadow-md"><div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400"/><div className="p-5">
+          <div className="flex items-start gap-3"><ProjectIdentity name={project.name}/><div className="min-w-0 flex-1"><span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">In progress</span><h3 className="mt-2 text-lg font-semibold"><Link className="hover:text-blue-700" href={`/dashboard/projects/${project.id}`}>{project.name}</Link></h3></div></div>
           <p className="mt-2 line-clamp-2 text-sm text-slate-500">{project.summary || "No project description added."}</p>
           <div className="mt-4 flex flex-wrap gap-2">{project.people.length ? project.people.map((person) => <Link key={person.id} href={`/dashboard/employees/${person.id}`} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200">{person.name}</Link>) : <span className="text-sm text-amber-700">No active employee assigned</span>}</div>
           <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">Deadline: {project.dueDate || "Not set"}</p>
-        </article>)}</div>}
+        </div></article>)}</div>}
       </section>
       <section aria-labelledby="employee-work" className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="space-y-4 border-b border-slate-200 p-5"><div><h2 id="employee-work" className="text-lg font-semibold">Who is working on what?</h2><p className="mt-1 text-sm text-slate-500">Task statuses are employee-updated. Project-specific work appears in today’s DSR.</p></div>
@@ -66,6 +65,13 @@ export function CurrentWorkDashboard({ work }: { work: CurrentWork }) {
       </section>
     </div>
   );
+}
+
+function ProjectIdentity({ name }: { name: string }) {
+  const initials = name.trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+  const tones = ["from-indigo-600 to-blue-500", "from-violet-600 to-fuchsia-500", "from-emerald-600 to-teal-500", "from-amber-500 to-orange-500"];
+  const tone = tones[name.split("").reduce((total, character) => total + character.charCodeAt(0), 0) % tones.length];
+  return <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${tone} text-sm font-bold text-white shadow-sm`}>{initials || "P"}</span>;
 }
 
 function InsightPanel({ children, empty, href, title }: { children: ReactNode; empty: string; href: string; title: string }) {

@@ -250,9 +250,10 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
                     ) : null}
                   </div>
 
-                  <h3 className="mt-3 text-base font-semibold leading-snug text-slate-900">
-                    {project.name}
-                  </h3>
+                  <div className="mt-4 flex items-start gap-3">
+                    <ProjectMark name={project.name} />
+                    <div className="min-w-0"><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-400">Project workspace</p><h3 className="mt-1 text-base font-semibold leading-snug text-slate-900">{project.name}</h3></div>
+                  </div>
 
                   <div className="mt-3 flex items-center justify-between">
                     <div className="flex -space-x-2">
@@ -772,6 +773,13 @@ function StatPill({ color, label, pulse = false, value }: { color: "blue" | "eme
       <p className="mt-1.5 text-2xl font-semibold text-slate-900">{value}</p>
     </div>
   );
+}
+
+function ProjectMark({ name }: { name: string }) {
+  const letters = name.trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+  const colors = ["from-indigo-600 to-blue-500", "from-violet-600 to-fuchsia-500", "from-emerald-600 to-teal-500", "from-amber-500 to-orange-500"];
+  const index = name.split("").reduce((total, character) => total + character.charCodeAt(0), 0) % colors.length;
+  return <span aria-label={`${name} project identity`} className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${colors[index]} text-sm font-bold text-white shadow-sm`}>{letters || "P"}</span>;
 }
 
 type FieldProps = {
