@@ -11,17 +11,23 @@ export const COMPANY_WORK_POLICY = {
 } as const;
 
 export const COMPANY_HOLIDAYS_2026: CompanyHoliday[] = [
-  ["Makar Sankranti", "2026-01-15"], ["Kanuma", "2026-01-16"], ["Republic Day", "2026-01-26"],
-  ["Holi 2nd Day - Dhuleti", "2026-03-03"], ["Ugadi Festival", "2026-03-19"], ["Eid-Ul-Fitar (Ramzan)", "2026-03-21"],
-  ["Shri Ram Navami", "2026-03-27"], ["Good Friday", "2026-04-03"], ["Dr B R Ambedkar Jayanti", "2026-04-14"],
-  ["May Day", "2026-05-01"], ["Bakri Id (Id-Uz-Zuha)", "2026-05-28"], ["Moharram", "2026-06-26"],
-  ["Independence Day", "2026-08-15"], ["Milad-Un-Nabi", "2026-08-26"], ["Shri Krishna Astami", "2026-09-04"],
-  ["Ganesh Chaturthi (1st Day)", "2026-09-14"], ["Mahatma Gandhi Jayanthi", "2026-10-02"], ["Vijaya Dashmi", "2026-10-20"], ["Christmas", "2026-12-25"],
+  ["Republic Day", "2026-01-26"], ["Holi", "2026-03-04"], ["Id-Ul-Fittr", "2026-03-21"],
+  ["Shri Ram Navami", "2026-03-26"], ["Dr B R Ambedkar Jayanti", "2026-04-14"], ["Bakri Id (Id-Uz-Zuha)", "2026-05-28"],
+  ["Independence Day", "2026-08-15"], ["Janmashtami", "2026-09-04"], ["Birthday Of Gandhiji", "2026-10-02"],
+  ["Dussehra", "2026-10-20"], ["Maharishi Valmiki Jayanti", "2026-10-26"], ["Gowardhan Puja", "2026-11-09"],
+  ["Guru Nanak Jayanti", "2026-11-24"], ["Christmas", "2026-12-25"],
 ].map(([name, date]) => ({ name, date, type: "PUBLIC" }));
 
+const REPLACED_DEFAULT_HOLIDAY_DATES = new Set([
+  "2026-01-15", "2026-01-16", "2026-01-26", "2026-03-03", "2026-03-19", "2026-03-21", "2026-03-27",
+  "2026-04-03", "2026-04-14", "2026-05-01", "2026-05-28", "2026-06-26", "2026-08-15", "2026-08-26",
+  "2026-09-04", "2026-09-14", "2026-10-02", "2026-10-20", "2026-12-25",
+]);
+
 export function mergeCompanyHolidays<T extends { date: string }>(stored: T[]): Array<T | CompanyHoliday> {
-  const storedDates = new Set(stored.map((holiday) => holiday.date));
-  return [...stored, ...COMPANY_HOLIDAYS_2026.filter((holiday) => !storedDates.has(holiday.date))].sort((a, b) => a.date.localeCompare(b.date));
+  const customHolidays = stored.filter((holiday) => !REPLACED_DEFAULT_HOLIDAY_DATES.has(holiday.date));
+  const storedDates = new Set(customHolidays.map((holiday) => holiday.date));
+  return [...customHolidays, ...COMPANY_HOLIDAYS_2026.filter((holiday) => !storedDates.has(holiday.date))].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function getWorkdayBreakdown(startDate: string, endDate: string, holidays: Iterable<string>) {
