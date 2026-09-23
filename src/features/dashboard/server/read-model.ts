@@ -447,7 +447,7 @@ export async function getEmployeesPageData(session?: AuthenticatedSession): Prom
   ] = await Promise.all([
     ProjectModel.find(
       hasAdminLikeAccess ? {} : isSalesSelfView ? { assignedUserIds: session.user.id } : { _id: { $in: [] } },
-      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1 },
+      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, archivedAt: 1, clientName: 1, clientBudget: 1 },
     )
       .sort({ createdAt: -1 })
       .lean(),
@@ -735,22 +735,24 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
   // Keep backwards compat: employees = all assignable users
   const employees = assignableUsers;
   const employeeMap = new Map(employees.map((employee) => [employee._id.toString(), employee]));
-  const uniqueAssignedEmployeeIds = new Set(projects.flatMap((project) => project.assignedUserIds ?? []));
-  const inProgressProjects = projects.filter((project) => project.status === "IN_PROGRESS").length;
-  const completedProjects = projects.filter((project) => project.status === "COMPLETED").length;
-  const plannedProjects = projects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
-  const closedByEmployeeCount = projects.filter((project) => project.closedByEmployeeId).length;
+  const activeProjects = projects.filter((project) => !project.archivedAt);
+  const archivedProjects = projects.filter((project) => project.archivedAt);
+  const uniqueAssignedEmployeeIds = new Set(activeProjects.flatMap((project) => project.assignedUserIds ?? []));
+  const inProgressProjects = activeProjects.filter((project) => project.status === "IN_PROGRESS").length;
+  const completedProjects = activeProjects.filter((project) => project.status === "COMPLETED").length;
+  const plannedProjects = activeProjects.filter((project) => project.status === "PLANNING" || project.status === "ON_HOLD").length;
+  const closedByEmployeeCount = activeProjects.filter((project) => project.closedByEmployeeId).length;
 
   return {
     summaryCards: [
-      { label: "Total Projects", value: String(projects.length), detail: "Project records currently maintained in the workspace." },
+      { label: "Active Projects", value: String(activeProjects.length), detail: "Project records currently maintained in the workspace." },
       { label: "In Progress", value: String(inProgressProjects), detail: "Projects currently under active execution." },
       { label: "Completed", value: String(completedProjects), detail: "Projects already marked complete." },
       { label: "Planned / Hold", value: String(plannedProjects), detail: "Projects still waiting to start or paused." },
       { label: "Closed by Employee", value: String(closedByEmployeeCount), detail: "Projects employees have self-reported as closed." },
       { label: "Assigned Employees", value: String(uniqueAssignedEmployeeIds.size), detail: "Employees currently mapped to at least one project." },
     ],
-    projects: projects.map((project) => ({
+    projects: activeProjects.map((project) => ({
       id: project._id.toString(),
       name: project.name,
       summary: project.summary,
@@ -767,6 +769,15 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
       clientName: String((project as { clientName?: string }).clientName ?? ""),
       clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
     })),
+    archivedProjects: archivedProjects.map((project) => ({
+      id: project._id.toString(), name: project.name, summary: project.summary, status: project.status, priority: project.priority,
+      dueDate: formatDate(project.dueDate), techStack: resolveProjectTechStack(project), assignedUserIds: project.assignedUserIds ?? [],
+      assignedUserNames: (project.assignedUserIds ?? []).map((userId) => employeeMap.get(userId)?.fullName ?? "Assigned employee"),
+      assignedUserPhotoUrls: (project.assignedUserIds ?? []).map((userId) => readString(toRecord(employeeMap.get(userId)).profilePhotoUrl) ?? ""),
+      createdByUserId: project.createdByUserId ?? "", closedByEmployeeId: project.closedByEmployeeId ?? "", closedByEmployeeAt: formatDate(project.closedByEmployeeAt ?? null),
+      clientName: String((project as { clientName?: string }).clientName ?? ""), clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
+    })),
+    canArchive: session.user.role === "SUPER_ADMIN",
     employeeOptions: employees.map((employee) => ({
       id: employee._id.toString(),
       label: `${employee.fullName} (${employee.email})`,

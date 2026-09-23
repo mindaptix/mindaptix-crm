@@ -70,6 +70,8 @@ const projectSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    archivedAt: { type: Date, default: null },
+    archivedByUserId: { type: String, default: "" },
   },
   baseSchemaOptions,
 );
@@ -84,6 +86,7 @@ const hasLatestProjectFields =
   cachedProjectModel.schema.path("assignedUserIds") &&
   cachedProjectModel.schema.path("createdByUserId") &&
   cachedProjectModel.schema.path("closedByEmployeeId") &&
+  cachedProjectModel.schema.path("archivedAt") &&
   cachedProjectModel.schema.path("clientName") &&
   cachedProjectModel.schema.path("clientBudget");
 

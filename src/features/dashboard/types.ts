@@ -461,6 +461,8 @@ export type EmployeeProjectView = {
 export type ProjectsPageData = {
   summaryCards: SummaryCard[];
   projects: EmployeeProjectEntry[];
+  archivedProjects: EmployeeProjectEntry[];
+  canArchive: boolean;
   employeeOptions: EmployeeOption[];
   technologyOptions: string[];
 };

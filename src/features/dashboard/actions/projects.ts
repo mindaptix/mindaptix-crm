@@ -398,6 +398,33 @@ export async function deleteManagedProject(formData: FormData) {
   revalidatePath("/dashboard/projects");
 }
 
+export async function archiveProject(_previousState: { error?: string; success?: string }, formData: FormData) {
+  const session = await getCurrentSession();
+  if (!session || session.user.role !== "SUPER_ADMIN") return { error: "Only the Super Admin can close and archive projects." };
+  const projectId = String(formData.get("projectId") ?? "").trim();
+  if (!projectId) return { error: "Project selection is required." };
+  await connectDb();
+  const project = await ProjectModel.findById(projectId, { name: 1, archivedAt: 1 }).lean();
+  if (!project) return { error: "Project not found." };
+  if (project.archivedAt) return { error: "This project is already archived." };
+  await ProjectModel.findByIdAndUpdate(projectId, { archivedAt: new Date(), archivedByUserId: session.user.id, status: "COMPLETED" });
+  for (const path of ["/dashboard", "/dashboard/projects", "/dashboard/portfolio", "/dashboard/dsr", "/dashboard/tasks"]) revalidatePath(path);
+  return { success: `\"${project.name}\" closed and moved to archive.` };
+}
+
+export async function restoreArchivedProject(_previousState: { error?: string; success?: string }, formData: FormData) {
+  const session = await getCurrentSession();
+  if (!session || session.user.role !== "SUPER_ADMIN") return { error: "Only the Super Admin can restore archived projects." };
+  const projectId = String(formData.get("projectId") ?? "").trim();
+  if (!projectId) return { error: "Project selection is required." };
+  await connectDb();
+  const project = await ProjectModel.findById(projectId, { name: 1, archivedAt: 1 }).lean();
+  if (!project?.archivedAt) return { error: "Archived project not found." };
+  await ProjectModel.findByIdAndUpdate(projectId, { archivedAt: null, archivedByUserId: "", status: "PLANNING" });
+  for (const path of ["/dashboard", "/dashboard/projects", "/dashboard/portfolio", "/dashboard/dsr", "/dashboard/tasks"]) revalidatePath(path);
+  return { success: `\"${project.name}\" restored to active projects.` };
+}
+
 function safeStatus(value: string): ProjectStatus {
   return PROJECT_STATUSES.includes(value as ProjectStatus) ? (value as ProjectStatus) : "PLANNING";
 }
@@ -469,5 +496,3 @@ async function notifyProjectAssignments({
     sourceKey: `project-assigned:${projectId}`,
   });
 }
-
-

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { createManagedProject, deleteManagedProject, updateManagedProject } from "@/features/dashboard/actions/projects";
+import { archiveProject, createManagedProject, deleteManagedProject, restoreArchivedProject, updateManagedProject } from "@/features/dashboard/actions/projects";
 import { emitDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
 import type { ProjectsPageData } from "@/features/dashboard/types";
@@ -58,6 +58,9 @@ const STATUS_FILTERS = ["ALL", "PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"
 export function ProjectsPanel({ data }: ProjectsPanelProps) {
   const [createState, createProjectAction, createPending] = useActionState(createManagedProject, INITIAL_PROJECT_STATE);
   const [updateState, updateProjectAction, updatePending] = useActionState(updateManagedProject, INITIAL_PROJECT_STATE);
+  const [archiveState, archiveAction, archivePending] = useActionState<{ error?: string; success?: string }, FormData>(archiveProject, {});
+  const [restoreState, restoreAction, restorePending] = useActionState<{ error?: string; success?: string }, FormData>(restoreArchivedProject, {});
+  const [view, setView] = useState<"active" | "archive">("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -72,7 +75,8 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
 
   const filteredProjects = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return data.projects.filter((project) => {
+    const source = view === "archive" ? data.archivedProjects : data.projects;
+    return source.filter((project) => {
       if (statusFilter === "CLOSED_BY_EMP") {
         if (!project.closedByEmployeeId) return false;
       } else if (statusFilter !== "ALL" && project.status !== statusFilter) {
@@ -82,7 +86,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
       return [project.name, project.summary, project.status, project.priority, project.dueDate, ...project.techStack, ...project.assignedUserNames]
         .join(" ").toLowerCase().includes(query);
     });
-  }, [data.projects, searchTerm, statusFilter]);
+  }, [data.archivedProjects, data.projects, searchTerm, statusFilter, view]);
 
   const selectedProject = selectedProjectId
     ? data.projects.find((p) => p.id === selectedProjectId) ?? null
@@ -138,7 +142,14 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
           <StatPill label="High Priority" value={String(highPri)} color="rose" />
           <StatPill label="Closed by Employee" value={String(closedByEmp)} color="violet" />
         </div>
+        <div className="mt-5 flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+          <button className={`rounded-md px-3 py-2 text-xs font-semibold ${view === "active" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`} onClick={() => setView("active")} type="button">Active projects ({data.projects.length})</button>
+          <button className={`rounded-md px-3 py-2 text-xs font-semibold ${view === "archive" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`} onClick={() => setView("archive")} type="button">Archive ({data.archivedProjects.length})</button>
+        </div>
       </section>
+
+      {archiveState.error || restoreState.error ? <Feedback>{archiveState.error ?? restoreState.error}</Feedback> : null}
+      {archiveState.success || restoreState.success ? <Feedback tone="success">{archiveState.success ?? restoreState.success}</Feedback> : null}
 
       {/* ── Employee-closed alert ── */}
       {closedByEmp > 0 ? (
@@ -342,13 +353,10 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
                       >
                         View Details
                       </Link>
-                      <button
-                        className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-                        onClick={() => setSelectedProjectId(project.id)}
-                        type="button"
-                      >
-                        Edit
-                      </button>
+                      {view === "archive" ? data.canArchive ? <form action={restoreAction}><input name="projectId" type="hidden" value={project.id} /><button className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700" disabled={restorePending} type="submit">Restore</button></form> : null : <>
+                        <button className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50" onClick={() => setSelectedProjectId(project.id)} type="button">Edit</button>
+                        {data.canArchive ? <form action={archiveAction}><input name="projectId" type="hidden" value={project.id} /><button className="shrink-0 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700" disabled={archivePending} onClick={(event) => { if (!confirm(`Close and archive ${project.name}?`)) event.preventDefault(); }} type="submit">Close</button></form> : null}
+                      </>}
                     </div>
                   </div>
                 </div>
