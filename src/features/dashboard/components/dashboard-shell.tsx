@@ -96,18 +96,18 @@ export function DashboardShell({ children, session, employeeSessionControl, admi
     <main className="crm-app relative min-h-screen overflow-x-hidden bg-[#f4f7fb] text-slate-900 lg:h-screen lg:overflow-hidden">
       <div className="relative mx-auto flex min-h-screen max-w-[1680px] gap-4 px-1 py-1 sm:px-3 sm:py-3 lg:h-screen lg:max-w-none lg:gap-0 lg:px-0 lg:py-0">
         <aside
-          className={`crm-sidebar fixed inset-y-0 left-0 z-40 flex h-screen w-[260px] flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#061227_0%,#0b1730_30%,#0b2040_68%,#0a4e87_100%)] px-4 py-4 text-white shadow-[28px_0_80px_rgba(2,6,23,0.3)] transition duration-300 lg:w-[260px] lg:px-5 lg:py-5 ${desktopSidebarClasses} ${
+          className={`crm-sidebar fixed inset-y-0 left-0 z-40 flex h-screen w-[280px] flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#061227_0%,#0b1730_30%,#0b2040_68%,#0a4e87_100%)] px-4 py-4 text-white shadow-[28px_0_80px_rgba(2,6,23,0.3)] transition duration-300 lg:w-[280px] lg:px-5 lg:py-5 ${desktopSidebarClasses} ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="crm-brand shrink-0 rounded-[1.85rem] border border-white/10 bg-[linear-gradient(180deg,rgba(11,28,53,0.98)_0%,rgba(10,54,94,0.94)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_36px_rgba(2,12,27,0.24)]">
-            <div className="flex items-center gap-3">
-              <div className="overflow-hidden rounded-[1rem] shadow-[0_16px_32px_rgba(16,185,129,0.28)]">
-                <Image alt="Dashboard icon" className="h-12 w-12 object-cover" height={48} src="/3.png" width={48} />
+          <div className="crm-brand shrink-0 rounded-[1.25rem] border border-white/10 bg-[linear-gradient(180deg,rgba(11,28,53,0.98)_0%,rgba(10,54,94,0.94)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_36px_rgba(2,12,27,0.24)]">
+            <div className="flex items-center gap-2.5">
+              <div className="overflow-hidden rounded-xl shadow-[0_12px_24px_rgba(16,185,129,0.24)]">
+                <Image alt="Mindaptix logo" className="h-11 w-11 object-cover object-[center_34%]" height={44} src="/3.png" width={44} />
               </div>
-              <div className="min-w-0">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-cyan-100/68">Workspace</p>
-                <h2 className="truncate text-xl font-semibold text-white">Mindaptix CRM</h2>
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.62rem] font-semibold uppercase tracking-[0.24em] text-cyan-100/68">Workspace</p>
+                <h2 className="mt-0.5 whitespace-nowrap text-[1.05rem] font-semibold leading-tight text-white">Mindaptix CRM</h2>
               </div>
             </div>
           </div>
