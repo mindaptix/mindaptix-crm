@@ -5,9 +5,10 @@ import { AttendancePanel } from "@/features/dashboard/components/attendance-pane
 import { EmployeesManagementPanel } from "@/features/dashboard/components/employees-management-panel";
 import { ExpensesPanel } from "@/features/dashboard/components/expenses-panel";
 import { SettingsPanel } from "@/features/dashboard/components/settings-panel";
+import { HolidayCalendarPanel } from "@/features/dashboard/components/holiday-calendar-panel";
 import { TasksPanel } from "@/features/dashboard/components/tasks-panel";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
-import { getAnnouncementsPageData, getAttendancePageData, getEmployeesPageData, getExpensesPageData, getSettingsPageData, getTasksPageData } from "@/features/dashboard/server/page-data";
+import { getAnnouncementsPageData, getAttendancePageData, getEmployeesPageData, getExpensesPageData, getHolidayCalendarData, getSettingsPageData, getTasksPageData } from "@/features/dashboard/server/page-data";
 import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
 export async function renderSalesDashboardPage(page: DashboardPageKey, session: AuthenticatedSession) {
@@ -44,6 +45,9 @@ export async function renderSalesDashboardPage(page: DashboardPageKey, session: 
     case "announcements": {
       const data = await getAnnouncementsPageData(session);
       return <AnnouncementsPanel data={data} />;
+    }
+    case "holidays": {
+      return <HolidayCalendarPanel holidays={await getHolidayCalendarData()} />;
     }
     case "settings": {
       const data = await getSettingsPageData(session);

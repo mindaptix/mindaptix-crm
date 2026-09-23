@@ -797,6 +797,11 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
         >
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Monthly summary</p>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">Attendance report</h2>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600">{data.monthlyCalendar.workingDays} working days</span>
+            <span className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700">{data.monthlyCalendar.weekendDays} weekend offs</span>
+            <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-700">{data.monthlyCalendar.holidayDays} holidays</span>
+          </div>
         </div>
 
         <DashboardTable

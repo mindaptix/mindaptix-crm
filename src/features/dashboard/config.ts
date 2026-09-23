@@ -20,6 +20,7 @@ export type DashboardNavKey =
   | "documents"
   | "alldocs"
   | "announcements"
+  | "holidays"
   | "settings";
 
 export type DashboardNavItem = {
@@ -54,6 +55,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   { key: "documents", label: "My Documents", href: "/dashboard/documents", allowedRoles: ["EMPLOYEE", "SALES"] },
   { key: "alldocs", label: "All Documents", href: "/dashboard/alldocs", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
   { key: "announcements", label: "Announcements", href: "/dashboard/announcements", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
+  { key: "holidays", label: "Holidays", href: "/dashboard/holidays", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
   { key: "settings", label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
 ];
 

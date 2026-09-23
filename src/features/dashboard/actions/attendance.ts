@@ -8,7 +8,9 @@ import { getDailyPlan } from "@/features/tasks/server/daily-plan";
 import { UserModel } from "@/database/mongodb/models/workforce/user";
 import { assertSuperAdmin } from "@/features/auth/lib/user-admin";
 import { SettingModel } from "@/database/mongodb/models/setting";
+import { HolidayModel } from "@/database/mongodb/models/system/holiday";
 import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time";
+import { COMPANY_HOLIDAYS_2026, COMPANY_WORK_POLICY } from "@/features/dashboard/lib/work-calendar";
 
 const VALID_WORK_MODES = ["OFFICE", "WFH", "FIELD"] as const;
 type WorkMode = (typeof VALID_WORK_MODES)[number];
@@ -130,6 +132,13 @@ export async function checkInAttendance(formData: FormData): Promise<AttendanceA
   const now = new Date();
   const dateKey = formatIndiaDateKey(now);
   const currentTimeKey = formatIndiaTimeKey(now);
+
+  const isWeekend = COMPANY_WORK_POLICY.weeklyOffDays.includes(new Date(`${dateKey}T00:00:00.000Z`).getUTCDay() as 0 | 6);
+  const isConfiguredHoliday = COMPANY_HOLIDAYS_2026.some((holiday) => holiday.date === dateKey);
+  const isCustomHoliday = Boolean(await HolidayModel.exists({ date: dateKey }));
+  if (isWeekend || isConfiguredHoliday || isCustomHoliday) {
+    return { error: isWeekend ? "Today is a weekly off (Saturday/Sunday). Attendance is not required." : "Today is a company holiday. Attendance is not required." };
+  }
 
   if (session.user.role === "EMPLOYEE") {
     const plan = await getDailyPlan(session.user.id, dateKey);

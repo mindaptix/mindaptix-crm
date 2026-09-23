@@ -361,6 +361,7 @@ export type AttendancePageData = {
   canViewLocation: boolean;
   canManageOthers: boolean;
   monthlyWorkingDays: number;
+  monthlyCalendar: { calendarDays: number; weekendDays: number; holidayDays: number; workingDays: number };
   officeLocation: {
     label: string;
     address: string;

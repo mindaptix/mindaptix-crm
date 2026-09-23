@@ -18,6 +18,7 @@ export {
   getAssetsPageData,
   getEmployeeDocumentsData,
   getAllEmployeeDocumentsData,
+  getHolidayCalendarData,
   getEmployeeDetailData,
   getProjectDetailData,
 } from "@/features/dashboard/server/read-model";

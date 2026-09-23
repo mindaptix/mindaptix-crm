@@ -35,6 +35,7 @@ import { AttendanceRegularizationModel } from "@/database/mongodb/models/workfor
 import { AssetModel } from "@/database/mongodb/models/workforce/asset";
 import { EmployeeDocumentModel } from "@/database/mongodb/models/workforce/employee-document";
 import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/shared/lib/india-time";
+import { getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 import type {
   AnnouncementsPageData,
   AttendanceMonthlyRow,
@@ -781,7 +782,6 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
   const today = getTodayDate();
   const monthPrefix = today.slice(0, 7);
   const monthStart = `${monthPrefix}-01`;
-  const monthlyWorkingDays = getWorkingDaysInDateRange(monthStart, today);
   const scopeIds =
     session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER"
       ? await getAllActiveEmployeeIds()
@@ -789,7 +789,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
   const attendanceIds = session.user.role === "EMPLOYEE" || session.user.role === "SALES" ? [session.user.id] : scopeIds;
   const attendanceScope = inScope(attendanceIds);
 
-  const [todayRecord, todayRecords, monthlyRecords, users, settings] = await Promise.all([
+  const [todayRecord, todayRecords, monthlyRecords, users, settings, monthlyHolidays] = await Promise.all([
     AttendanceModel.findOne({ userId: session.user.id, dateKey: today }).lean(),
     AttendanceModel.find({ userId: attendanceScope, dateKey: today }).sort({ checkInAt: 1 }).lean(),
     AttendanceModel.find({ userId: attendanceScope, dateKey: { $regex: `^${monthPrefix}` } }).lean(),
@@ -807,7 +807,10 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
         geoFenceEnabled: 1,
       },
     ).lean(),
+    HolidayModel.find({ date: { $gte: monthStart, $lte: today } }, { date: 1 }).lean(),
   ]);
+  const monthlyCalendar = getWorkdayBreakdown(monthStart, today, mergeCompanyHolidays(monthlyHolidays).map((holiday) => holiday.date));
+  const monthlyWorkingDays = monthlyCalendar.workingDays;
   const settingsRecord = toRecord(settings);
   const workStart = readString(settingsRecord.workStart) ?? "10:00";
   const lateGraceMinutes = readNumberLike(settingsRecord.lateGraceMinutes) ?? 15;
@@ -852,6 +855,7 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
     canViewLocation,
     canManageOthers: session.user.role === "SUPER_ADMIN",
     monthlyWorkingDays,
+    monthlyCalendar,
     officeLocation,
     summaryCards: [
       { label: "Present Today", value: String(presentCount), detail: "Attendance entries marked for today." },
@@ -1639,15 +1643,42 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     openAiChatModel: readString(toRecord(settings).openAiChatModel) ?? process.env.OPENAI_DSR_MODEL ?? "gpt-4o-mini",
     hasGroqApiKey: Boolean(readString(toRecord(settings).groqApiKeyEncrypted) || process.env.GROQ_API_KEY),
     hasOpenAiApiKey: Boolean(readString(toRecord(settings).openAiApiKeyEncrypted) || process.env.OPENAI_API_KEY),
-    holidays: holidays.map((h) => ({
+    holidays: mergeCompanyHolidays(holidays.map((h) => ({
       id: h._id.toString(),
       name: h.name,
       date: h.date,
       year: h.year,
       type: h.type,
       description: h.description ?? "",
+    }))).map((holiday, index) => ({
+      id: "id" in holiday ? holiday.id : `company-holiday-${holiday.date}-${index}`,
+      name: holiday.name,
+      date: holiday.date,
+      year: Number(holiday.date.slice(0, 4)),
+      type: holiday.type,
+      description: "description" in holiday ? holiday.description : "",
     })),
   };
+}
+
+export async function getHolidayCalendarData() {
+  await connectDb();
+  const holidays = await HolidayModel.find({ year: 2026 }).sort({ date: 1 }).lean();
+  return mergeCompanyHolidays(holidays.map((holiday) => ({
+    id: holiday._id.toString(),
+    name: holiday.name,
+    date: holiday.date,
+    year: holiday.year,
+    type: holiday.type,
+    description: holiday.description ?? "",
+  }))).map((holiday, index) => ({
+    id: "id" in holiday ? holiday.id : `company-holiday-${holiday.date}-${index}`,
+    name: holiday.name,
+    date: holiday.date,
+    year: Number(holiday.date.slice(0, 4)),
+    type: holiday.type,
+    description: "description" in holiday ? holiday.description : "",
+  }));
 }
 
 function getLast3MonthKeys(): string[] {

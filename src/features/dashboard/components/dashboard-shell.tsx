@@ -303,7 +303,7 @@ const NAV_GROUPS: { label: string | null; keys: DashboardNavKey[] }[] = [
   { label: "Sales & Schedule", keys: ["client-pitches", "meetings"] },
   { label: "Finance", keys: ["reports", "payroll", "expenses", "payments"] },
   { label: "Resources", keys: ["assets", "documents", "alldocs"] },
-  { label: "Communication", keys: ["announcements"] },
+  { label: "Communication", keys: ["announcements", "holidays"] },
   { label: "Account", keys: ["settings"] },
 ];
 
@@ -351,6 +351,8 @@ function getMenuIcon(key: DashboardNavKey) {
       return <DocumentsIcon />;
     case "announcements":
       return <MegaphoneIcon />;
+    case "holidays":
+      return <CalendarIcon />;
     case "settings":
       return <SettingsIcon />;
   }
