@@ -38,6 +38,11 @@ export async function getCurrentWork(session: AuthenticatedSession) {
       updates: updates.filter((update) => update.userId === id).map((update) => ({ id: String(update._id), project: projectMap.get(update.projectId) ?? "No linked project", summary: update.summary })),
     };
   });
+  const now = new Date();
+  const overdueTasks = mappedTasks.filter((task) => task.deadlineAt && new Date(task.deadlineAt) < now);
+  const missingDsrPeople = people.filter((person) => person.presence === "Checked in" && person.updates.length === 0);
+  const uncheckedPeople = people.filter((person) => person.presence === "Not checked in");
+  const unassignedProjects = projects.filter((project) => project.status === "IN_PROGRESS" && project.assignedUserIds.length === 0);
   return {
     generatedAt: new Date().toISOString(),
     today, people,
@@ -47,6 +52,14 @@ export async function getCurrentWork(session: AuthenticatedSession) {
       people: people.filter((person) => project.assignedUserIds.includes(person.id)).map((person) => ({ id: person.id, name: person.name })),
     })),
     assignedTasks: mappedTasks.filter((task) => task.employeeId === session.user.id),
+    insights: {
+      checkedIn: people.filter((person) => person.presence === "Checked in").length,
+      onLeave: people.filter((person) => person.presence === "On leave").length,
+      unchecked: uncheckedPeople.length,
+      overdueTasks,
+      missingDsrPeople: missingDsrPeople.map((person) => ({ id: person.id, name: person.name })),
+      unassignedProjects: unassignedProjects.map((project) => ({ id: String(project._id), name: project.name })),
+    },
   };
 }
 

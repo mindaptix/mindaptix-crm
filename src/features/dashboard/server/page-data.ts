@@ -18,4 +18,6 @@ export {
   getAssetsPageData,
   getEmployeeDocumentsData,
   getAllEmployeeDocumentsData,
-} from "@/features/dashboard/data";
+  getEmployeeDetailData,
+  getProjectDetailData,
+} from "@/features/dashboard/server/read-model";

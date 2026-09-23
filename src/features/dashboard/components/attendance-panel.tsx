@@ -435,29 +435,25 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard
-          gradient="from-emerald-500 to-teal-500"
-          iconBg="bg-white/20"
+          tone="emerald"
           icon="✓"
           label="Present"
           value={presentToday}
         />
         <StatCard
-          gradient="from-rose-500 to-pink-500"
-          iconBg="bg-white/20"
+          tone="slate"
           icon="✕"
-          label="Absent"
+          label="Not marked"
           value={absentToday}
         />
         <StatCard
-          gradient="from-amber-500 to-orange-500"
-          iconBg="bg-white/20"
+          tone="amber"
           icon="⏱"
           label="Late"
           value={lateToday}
         />
         <StatCard
-          gradient="from-violet-500 to-purple-500"
-          iconBg="bg-white/20"
+          tone="indigo"
           icon="🏠"
           label="WFH"
           value={wfhToday}
@@ -676,20 +672,14 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
         )}
 
         {/* Today's roster */}
-        <div className="overflow-hidden rounded-[1.8rem] shadow-[0_8px_40px_rgba(15,23,42,0.1)]"
-          style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff" }}>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           {/* Header */}
           <div
-            className="flex flex-wrap items-center justify-between gap-3 px-6 py-5"
-            style={{
-              background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)",
-              borderBottom: "1px solid rgba(99,102,241,0.1)",
-            }}
+            className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6"
           >
             <div>
-              <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]"
-                style={{ color: "#6366f1" }}>Live Roster</p>
-              <h2 className="mt-0.5 text-lg font-bold text-slate-800">Today&apos;s Attendance</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Live attendance</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-900">Today&apos;s team roster</h2>
             </div>
             <div className="flex items-center gap-2 rounded-full px-3 py-1.5"
               style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
@@ -711,13 +701,13 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
-                  <tr style={{ background: "linear-gradient(90deg,#f8fafc,#f1f5f9)", borderBottom: "2px solid rgba(99,102,241,0.08)" }}>
-                    <th className="px-5 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Employee</th>
-                    <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Check In</th>
-                    <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Check Out</th>
-                    <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Hours</th>
-                    <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Mode</th>
-                    <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Status</th>
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="px-5 py-3 text-left text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Employee</th>
+                    <th className="px-4 py-3 text-left text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Check in</th>
+                    <th className="px-4 py-3 text-left text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Check out</th>
+                    <th className="px-4 py-3 text-left text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Hours</th>
+                    <th className="px-4 py-3 text-left text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Mode</th>
+                    <th className="px-4 py-3 text-left text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Status</th>
                     {data.canViewLocation && (
                       <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Location</th>
                     )}
@@ -801,19 +791,12 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
       )}
 
       {/* ── Monthly report ── */}
-      <div className="overflow-hidden rounded-[1.8rem] shadow-[0_8px_40px_rgba(15,23,42,0.08)]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff" }}>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div
-          className="px-6 py-5"
-          style={{
-            background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)",
-            borderBottom: "1px solid rgba(99,102,241,0.1)",
-          }}
+          className="border-b border-slate-200 px-5 py-4 sm:px-6"
         >
-          <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>
-            Monthly Summary
-          </p>
-          <h2 className="mt-0.5 text-lg font-bold text-slate-800">Attendance Report</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Monthly summary</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900">Attendance report</h2>
         </div>
 
         <DashboardTable
@@ -1057,23 +1040,24 @@ function TimeBox({ label, time, accent }: { label: string; time: string | null; 
   );
 }
 
-function StatCard({ gradient, iconBg, icon, label, value }: {
-  gradient: string; iconBg: string; icon: string; label: string; value: number;
+function StatCard({ icon, label, tone, value }: {
+  icon: string; label: string; tone: "emerald" | "slate" | "amber" | "indigo"; value: number;
 }) {
+  const tones = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    indigo: "border-indigo-100 bg-indigo-50 text-indigo-700",
+  };
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl bg-linear-to-br ${gradient} p-4 text-white shadow-lg`}
-      style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}
-    >
-      {/* subtle bg circle */}
-      <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+    <div className={`rounded-xl border p-4 ${tones[tone]}`}>
       <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg ${iconBg}`}>
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/80 text-base shadow-sm">
           {icon}
         </div>
         <div>
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em] text-white/70">{label}</p>
-          <p className="text-2xl font-black leading-none text-white">{value}</p>
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] opacity-70">{label}</p>
+          <p className="mt-1 text-2xl font-semibold leading-none">{value}</p>
         </div>
       </div>
     </div>

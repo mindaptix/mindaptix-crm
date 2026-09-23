@@ -6,7 +6,7 @@ import React, { type ReactNode, useActionState, useCallback, useEffect, useMemo,
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { addTaskComment, createTask, reviewTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
+import { addTaskComment, closeTask, createTask, deleteTask, reviewTask, updateTaskStatus } from "@/features/dashboard/actions/tasks";
 import { emitDashboardSync, subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { Feedback } from "@/shared/ui/feedback";
 import { FormActionButton } from "@/shared/ui/form-action-button";
@@ -16,6 +16,7 @@ import { TASK_DESCRIPTION_MAX_LENGTH } from "@/features/tasks/constants";
 
 type TasksPanelProps = {
   canAssign: boolean;
+  canManageLifecycle?: boolean;
   data: TaskPageData;
   readOnly: boolean;
 };
@@ -32,12 +33,12 @@ const INITIAL_TASK_STATE = {
   },
 };
 
-const STATUS_CONFIG: Record<string, { gradient: string; chip: string; chipText: string; dot: string; label: string }> = {
-  PENDING:        { gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", chip: "rgba(245,158,11,0.12)",  chipText: "#d97706", dot: "#f59e0b", label: "Pending" },
-  IN_PROGRESS:    { gradient: "linear-gradient(135deg,#3b82f6,#6366f1)", chip: "rgba(99,102,241,0.12)",  chipText: "#4f46e5", dot: "#6366f1", label: "In Progress" },
-  COMPLETED:      { gradient: "linear-gradient(135deg,#f97316,#fb923c)", chip: "rgba(249,115,22,0.12)",  chipText: "#ea580c", dot: "#f97316", label: "Awaiting Review" },
-  CLOSED:         { gradient: "linear-gradient(135deg,#10b981,#34d399)", chip: "rgba(16,185,129,0.12)",  chipText: "#059669", dot: "#10b981", label: "Closed" },
-  REJECTED:       { gradient: "linear-gradient(135deg,#ef4444,#f87171)", chip: "rgba(239,68,68,0.12)",   chipText: "#dc2626", dot: "#ef4444", label: "Rejected" },
+const STATUS_CONFIG: Record<string, { chip: string; chipText: string; dot: string; label: string }> = {
+  PENDING:        { chip: "rgba(245,158,11,0.12)",  chipText: "#d97706", dot: "#f59e0b", label: "Pending" },
+  IN_PROGRESS:    { chip: "rgba(99,102,241,0.12)",  chipText: "#4f46e5", dot: "#6366f1", label: "In Progress" },
+  COMPLETED:      { chip: "rgba(249,115,22,0.12)",  chipText: "#ea580c", dot: "#f97316", label: "Awaiting Review" },
+  CLOSED:         { chip: "rgba(16,185,129,0.12)",  chipText: "#059669", dot: "#10b981", label: "Closed" },
+  REJECTED:       { chip: "rgba(239,68,68,0.12)",   chipText: "#dc2626", dot: "#ef4444", label: "Rejected" },
 };
 
 const PRIORITY_CONFIG: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -46,7 +47,7 @@ const PRIORITY_CONFIG: Record<string, { bg: string; text: string; border: string
   LOW:    { bg: "rgba(100,116,139,0.09)",text: "#475569", border: "rgba(100,116,139,0.2)", label: "Low" },
 };
 
-export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
+export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOnly }: TasksPanelProps) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createTask, INITIAL_TASK_STATE);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -115,7 +116,7 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
               </h2>
             </div>
             <div className="flex items-center gap-3">
-              {canAssign && (
+              {!readOnly && (
                 <button
                   className="crm-primary"
                   onClick={() => setIsCreateOpen(true)}
@@ -179,6 +180,7 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
                 <TaskCard
                   key={task.id}
                   canAssign={canAssign}
+                  canManageLifecycle={canManageLifecycle}
                   task={task}
                   readOnly={readOnly}
                   onTaskUpdated={refreshView}
@@ -189,8 +191,9 @@ export function TasksPanel({ canAssign, data, readOnly }: TasksPanelProps) {
       </div>
 
       {/* ── Create Task Modal ── */}
-      {isCreateOpen && canAssign ? (
+      {isCreateOpen && !readOnly ? (
         <CreateTaskModal
+          canAssign={canAssign}
           data={data}
           formAction={formAction}
           onClose={() => setIsCreateOpen(false)}
@@ -218,12 +221,14 @@ type CreateTaskState = {
 };
 
 function CreateTaskModal({
+  canAssign,
   data,
   formAction,
   onClose,
   pending,
   state,
 }: {
+  canAssign: boolean;
   data: TaskPageData;
   formAction: (fd: FormData) => void;
   onClose: () => void;
@@ -274,7 +279,7 @@ function CreateTaskModal({
             <div>
               <p className="text-xs font-medium text-slate-500">Work management</p>
               <h4 className="mt-0.5 text-lg font-semibold text-slate-900">Create task</h4>
-              <p className="mt-0.5 text-sm text-slate-500">Set an owner, due date, and priority.</p>
+              <p className="mt-0.5 text-sm text-slate-500">{canAssign ? "Set an owner, due date, and priority." : "Create your work plan with a deadline and priority."}</p>
             </div>
           </div>
         </div>
@@ -290,8 +295,8 @@ function CreateTaskModal({
               <FormSelect icon={<FlagIcon />} label="Priority" name="priority" defaultValue={state.values?.priority ?? "MEDIUM"} options={["LOW", "MEDIUM", "HIGH"]} labels={{ LOW: "Low", MEDIUM: "Medium", HIGH: "High" }} />
             </div>
             <FormTextArea label="Description" name="description" placeholder="Add context, deliverables, and acceptance criteria" defaultValue={state.values?.description} maxLength={TASK_DESCRIPTION_MAX_LENGTH} />
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <FormSelect icon={<UserIcon />} label="Owner" name="assignedUserId" defaultValue={state.values?.assignedUserId ?? ""} includePlaceholder options={data.employeeOptions.map((e) => e.id)} labels={Object.fromEntries(data.employeeOptions.map((e) => [e.id, e.label]))} />
+            <div className={`grid gap-4 sm:grid-cols-2 ${canAssign ? "lg:grid-cols-3" : ""}`}>
+              {canAssign ? <FormSelect icon={<UserIcon />} label="Owner" name="assignedUserId" defaultValue={state.values?.assignedUserId ?? ""} includePlaceholder options={data.employeeOptions.map((e) => e.id)} labels={Object.fromEntries(data.employeeOptions.map((e) => [e.id, e.label]))} /> : null}
               <FormField icon={<CalIcon />} label="Deadline Date (IST)" name="dueDate" placeholder="Due date" type="date" defaultValue={state.values?.dueDate} />
               <FormField icon={<CalIcon />} label="Deadline Time (IST)" name="dueTime" placeholder="18:00" type="time" defaultValue={state.values?.dueTime ?? "18:00"} />
             </div>
@@ -339,16 +344,19 @@ function CreateTaskModal({
 /* ─── Task Card ─── */
 function TaskCard({
   canAssign,
+  canManageLifecycle,
   task,
   readOnly,
   onTaskUpdated,
 }: {
   canAssign: boolean;
+  canManageLifecycle: boolean;
   task: TaskEntry;
   readOnly: boolean;
   onTaskUpdated: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.PENDING;
   const pc = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.LOW;
 
@@ -361,23 +369,23 @@ function TaskCard({
           <div className="min-w-0">
             {/* Title row */}
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <h3 className="text-[0.95rem] font-bold text-slate-800">{task.title}</h3>
+              <h3 className="text-[0.95rem] font-semibold text-slate-900">{task.title}</h3>
               <div className="flex shrink-0 flex-wrap items-center gap-2 lg:hidden">
                 {/* Status badge */}
-                <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wider"
+                <span className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
                   style={{ background: sc.chip, color: sc.chipText }}>
                   <span className={`h-1.5 w-1.5 rounded-full ${task.status === "IN_PROGRESS" ? "animate-pulse" : ""}`}
                     style={{ background: sc.dot }} />
                   {sc.label}
                 </span>
                 {/* Priority badge */}
-                <span className="rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wider"
+                <span className="rounded-md px-2.5 py-1 text-xs font-semibold"
                   style={{ background: pc.bg, color: pc.text, border: `1px solid ${pc.border}` }}>
                   {pc.label}
                 </span>
                 {/* Overdue badge */}
                 {task.isOverdue && (
-                  <span className="rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wider"
+                  <span className="rounded-md px-2.5 py-1 text-xs font-semibold"
                     style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}>
                     ⚠ Overdue
                   </span>
@@ -412,7 +420,7 @@ function TaskCard({
               {/* Due date */}
               {dueDateDisplay && (
                 <span
-                  className="flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 font-medium"
                   style={
                     task.isOverdue
                       ? { background: "rgba(239,68,68,0.08)", color: "#dc2626" }
@@ -428,7 +436,7 @@ function TaskCard({
 
               {/* Labels */}
               {task.labels.length > 0 && task.labels.map((lbl) => (
-                <span key={lbl} className="rounded-full px-2 py-0.5 font-semibold"
+                <span key={lbl} className="rounded-md px-2 py-1 font-medium"
                   style={{ background: "rgba(99,102,241,0.07)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.12)" }}>
                   {lbl}
                 </span>
@@ -441,7 +449,7 @@ function TaskCard({
                 {task.attachments.map((att) => (
                   <a
                     key={att.url}
-                    className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold transition-colors hover:brightness-95"
+                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors hover:brightness-95"
                     href={att.url}
                     rel="noreferrer"
                     target="_blank"
@@ -479,7 +487,7 @@ function TaskCard({
                 >
                   <input name="taskId" type="hidden" value={task.id} />
                   <select
-                    className="rounded-xl border border-slate-200 bg-white py-1.5 pl-3 pr-7 text-xs font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-50"
+                    className="rounded-md border border-slate-300 bg-white py-1.5 pl-3 pr-7 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     defaultValue={task.status === "REJECTED" ? "IN_PROGRESS" : task.status}
                     name="status"
                   >
@@ -488,8 +496,7 @@ function TaskCard({
                     <option value="COMPLETED">Submit for Review</option>
                   </select>
                   <FormActionButton
-                    className="rounded-xl px-3 py-1.5 text-xs font-bold"
-                    style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", color: "#fff", border: "none", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" } as React.CSSProperties}
+                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
                     pendingLabel="Saving…"
                     type="submit"
                   >
@@ -512,8 +519,7 @@ function TaskCard({
                     <input name="taskId" type="hidden" value={task.id} />
                     <input name="action" type="hidden" value="ACCEPT" />
                     <FormActionButton
-                      className="rounded-full px-3 py-1.5 text-[0.65rem] font-bold"
-                      style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff", border: "none", boxShadow: "0 3px 10px rgba(16,185,129,0.3)" } as React.CSSProperties}
+                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                       pendingLabel="Accepting…"
                       type="submit"
                     >
@@ -531,8 +537,7 @@ function TaskCard({
                     <input name="taskId" type="hidden" value={task.id} />
                     <input name="action" type="hidden" value="REJECT" />
                     <FormActionButton
-                      className="rounded-full px-3 py-1.5 text-[0.65rem] font-bold"
-                      style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", border: "none", boxShadow: "0 3px 10px rgba(239,68,68,0.3)" } as React.CSSProperties}
+                      className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
                       pendingLabel="Rejecting…"
                       type="submit"
                     >
@@ -542,8 +547,40 @@ function TaskCard({
                 </div>
               )}
 
+              {canManageLifecycle && task.status !== "CLOSED" ? (
+                <form action={async (formData) => {
+                  const result = await closeTask(formData);
+                  if (result.error) { window.alert(result.error); return; }
+                  emitDashboardSync("task-closed");
+                  onTaskUpdated();
+                }}>
+                  <input name="taskId" type="hidden" value={task.id} />
+                  <FormActionButton className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[0.68rem] font-semibold text-emerald-700 transition hover:bg-emerald-100" pendingLabel="Closing…" type="submit">Close task</FormActionButton>
+                </form>
+              ) : null}
+
+              {canManageLifecycle ? (
+                confirmDelete ? (
+                  <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1">
+                    <span className="text-[0.68rem] font-medium text-red-700">Delete permanently?</span>
+                    <form action={async (formData) => {
+                      const result = await deleteTask(formData);
+                      if (result.error) { window.alert(result.error); return; }
+                      emitDashboardSync("task-deleted");
+                      onTaskUpdated();
+                    }}>
+                      <input name="taskId" type="hidden" value={task.id} />
+                      <FormActionButton className="text-[0.68rem] font-semibold text-red-700 hover:text-red-900" pendingLabel="Deleting…" type="submit">Delete</FormActionButton>
+                    </form>
+                    <button className="text-[0.68rem] font-medium text-slate-500 hover:text-slate-800" onClick={() => setConfirmDelete(false)} type="button">Cancel</button>
+                  </div>
+                ) : (
+                  <button className="rounded-md px-2 py-1.5 text-[0.68rem] font-medium text-slate-400 transition hover:bg-red-50 hover:text-red-700" onClick={() => setConfirmDelete(true)} type="button">Delete</button>
+                )
+              ) : null}
+
               <button
-                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.65rem] font-semibold transition-colors"
+                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
                 style={{ background: "rgba(99,102,241,0.07)", color: "#6366f1" }}
                 onClick={() => setExpanded((v) => !v)}
                 type="button"
@@ -559,21 +596,20 @@ function TaskCard({
 
             {/* Comments section (expandable) */}
             {expanded && (
-              <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                 {task.comments.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-500">
+                  <div className="rounded-md border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-500">
                     No comments yet.
                   </div>
                 ) : (
                   task.comments.map((c) => (
-                    <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div key={c.id} className="rounded-md border border-slate-200 bg-white p-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
-                          style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)" }}>
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[0.6rem] font-semibold text-indigo-700">
                           {c.userName.charAt(0).toUpperCase()}
                         </div>
                         <span className="text-[0.72rem] font-bold text-slate-800">{c.userName}</span>
-                        <span className="rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase"
+                        <span className="rounded-md px-2 py-0.5 text-[0.65rem] font-semibold"
                           style={{ background: "rgba(99,102,241,0.07)", color: "#6366f1" }}>{c.role}</span>
                         <span className="text-[0.68rem] text-slate-400">{c.createdAt}</span>
                       </div>
@@ -588,19 +624,18 @@ function TaskCard({
                       emitDashboardSync("task-comment-added");
                       onTaskUpdated();
                     }}
-                    className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                    className="space-y-3 rounded-md border border-slate-200 bg-white p-3"
                   >
                     <input name="taskId" type="hidden" value={task.id} />
                     <textarea
-                      className="min-h-20 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                      className="min-h-20 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                       name="message"
                       placeholder="Add a comment or update..."
                       required
                     />
                     <div className="flex justify-end">
                       <FormActionButton
-                        className="h-11 w-full rounded-xl px-6 text-sm font-bold sm:w-auto"
-                        style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", color: "#fff", border: "none" } as React.CSSProperties}
+                        className="h-10 w-full rounded-md bg-indigo-600 px-5 text-sm font-semibold text-white hover:bg-indigo-700 sm:w-auto"
                         pendingLabel="Sending..."
                         type="submit"
                       >
@@ -643,7 +678,7 @@ function FilterPill({ label, value, options, onChange, labels }: {
   return (
     <div className="relative">
       <select
-        className="appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-7 text-xs font-semibold text-slate-600 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-50"
+        className="appearance-none rounded-md border border-slate-300 bg-white py-2 pl-3 pr-7 text-xs font-medium text-slate-600 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >

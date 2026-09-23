@@ -32,7 +32,7 @@ const CONDITION_CFG: Record<string, string> = {
 
 const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
-const INPUT = "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50";
+const INPUT = "w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100";
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -55,10 +55,10 @@ export function AssetsPanel({ data }: Props) {
   }, [data.assets, search, statusFilter, categoryFilter]);
 
   const summaryCards = [
-    { label: "Total Assets", value: data.totalAssets, color: "#6366f1", shadow: "rgba(99,102,241,0.28)", grad: "linear-gradient(135deg,#6366f1,#818cf8)" },
-    { label: "Assigned",     value: data.assignedCount, color: "#10b981", shadow: "rgba(16,185,129,0.28)", grad: "linear-gradient(135deg,#10b981,#34d399)" },
-    { label: "Available",    value: data.availableCount, color: "#3b82f6", shadow: "rgba(59,130,246,0.28)", grad: "linear-gradient(135deg,#3b82f6,#60a5fa)" },
-    { label: "Lost/Damaged", value: data.lostOrDamagedCount, color: "#f59e0b", shadow: "rgba(245,158,11,0.28)", grad: "linear-gradient(135deg,#f59e0b,#fbbf24)" },
+    { label: "Total assets", value: data.totalAssets, tone: "text-slate-900" },
+    { label: "Assigned", value: data.assignedCount, tone: "text-indigo-700" },
+    { label: "Available", value: data.availableCount, tone: "text-emerald-700" },
+    { label: "Needs attention", value: data.lostOrDamagedCount, tone: "text-amber-700" },
   ];
 
   const categories = [...new Set(data.assets.map((a) => a.category))];
@@ -67,15 +67,12 @@ export function AssetsPanel({ data }: Props) {
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* Hero */}
-      <div
-        className="overflow-hidden rounded-[1.8rem]"
-        style={{ background: "linear-gradient(135deg,#312e81 0%,#4f46e5 60%,#6366f1 100%)", boxShadow: "0 12px 40px rgba(79,70,229,0.35)" }}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4 px-7 py-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-indigo-200">Company</p>
-            <h1 className="mt-1 text-2xl font-black text-white">Asset Management</h1>
-            <p className="mt-1 text-[0.78rem] text-indigo-200">Track, assign, and manage all company assets.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Company assets</p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900">Asset register</h1>
+            <p className="mt-1 text-sm text-slate-500">Track ownership, condition, procurement details, and returns.</p>
           </div>
           {data.canManage && (
             <div className="flex gap-2">
@@ -84,7 +81,7 @@ export function AssetsPanel({ data }: Props) {
                   key={t}
                   onClick={() => setTab(t)}
                   type="button"
-                  className={`rounded-xl px-4 py-2 text-sm font-bold transition ${tab === t ? "bg-white text-indigo-700 shadow" : "bg-white/15 text-white hover:bg-white/25"}`}
+                  className={`rounded-md px-3.5 py-2 text-sm font-semibold transition ${tab === t ? "bg-indigo-600 text-white shadow-sm" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
                 >
                   {t === "list" ? "All Assets" : "+ Add Asset"}
                 </button>
@@ -94,11 +91,11 @@ export function AssetsPanel({ data }: Props) {
         </div>
 
         {/* Summary stat row */}
-        <div className="grid grid-cols-2 gap-px border-t border-white/10 bg-white/10 sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-200 pt-5 sm:grid-cols-4">
           {summaryCards.map((c) => (
-            <div key={c.label} className="bg-indigo-900/30 px-5 py-4">
-              <p className="text-2xl font-black text-white">{c.value}</p>
-              <p className="mt-0.5 text-[0.65rem] font-semibold text-indigo-300">{c.label}</p>
+            <div key={c.label} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className={`text-2xl font-semibold ${c.tone}`}>{c.value}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">{c.label}</p>
             </div>
           ))}
         </div>
@@ -109,20 +106,20 @@ export function AssetsPanel({ data }: Props) {
       {tab === "list" && (
         <>
           {/* Filters */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <div className="relative flex flex-1 min-w-50 items-center">
               <svg className="pointer-events-none absolute left-3.5 text-slate-400" fill="none" height="13" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="13">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
               </svg>
               <input
-                className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-9 pr-4 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50 placeholder:text-slate-400"
+                className="w-full rounded-md border border-slate-300 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
                 placeholder="Search assets…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <select
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-300"
+              className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -133,7 +130,7 @@ export function AssetsPanel({ data }: Props) {
             </select>
             {categories.length > 1 && (
               <select
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-300"
+                className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
               >
@@ -147,7 +144,7 @@ export function AssetsPanel({ data }: Props) {
 
           {/* Asset grid */}
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-[1.8rem] border border-dashed border-slate-200 bg-slate-50 py-20 text-center">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white py-20 text-center">
               <p className="text-3xl">📦</p>
               <p className="mt-3 font-semibold text-slate-600">No assets found</p>
               <p className="mt-1 text-sm text-slate-400">
@@ -180,19 +177,12 @@ function AssetCard({ asset, canManage, employeeOptions }: { asset: AssetEntry; c
   const icon = CATEGORY_ICONS[asset.category] ?? "📦";
 
   return (
-    <div
-      className="overflow-hidden rounded-[1.6rem] transition-all hover:-translate-y-0.5 hover:shadow-lg"
-      style={{ border: "1px solid rgba(226,232,240,0.9)", background: "#fff", boxShadow: "0 4px 20px rgba(15,23,42,0.06)" }}
-    >
-      {/* Top accent bar */}
-      <div className="h-1.5" style={{ background: sc.border.replace("rgba", "rgba").replace("0.25", "0.6") }} />
-
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md">
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl"
-              style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)", border: "1px solid rgba(99,102,241,0.12)" }}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-xl"
             >
               {icon}
             </div>
@@ -204,7 +194,7 @@ function AssetCard({ asset, canManage, employeeOptions }: { asset: AssetEntry; c
             </div>
           </div>
           <span
-            className="shrink-0 rounded-full border px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wider"
+            className="shrink-0 rounded-md border px-2 py-1 text-[0.65rem] font-semibold"
             style={{ background: sc.bg, color: sc.text, borderColor: sc.border }}
           >
             {asset.status}
@@ -226,9 +216,9 @@ function AssetCard({ asset, canManage, employeeOptions }: { asset: AssetEntry; c
             <InfoRow icon="💰" label="Value" value={INR.format(asset.purchasePrice)} />
           )}
           {(asset.status === "LOST" || asset.status === "DAMAGED") && asset.fineAmount > 0 && (
-            <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
-              <p className="text-[0.65rem] font-bold uppercase tracking-wider text-rose-600">Fine Charged</p>
-              <p className="mt-0.5 text-sm font-black text-rose-700">{INR.format(asset.fineAmount)}</p>
+            <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-rose-600">Fine charged</p>
+              <p className="mt-0.5 text-sm font-semibold text-rose-700">{INR.format(asset.fineAmount)}</p>
               {asset.fineNote && <p className="mt-0.5 text-[0.68rem] text-rose-500">{asset.fineNote}</p>}
             </div>
           )}
@@ -240,19 +230,19 @@ function AssetCard({ asset, canManage, employeeOptions }: { asset: AssetEntry; c
 
         {/* Error/success */}
         {(updateState.error || assignState.error || returnState.error || deleteState.error) && (
-          <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[0.72rem] font-medium text-rose-700">
+          <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[0.72rem] font-medium text-rose-700">
             {updateState.error ?? assignState.error ?? returnState.error ?? deleteState.error}
           </p>
         )}
         {(updateState.success || assignState.success || returnState.success || deleteState.success) && (
-          <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[0.72rem] font-medium text-emerald-700">
+          <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[0.72rem] font-medium text-emerald-700">
             {updateState.success ?? assignState.success ?? returnState.success ?? deleteState.success}
           </p>
         )}
 
         {/* Admin actions */}
         {canManage && (
-          <div className="mt-4 border-t border-slate-50 pt-4">
+          <div className="mt-4 border-t border-slate-200 pt-4">
             <button
               className="mb-3 flex w-full items-center justify-between text-[0.72rem] font-semibold text-slate-500"
               onClick={() => setExpanded((v) => !v)}
@@ -269,14 +259,13 @@ function AssetCard({ asset, canManage, employeeOptions }: { asset: AssetEntry; c
                 {asset.status === "AVAILABLE" && employeeOptions.length > 0 && (
                   <form action={assignAction} className="flex gap-2">
                     <input type="hidden" name="assetId" value={asset.id} />
-                    <select className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-700 outline-none focus:border-indigo-300" name="userId" required>
+                    <select className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-700 outline-none focus:border-indigo-500" name="userId" required>
                       <option value="">Select employee…</option>
                       {employeeOptions.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
                     </select>
                     <button
-                      className="rounded-xl px-3 py-2 text-[0.78rem] font-bold text-white transition disabled:opacity-50"
+                      className="rounded-md bg-indigo-600 px-3 py-2 text-[0.78rem] font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
                       disabled={assignPending}
-                      style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)" }}
                       type="submit"
                     >
                       {assignPending ? "…" : "Assign"}
@@ -291,7 +280,7 @@ function AssetCard({ asset, canManage, employeeOptions }: { asset: AssetEntry; c
                 <form action={deleteAction}>
                   <input type="hidden" name="assetId" value={asset.id} />
                   <button
-                    className="w-full rounded-xl border border-rose-100 bg-rose-50 py-2 text-[0.78rem] font-semibold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
+                    className="w-full rounded-md border border-rose-200 bg-rose-50 py-2 text-[0.78rem] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
                     disabled={deletePending}
                     type="submit"
                     onClick={(e) => { if (!confirm("Delete this asset permanently?")) e.preventDefault(); }}
@@ -322,49 +311,49 @@ function UpdateAssetForm({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
       <button
         className="flex w-full items-center justify-between text-[0.78rem] font-bold text-slate-700"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
         Edit Details
-        <span style={{ transform: open ? "rotate(180deg)" : "rotate(0)" }}>â–¾</span>
+        <span style={{ transform: open ? "rotate(180deg)" : "rotate(0)" }}>▾</span>
       </button>
 
       {open && (
         <form action={action} className="mt-3 space-y-2">
           <input name="assetId" type="hidden" value={asset.id} />
-          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.name} name="name" placeholder="Asset name" required />
+          <input className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.name} name="name" placeholder="Asset name" required />
           <div className="grid gap-2 sm:grid-cols-2">
-            <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.brand} name="brand" placeholder="Brand" />
-            <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.model} name="model" placeholder="Model" />
+            <input className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.brand} name="brand" placeholder="Brand" />
+            <input className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.model} name="model" placeholder="Model" />
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.category} name="category" required>
+            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.category} name="category" required>
               {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.condition} name="condition">
+            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.condition} name="condition">
               <option value="NEW">New</option>
               <option value="GOOD">Good</option>
               <option value="FAIR">Fair</option>
               <option value="POOR">Poor</option>
             </select>
           </div>
-          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.serialNumber} name="serialNumber" placeholder="Serial number" />
+          <input className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.serialNumber} name="serialNumber" placeholder="Serial number" />
           <div className="grid gap-2 sm:grid-cols-2">
-            <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.purchaseDate} name="purchaseDate" type="date" />
-            <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.purchasePrice || ""} min="0" name="purchasePrice" placeholder="Purchase price" type="number" />
+            <input className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.purchaseDate} name="purchaseDate" type="date" />
+            <input className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.purchasePrice || ""} min="0" name="purchasePrice" placeholder="Purchase price" type="number" />
           </div>
-          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-300" defaultValue={asset.notes} name="notes" placeholder="Notes" />
+          <input className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-800 outline-none focus:border-indigo-500" defaultValue={asset.notes} name="notes" placeholder="Notes" />
           <button
-            className="w-full rounded-xl bg-indigo-600 py-2 text-[0.78rem] font-bold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+            className="w-full rounded-md bg-indigo-600 py-2 text-[0.78rem] font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
             disabled={pending}
             type="submit"
           >
-            {pending ? "Updatingâ€¦" : "Update Asset"}
+            {pending ? "Updating…" : "Update Asset"}
           </button>
         </form>
       )}
@@ -387,7 +376,7 @@ function ReturnForm({
     <form action={action} className="space-y-2">
       <input type="hidden" name="assetId" value={assetId} />
       <select
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[0.8rem] text-slate-700 outline-none focus:border-indigo-300"
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-700 outline-none focus:border-indigo-500"
         name="newStatus"
         value={status}
         onChange={(e) => setStatus(e.target.value)}
@@ -398,14 +387,14 @@ function ReturnForm({
       </select>
 
       {(status === "LOST" || status === "DAMAGED") && (
-        <div className="space-y-2 rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+        <div className="space-y-2 rounded-md border border-rose-200 bg-rose-50 p-3">
           <p className="text-[0.68rem] font-bold text-rose-600 uppercase tracking-wider">
             {status === "LOST" ? "Asset Gum Ho Gaya" : "Asset Kharab Ho Gaya"} — Fine Details
           </p>
           <label className="block">
             <span className="mb-1 block text-[0.72rem] font-semibold text-slate-600">Fine Amount (₹)</span>
             <input
-              className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-rose-400"
+              className="w-full rounded-md border border-rose-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-rose-400"
               min="0"
               name="fineAmount"
               placeholder="0"
@@ -415,7 +404,7 @@ function ReturnForm({
           <label className="block">
             <span className="mb-1 block text-[0.72rem] font-semibold text-slate-600">Fine Note (optional)</span>
             <input
-              className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-rose-400"
+              className="w-full rounded-md border border-rose-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-rose-400"
               name="fineNote"
               placeholder="e.g. Employee se recover kiya jaayega"
             />
@@ -424,7 +413,7 @@ function ReturnForm({
       )}
 
       <button
-        className="w-full rounded-xl border border-amber-200 bg-amber-50 py-2 text-[0.78rem] font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+        className="w-full rounded-md border border-amber-200 bg-amber-50 py-2 text-[0.78rem] font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
         disabled={pending}
         type="submit"
       >
@@ -440,38 +429,35 @@ function AddAssetForm() {
   const [state, action, pending] = useActionState(addAsset, {});
 
   return (
-    <div
-      className="overflow-hidden rounded-[1.8rem]"
-      style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}
-    >
-      <div className="px-7 py-5" style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
-        <p className="text-[0.62rem] font-bold uppercase tracking-[0.26em]" style={{ color: "#6366f1" }}>Add</p>
-        <h2 className="mt-0.5 text-xl font-bold text-slate-900">New Asset</h2>
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-6 py-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">New record</p>
+        <h2 className="mt-1 text-xl font-semibold text-slate-900">Add asset</h2>
         <p className="text-sm text-slate-500">Register a new company asset in the system.</p>
       </div>
 
-      <form action={action} className="p-7">
-        {state.error   && <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{state.error}</div>}
-        {state.success && <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{state.success}</div>}
+      <form action={action} className="p-6">
+        {state.error   && <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{state.error}</div>}
+        {state.success && <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{state.success}</div>}
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="col-span-full block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Asset Name *</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Asset name *</span>
             <input className={INPUT} name="name" placeholder="e.g. MacBook Pro 14-inch" required />
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Brand</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Brand</span>
             <input className={INPUT} name="brand" placeholder="e.g. Apple, Dell, Samsung" />
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Model</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Model</span>
             <input className={INPUT} name="model" placeholder="e.g. iPhone 6S, ThinkPad X1" />
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Category *</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Category *</span>
             <select className={INPUT} name="category" required>
               <option value="">Select category…</option>
               {Object.entries(CATEGORY_LABELS).map(([v, l]) => (
@@ -481,7 +467,7 @@ function AddAssetForm() {
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Condition</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Condition</span>
             <select className={INPUT} name="condition" defaultValue="GOOD">
               <option value="NEW">New</option>
               <option value="GOOD">Good</option>
@@ -491,31 +477,30 @@ function AddAssetForm() {
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Serial Number</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Serial number</span>
             <input className={INPUT} name="serialNumber" placeholder="e.g. IMEI, service tag, asset code" />
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Purchase Date</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Purchase date</span>
             <input className={INPUT} name="purchaseDate" type="date" />
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Purchase Price</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Purchase price</span>
             <input className={INPUT} min="0" name="purchasePrice" placeholder="0" type="number" />
           </label>
 
 
           <label className="col-span-full block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Notes</span>
+            <span className="mb-1.5 block text-xs font-medium text-slate-700">Notes</span>
             <input className={INPUT} name="notes" placeholder="Any additional details…" />
           </label>
         </div>
 
         <button
-          className="mt-6 rounded-2xl px-7 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+          className="mt-6 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
           disabled={pending}
-          style={{ background: "linear-gradient(135deg,#4f46e5,#4338ca)", boxShadow: "0 4px 14px rgba(79,70,229,0.35)" }}
           type="submit"
         >
           {pending ? "Adding…" : "Add Asset"}

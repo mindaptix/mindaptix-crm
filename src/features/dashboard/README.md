@@ -10,13 +10,13 @@ This feature follows a simple route -> server -> component -> action flow.
   Shared dashboard view-model types used by server data builders and UI.
 - `team-scope.ts`
   Role-based visibility helpers for employee/team filtering.
-- `data.ts`
-  Central dashboard read-model builder. This is the main place where dashboard pages collect MongoDB data and shape it for UI.
+- `server/read-model.ts`
+  Central dashboard read-model builder. It is private to the server layer and shapes MongoDB data into UI view models.
 
 ## Server data
 
 - `server/page-data.ts`
-  Public server-only entrypoint for dashboard page data.
+  Public server-only entrypoint for dashboard page data. Pages import read functions from here, never from the read model directly.
   If you want to know where a dashboard page fetches data from, start here.
 
 ## Route rendering
@@ -81,7 +81,7 @@ This feature follows a simple route -> server -> component -> action flow.
 ## Fast lookup guide
 
 - "Where does dashboard page data come from?"
-  `server/page-data.ts` -> `data.ts`
+  `server/page-data.ts` -> `server/read-model.ts`
 - "Where is the UI for a sidebar page?"
   `components/*-panel.tsx`
 - "Where is the write logic / API-like action?"

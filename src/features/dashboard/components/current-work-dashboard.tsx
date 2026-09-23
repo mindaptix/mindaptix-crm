@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import type { CurrentWork } from "@/features/dashboard/shared/current-work";
 import { DashboardTasks } from "@/features/tasks/components/dashboard-tasks";
 import { formatTaskDeadline } from "@/features/tasks/deadline";
@@ -18,22 +19,26 @@ export function CurrentWorkDashboard({ work }: { work: CurrentWork }) {
   const [query, setQuery] = useState("");
   const [projectId, setProjectId] = useState("");
   const allTasks = work.people.flatMap((person) => person.tasks.map((task) => ({ ...task, employeeName: person.name })));
-  const overdue = allTasks.filter((task) => task.deadlineAt && task.deadlineAt < work.generatedAt);
   const priorities = allTasks.filter((task) => task.priority === "HIGH" || (task.deadlineAt && task.deadlineAt < work.generatedAt)).sort((a, b) => a.deadlineAt.localeCompare(b.deadlineAt)).slice(0, 5);
   const people = work.people.filter((person) =>
     (!projectId || person.projects.some((project) => project.id === projectId)) &&
     [person.name, ...person.projects.map((project) => project.name), ...person.tasks.map((task) => task.title)].join(" ").toLowerCase().includes(query.toLowerCase().trim()),
   );
   return (
-    <div className="space-y-6 px-3 pb-8 sm:px-7">
+    <div className="space-y-6 px-3 pb-8 pt-3 sm:px-7 sm:pt-6">
       {work.assignedTasks.length > 0 && <DashboardTasks tasks={work.assignedTasks} />}
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Work overview · {work.today}</p><h1 className="mt-2 text-2xl font-semibold text-slate-950">Projects & team activity</h1><p className="mt-2 text-sm text-slate-500">Current assignments, task status and today’s reported work.</p></div>
-        <Link href="/dashboard/tasks" className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Assign task</Link>
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">CEO workspace · {work.today}</p><h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Company delivery snapshot</h1><p className="mt-2 text-sm text-slate-500">Today&apos;s team availability, delivery risks and project ownership.</p></div>
+        <div className="flex gap-2"><Link href="/dashboard/reports" className="rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View reports</Link><Link href="/dashboard/tasks" className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700">Assign task</Link></div>
       </header>
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[{ label: "Active work", value: allTasks.length, detail: "Open tasks across your team" }, { label: "Checked in", value: work.people.filter((person) => person.presence === "Checked in").length, detail: "Employees currently checked in" }, { label: "Overdue", value: overdue.length, detail: "Tasks requiring attention" }].map((metric) => <article key={metric.label} className="crm-surface p-5"><p className="text-sm font-medium text-slate-600">{metric.label}</p><p className={`mt-5 text-3xl font-semibold tracking-tight ${metric.label === "Overdue" && metric.value ? "text-red-600" : "text-slate-900"}`}>{metric.value}</p><p className="mt-2 text-xs text-slate-400">{metric.detail}</p></article>)}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[{ label: "Projects in delivery", value: work.projects.length, detail: "Active projects with current owners", tone: "text-indigo-700" }, { label: "Team available", value: `${work.insights.checkedIn}/${work.people.length}`, detail: `${work.insights.onLeave} on leave · ${work.insights.unchecked} not checked in`, tone: "text-emerald-700" }, { label: "Work at risk", value: work.insights.overdueTasks.length, detail: "Overdue tasks that need a decision", tone: work.insights.overdueTasks.length ? "text-red-700" : "text-slate-900" }, { label: "DSR follow-up", value: work.insights.missingDsrPeople.length, detail: "Checked-in employees without today’s DSR", tone: work.insights.missingDsrPeople.length ? "text-amber-700" : "text-slate-900" }].map((metric) => <article key={metric.label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{metric.label}</p><p className={`mt-3 text-3xl font-semibold tracking-tight ${metric.tone}`}>{metric.value}</p><p className="mt-2 text-xs leading-5 text-slate-500">{metric.detail}</p></article>)}
       </div>
+      <section className="grid gap-4 xl:grid-cols-3">
+        <InsightPanel title="Delivery risks" href="/dashboard/tasks" empty="No overdue work right now.">{work.insights.overdueTasks.slice(0, 4).map((task) => <p key={task.id} className="text-sm text-slate-700"><span className="font-medium">{task.title}</span><span className="block text-xs text-slate-500">Due {formatTaskDeadline(task.deadlineAt)}</span></p>)}</InsightPanel>
+        <InsightPanel title="Missing DSR follow-up" href="/dashboard/dsr" empty="All checked-in employees have submitted an update.">{work.insights.missingDsrPeople.slice(0, 4).map((person) => <Link key={person.id} href={`/dashboard/employees/${person.id}`} className="block text-sm font-medium text-slate-700 hover:text-indigo-700">{person.name}</Link>)}</InsightPanel>
+        <InsightPanel title="Unassigned projects" href="/dashboard/projects" empty="Every ongoing project has an owner.">{work.insights.unassignedProjects.slice(0, 4).map((project) => <Link key={project.id} href={`/dashboard/projects/${project.id}`} className="block text-sm font-medium text-slate-700 hover:text-indigo-700">{project.name}</Link>)}</InsightPanel>
+      </section>
       <section className="crm-surface p-5" aria-label="Priority work">
         <div className="flex items-center justify-between"><h2 className="text-base font-semibold">Priority tasks</h2><Link href="/dashboard/tasks" className="text-xs font-medium text-violet-700">See all →</Link></div>
         {priorities.length ? <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{priorities.map((task) => <Link key={task.id} href="/dashboard/tasks" className="rounded-lg bg-violet-50/70 p-4"><p className="text-sm font-medium text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.employeeName}</p><p className="mt-3 text-xs text-violet-700">{task.deadlineAt ? formatTaskDeadline(task.deadlineAt) : "No deadline"}</p></Link>)}</div> : <p className="mt-4 text-sm text-slate-500">No high-priority or overdue work.</p>}
@@ -61,4 +66,10 @@ export function CurrentWorkDashboard({ work }: { work: CurrentWork }) {
       </section>
     </div>
   );
+}
+
+function InsightPanel({ children, empty, href, title }: { children: ReactNode; empty: string; href: string; title: string }) {
+  const entries = Array.isArray(children) ? children : [children];
+  const hasEntries = entries.some(Boolean);
+  return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-slate-900">{title}</h2><Link className="text-xs font-semibold text-indigo-600 hover:text-indigo-800" href={href}>Open</Link></div><div className="mt-4 space-y-3">{hasEntries ? children : <p className="text-sm leading-5 text-slate-500">{empty}</p>}</div></section>;
 }

@@ -1307,6 +1307,8 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
           workDate: string;
         }>;
         taskRows: Array<{
+          completedAt: string;
+          createdAt: string;
           dueDate: string;
           deadlineAt: string;
           deadlineMissed: boolean;
@@ -1413,6 +1415,8 @@ export async function getReportsPageData(session: AuthenticatedSession): Promise
       if (deadlineMissed) item.missedDeadlineCount += 1;
       item.taskTitles.add(task.title);
       item.taskRows.push({
+        completedAt: task.completedAt ? task.completedAt.toISOString() : "",
+        createdAt: task.createdAt ? task.createdAt.toISOString() : "",
         dueDate: task.dueDate,
         deadlineAt: taskDeadline(task)?.toISOString() ?? "",
         deadlineMissed,

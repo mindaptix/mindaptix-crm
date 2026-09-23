@@ -105,52 +105,51 @@ export function SalesWorkspacePanel({
       ];
 
   return (
-    <div className="space-y-6">
-      {/* ── Page Header ───────────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-7 py-7 shadow-[0_20px_60px_rgba(15,23,42,0.22)]">
+    <div className="space-y-6 px-3 py-3 sm:px-7 sm:py-6">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-sm sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-300">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                 <svg fill="none" height="20" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="20">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-300">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">
                 {salesOnly ? "My Pipeline" : "Sales Pipeline"}
               </p>
             </div>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
               {salesOnly ? "My Sales Workspace" : "Sales Workspace"}
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
               {salesOnly
                 ? "Track your leads, update call status, and manage follow-ups."
                 : "Full sales pipeline: lead intake, follow-ups, deals, payments, and target tracking."}
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-            <span className="text-xs font-semibold text-slate-300">Live Sync</span>
+          <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            <span className="text-xs font-medium text-emerald-700">Live sync</span>
           </div>
         </div>
 
         {/* Stats row */}
-        <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 border-t border-slate-200 pt-5 sm:grid-cols-4">
           {statsCards.map((card) => {
             const colorMap: Record<string, string> = {
-              blue:    "from-blue-500/20 to-blue-600/10 border-blue-500/20 text-blue-300",
-              amber:   "from-amber-500/20 to-amber-600/10 border-amber-500/20 text-amber-300",
-              violet:  "from-violet-500/20 to-violet-600/10 border-violet-500/20 text-violet-300",
-              rose:    "from-rose-500/20 to-rose-600/10 border-rose-500/20 text-rose-300",
-              emerald: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/20 text-emerald-300",
+              blue:    "border-blue-200 bg-blue-50",
+              amber:   "border-amber-200 bg-amber-50",
+              violet:  "border-violet-200 bg-violet-50",
+              rose:    "border-rose-200 bg-rose-50",
+              emerald: "border-emerald-200 bg-emerald-50",
             };
             return (
-              <div className={`rounded-2xl border bg-gradient-to-br px-4 py-4 ${colorMap[card.color]}`} key={card.label}>
-                <p className="text-2xl font-bold text-white">{card.value}</p>
-                <p className="mt-1 text-xs font-semibold">{card.label}</p>
-                <p className="mt-0.5 text-[0.68rem] text-slate-400">{card.sub}</p>
+              <div className={`rounded-lg border px-4 py-4 ${colorMap[card.color]}`} key={card.label}>
+                <p className="text-2xl font-semibold text-slate-900">{card.value}</p>
+                <p className="mt-1 text-xs font-medium text-slate-700">{card.label}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{card.sub}</p>
               </div>
             );
           })}
@@ -310,8 +309,8 @@ export function SalesWorkspacePanel({
 function LeadsSection({ rows, salesOnly }: { rows: SalesLeadEntry[]; salesOnly: boolean }) {
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-200/60 text-slate-400">
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-slate-200/60 text-slate-400">
           <svg fill="none" height="24" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" width="24">
             <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -357,7 +356,7 @@ function LeadCard({ row, salesOnly }: { row: SalesLeadEntry; salesOnly: boolean 
                                           "border-l-blue-300";
 
   return (
-    <div className={`overflow-hidden rounded-2xl border border-l-4 border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md ${borderAccent}`}>
+    <div className={`overflow-hidden rounded-xl border border-l-4 border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md ${borderAccent}`}>
       {/* Card header */}
       <div className="flex flex-wrap items-start justify-between gap-4 px-5 pt-4 pb-3">
         <div className="flex items-start gap-3 min-w-0">
@@ -521,7 +520,7 @@ function UpdateCallForm({ leadId, onSuccess }: { leadId: string; onSuccess: () =
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Call Comments</label>
         <textarea
-          className="mt-2 min-h-[4.5rem] w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+          className="mt-2 min-h-[4.5rem] w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           name="callNotes"
           placeholder="Is call me kya hua, client ki response, next step..."
         />
@@ -561,23 +560,23 @@ function SalesLeadForm({
   techOptions: string[];
 }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       {/* Form header */}
-      <div className="border-b border-slate-100 bg-gradient-to-r from-blue-50 to-slate-50 px-6 py-5">
+      <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
             <svg fill="none" height="16" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" width="16">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">My Call Log</p>
-            <h3 className="text-lg font-bold text-slate-900">Log New Lead</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">My Call Log</p>
+            <h3 className="text-lg font-semibold text-slate-900">Log New Lead</h3>
           </div>
         </div>
       </div>
 
-      <form action={submitAction} className="px-6 py-5 space-y-5">
+      <form action={submitAction} className="space-y-5 px-5 py-5 sm:px-6">
         {leadState.error ? <Feedback>{leadState.error}</Feedback> : null}
         {leadState.success ? <Feedback tone="success">{leadState.success}</Feedback> : null}
 
@@ -599,7 +598,7 @@ function SalesLeadForm({
             {CALL_STATUS_OPTIONS.map((opt) => (
               <label className="cursor-pointer" key={opt}>
                 <input className="peer sr-only" defaultChecked={leadState.values?.callStatus === opt} name="callStatus" type="radio" value={opt} />
-                <span className={`flex flex-col items-center gap-1.5 rounded-xl border-2 border-transparent bg-slate-50 px-2 py-3 text-xs font-semibold text-slate-500 transition-all hover:border-slate-200 peer-checked:border-current ${CALL_STATUS_PICKER_CLASSES[opt]}`}>
+                <span className={`flex flex-col items-center gap-1.5 rounded-md border-2 border-transparent bg-slate-50 px-2 py-3 text-xs font-medium text-slate-500 transition-all hover:border-slate-200 peer-checked:border-current ${CALL_STATUS_PICKER_CLASSES[opt]}`}>
                   <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
                   {CALL_STATUS_LABELS[opt]}
                 </span>
@@ -637,7 +636,7 @@ function SalesLeadForm({
         </FormSection>
 
         <button
-          className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 py-3.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.28)] transition-all hover:from-blue-500 hover:to-blue-600 disabled:opacity-50 sm:w-auto sm:min-w-48"
+          className="w-full rounded-md bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 sm:w-auto sm:min-w-48"
           disabled={pending}
           type="submit"
         >
@@ -664,22 +663,22 @@ function AdminLeadForm({
   techOptions: string[];
 }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-white shadow-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-white">
             <svg fill="none" height="16" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" width="16">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Lead Intake</p>
-            <h3 className="text-lg font-bold text-slate-900">Add Sales Record</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Lead Intake</p>
+            <h3 className="text-lg font-semibold text-slate-900">Add Sales Record</h3>
           </div>
         </div>
       </div>
 
-      <form action={submitAction} className="px-6 py-5 space-y-5">
+      <form action={submitAction} className="space-y-5 px-5 py-5 sm:px-6">
         {leadState.error ? <Feedback>{leadState.error}</Feedback> : null}
         {leadState.success ? <Feedback tone="success">{leadState.success}</Feedback> : null}
 
@@ -720,7 +719,7 @@ function AdminLeadForm({
             {CALL_STATUS_OPTIONS.map((opt) => (
               <label className="cursor-pointer" key={opt}>
                 <input className="peer sr-only" defaultChecked={leadState.values?.callStatus === opt} name="callStatus" type="radio" value={opt} />
-                <span className={`flex flex-col items-center gap-1.5 rounded-xl border-2 border-transparent bg-slate-50 px-2 py-3 text-xs font-semibold text-slate-500 transition-all hover:border-slate-200 peer-checked:border-current ${CALL_STATUS_PICKER_CLASSES[opt]}`}>
+                <span className={`flex flex-col items-center gap-1.5 rounded-md border-2 border-transparent bg-slate-50 px-2 py-3 text-xs font-medium text-slate-500 transition-all hover:border-slate-200 peer-checked:border-current ${CALL_STATUS_PICKER_CLASSES[opt]}`}>
                   <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
                   {CALL_STATUS_LABELS[opt]}
                 </span>
@@ -758,7 +757,7 @@ function AdminLeadForm({
         </FormSection>
 
         <button
-          className="w-full rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 py-3.5 text-sm font-bold text-white shadow-sm transition-all hover:from-slate-700 hover:to-slate-800 disabled:opacity-50 sm:w-auto sm:min-w-48"
+          className="w-full rounded-md bg-slate-800 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-900 disabled:opacity-50 sm:w-auto sm:min-w-48"
           disabled={pending || salesOptions.length === 0}
           type="submit"
         >
@@ -783,10 +782,10 @@ function PipelineCard({
   title: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 px-5 py-4">
-        <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-blue-500">{eyebrow}</p>
-        <h3 className="mt-1 text-xl font-bold text-slate-900">{title}</h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">{eyebrow}</p>
+        <h3 className="mt-1 text-lg font-semibold text-slate-900">{title}</h3>
         <p className="mt-1 text-xs text-slate-500">{description}</p>
       </div>
       <div className="p-4">
@@ -803,7 +802,7 @@ function PipelineCard({
 function FormSection({ children, label }: { children: ReactNode; label: string }) {
   return (
     <div className="space-y-3">
-      <p className="flex items-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
         <span className="h-px flex-1 bg-slate-100" />
         {label}
         <span className="h-px flex-1 bg-slate-100" />
@@ -835,10 +834,10 @@ function FormField({
   const resolved = type === "date" && fallbackTodayForDate ? defaultValue || getTodayDate() : defaultValue;
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
       <input
         autoComplete={autoComplete}
-        className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 ${type === "date" ? "scheme-light" : ""}`}
+        className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${type === "date" ? "scheme-light" : ""}`}
         defaultValue={resolved}
         name={name}
         placeholder={placeholder}
@@ -870,8 +869,8 @@ function FormSelect({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
-      <select className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" defaultValue={defaultValue} name={name} required={required}>
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
+      <select className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={defaultValue} name={name} required={required}>
         {includePlaceholder ? <option value="">{placeholder}</option> : null}
         {options.map((opt) => (
           <option key={opt} value={opt}>{labels?.[opt] ?? opt}</option>
@@ -896,8 +895,8 @@ function FormMultiSelect({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
-      <select className="min-h-36 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" defaultValue={defaultValue} multiple name={name} required>
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
+      <select className="min-h-36 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={defaultValue} multiple name={name} required>
         {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
       </select>
       {helperText ? <span className="mt-1.5 block text-xs text-slate-400">{helperText}</span> : null}
@@ -909,7 +908,7 @@ function FormTextArea({ defaultValue, label, name, placeholder }: { defaultValue
   return (
     <label className="block">
       {label ? <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span> : null}
-      <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" defaultValue={defaultValue} name={name} placeholder={placeholder} />
+      <textarea className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={defaultValue} name={name} placeholder={placeholder} />
     </label>
   );
 }
@@ -918,7 +917,7 @@ function InlineDate({ label, name }: { label: string; name: string }) {
   return (
     <label className="block">
       <span className="mb-1 block text-[0.68rem] font-semibold text-slate-500">{label}</span>
-      <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none scheme-light focus:border-blue-300 focus:ring-2 focus:ring-blue-100" name={name} type="date" />
+      <input className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none scheme-light focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" name={name} type="date" />
     </label>
   );
 }

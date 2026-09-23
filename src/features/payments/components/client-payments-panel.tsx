@@ -48,7 +48,6 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
 
   return (
     <div className="space-y-5 px-3 pb-3 pt-2 sm:px-7 sm:pb-6">
-      <label className="block text-sm font-medium text-slate-600">Filter by project<select className="crm-input mt-2 max-w-sm" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="">All projects</option><option value="unlinked">Needs project link</option>{suggestions.map((project) => <option value={project.id} key={project.id}>{project.projectName}</option>)}</select></label>
 
       {/* ── Page header ── */}
       <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
@@ -67,8 +66,8 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
                 </span>
                 Back
               </button>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Finance</p>
-              <h2 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-950">Payments</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Finance</p>
+              <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Payments</h2>
               <p className="mt-1 text-sm text-slate-500">Track all client invoices, received amounts, and overdue payments.</p>
             </div>
             {data.canManage ? (
@@ -167,6 +166,18 @@ export function ClientPaymentsPanel({ data }: { data: PaymentsPageData }) {
             </button>
           );
         })}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <label className="block min-w-[220px] flex-1 text-xs font-medium text-slate-700">
+          Project
+          <select className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
+            <option value="">All projects</option>
+            <option value="unlinked">Needs project link</option>
+            {suggestions.map((project) => <option value={project.id} key={project.id}>{project.projectName}</option>)}
+          </select>
+        </label>
+        <p className="pb-2 text-xs text-slate-500">{filtered.length} payment record{filtered.length === 1 ? "" : "s"} shown</p>
       </div>
 
       {/* ── Payment cards grid ── */}

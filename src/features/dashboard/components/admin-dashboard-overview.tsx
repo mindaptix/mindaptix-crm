@@ -1022,16 +1022,15 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
   ];
 
   return (
-    <section className="mt-5 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.07)]">
-      <div className="h-1 bg-gradient-to-r from-rose-600 via-pink-400 to-amber-300" />
-      <div className="p-4 sm:p-5">
+    <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-700">{section.badge}</p>
-            <h4 className="mt-1 text-[1.8rem] font-semibold tracking-tight text-slate-950">{section.title}</h4>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">{section.badge}</p>
+            <h4 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{section.title}</h4>
           </div>
           <button
-            className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-rose-800 transition hover:border-rose-300 hover:bg-rose-100"
+            className="rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
             onClick={() => setShowForm((value) => !value)}
             type="button"
           >
@@ -1040,13 +1039,13 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
         </div>
 
         {showForm ? (
-          <form action={formAction} className="mt-4 rounded-[1.3rem] border border-rose-100 bg-rose-50/50 p-4">
-            {state.error ? <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{state.error}</p> : null}
-            {state.success ? <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{state.success}</p> : null}
+          <form action={formAction} className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            {state.error ? <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{state.error}</p> : null}
+            {state.success ? <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{state.success}</p> : null}
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Sales Owner
-                <select className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.salesUserId ?? section.meetingOwners?.[0]?.id ?? ""} name="salesUserId" required>
+                <select className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.salesUserId ?? section.meetingOwners?.[0]?.id ?? ""} name="salesUserId" required>
                   <option value="">Select owner</option>
                   {(section.meetingOwners ?? []).map((owner) => (
                     <option key={owner.id} value={owner.id}>
@@ -1055,41 +1054,41 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
                   ))}
                 </select>
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Client Name
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.clientName ?? ""} name="clientName" placeholder="Client name" required />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.clientName ?? ""} name="clientName" placeholder="Client name" required />
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Meeting Date
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.meetingDate ?? ""} name="meetingDate" required type="date" />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.meetingDate ?? ""} name="meetingDate" required type="date" />
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Meeting Time
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.meetingTime ?? ""} name="meetingTime" type="time" />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.meetingTime ?? ""} name="meetingTime" type="time" />
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Phone
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.clientPhone ?? ""} name="clientPhone" placeholder="Client phone" />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.clientPhone ?? ""} name="clientPhone" placeholder="Client phone" />
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Email
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.clientEmail ?? ""} name="clientEmail" placeholder="Client email" type="email" />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.clientEmail ?? ""} name="clientEmail" placeholder="Client email" type="email" />
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Budget
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.budget ?? ""} min="0" name="budget" placeholder="0" type="number" />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.budget ?? ""} min="0" name="budget" placeholder="0" type="number" />
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Quote
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.pitchedPrice ?? ""} min="0" name="pitchedPrice" placeholder="0" type="number" />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.pitchedPrice ?? ""} min="0" name="pitchedPrice" placeholder="0" type="number" />
               </label>
             </div>
             <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <label className="grid gap-1.5 text-xs font-medium text-slate-700">
                 Note
-                <input className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-rose-300" defaultValue={state.values?.notes ?? ""} name="notes" placeholder="Meeting agenda or note" />
+                <input className="rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" defaultValue={state.values?.notes ?? ""} name="notes" placeholder="Meeting agenda or note" />
               </label>
-              <button className="rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60" disabled={pending || !section.meetingOwners?.length} type="submit">
+              <button className="rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60" disabled={pending || !section.meetingOwners?.length} type="submit">
                 {pending ? "Saving..." : "Save Meeting"}
               </button>
             </div>
@@ -1099,21 +1098,21 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
 
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {meetingCards.map((card) => (
-            <article className={`rounded-[1.2rem] border p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${getMeetingStatusCardClass(card.tone)}`} key={card.label}>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em]">{card.label}</p>
-              <p className="mt-3 text-[2rem] font-semibold leading-none">{card.value}</p>
-              <p className="mt-3 text-sm leading-5 opacity-75">{card.detail}</p>
+            <article className={`rounded-lg border p-4 ${getMeetingStatusCardClass(card.tone)}`} key={card.label}>
+              <p className="text-xs font-medium">{card.label}</p>
+              <p className="mt-3 text-2xl font-semibold leading-none">{card.value}</p>
+              <p className="mt-3 text-xs leading-5 opacity-75">{card.detail}</p>
             </article>
           ))}
         </div>
 
-        <div className="mt-5 rounded-[1.4rem] border border-slate-100 bg-white shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+        <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="p-5 pb-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-700">Meeting List</p>
-              <h5 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Client & Team Schedule</h5>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Meeting List</p>
+              <h5 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Client & Team Schedule</h5>
             </div>
-            <span className="mx-5 mt-5 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+            <span className="mx-5 mt-5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
               {section.items.length} meeting(s)
             </span>
           </div>
@@ -1122,7 +1121,7 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
             {section.items.length ? (
               <table className="min-w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-y border-slate-100 bg-slate-50 text-left text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <tr className="border-y border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                     <th className="px-5 py-3">Client / Meeting</th>
                     <th className="px-5 py-3">Time</th>
                     <th className="px-5 py-3">Owner</th>
@@ -1137,7 +1136,7 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
                     const detail = parseMeetingDescription(item.description);
                     const isCompleted = /completed/i.test(meta.status);
                     return (
-                      <tr className="transition hover:bg-rose-50/40" key={item.id}>
+                      <tr className="transition hover:bg-slate-50" key={item.id}>
                         <td className="px-5 py-4">
                           <p className="font-semibold text-slate-950">{item.title}</p>
                           <p className="mt-1 text-xs text-slate-500">{meta.type}</p>
@@ -1153,7 +1152,7 @@ function MeetingSchedulePanel({ section }: { section: ExecutiveOverviewSection }
                           <p className="mt-1 text-xs text-slate-500">Quote {detail.quoted}</p>
                         </td>
                         <td className="px-5 py-4">
-                          <span className={`rounded-full border px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] ${isCompleted ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+                          <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${isCompleted ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                             {meta.status}
                           </span>
                         </td>
@@ -1796,4 +1795,3 @@ function buildExecutiveMetricData(metrics: SummaryCard[], sectionId: string): Da
     color: palette[index % palette.length],
   }));
 }
-

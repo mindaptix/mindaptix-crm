@@ -17,11 +17,11 @@ const ATTENDANCE_CFG: Record<string, { bg: string; text: string }> = {
   "Not Marked":         { bg: "rgba(148,163,184,0.08)", text: "#94a3b8" },
 };
 
-const SUMMARY_GRADS = [
-  { gradient: "linear-gradient(135deg,#6366f1,#818cf8)", shadow: "rgba(99,102,241,0.3)" },
-  { gradient: "linear-gradient(135deg,#10b981,#34d399)", shadow: "rgba(16,185,129,0.3)" },
-  { gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.28)" },
-  { gradient: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)" },
+const SUMMARY_TONES = [
+  "border-indigo-200 bg-indigo-50",
+  "border-emerald-200 bg-emerald-50",
+  "border-amber-200 bg-amber-50",
+  "border-sky-200 bg-sky-50",
 ];
 
 function initials(name: string) {
@@ -115,7 +115,7 @@ function AttendanceTimelineTable({ compact = false, rows, today }: { compact?: b
           <col style={{ width: compact ? 86 : 96 }} />
         </colgroup>
         <thead className={compact ? "sticky top-0 z-10" : undefined}>
-          <tr style={{ background: "linear-gradient(135deg,#f8faff,#eef4ff)" }}>
+          <tr className="bg-slate-50">
             {["Date", "Status", "Check In", "Check Out", "Projects", "DSR"].map((h) => (
               <th key={h} className={headCls}>{h}</th>
             ))}
@@ -240,11 +240,9 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
   );
 
   useEffect(() => {
-    if (!activeReport.monthlyEmployeeReports.some((row) => row.id === selectedEmployeeId)) {
-      setSelectedEmployeeId(activeReport.monthlyEmployeeReports[0]?.id ?? "");
-    }
+    setSelectedEmployeeId((current) => activeReport.monthlyEmployeeReports.some((row) => row.id === current) ? current : activeReport.monthlyEmployeeReports[0]?.id ?? "");
     setExpandedEmployeeId(null);
-  }, [activeReport, selectedEmployeeId]);
+  }, [activeReport]);
 
   const filteredMonthlyReports = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -441,21 +439,18 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* Hero header with download buttons */}
-      <div
-        className="overflow-hidden rounded-[1.8rem]"
-        style={{ background: "linear-gradient(135deg,#6366f1 0%,#4f46e5 60%,#4338ca 100%)", boxShadow: "0 12px 40px rgba(99,102,241,0.35)" }}
-      >
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-7">
           <div>
-            <p className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-indigo-200">Monthly Report</p>
-            <h1 className="mt-1.5 text-2xl font-black text-white">{activeReport.label} — Employee Reports</h1>
-            <p className="mt-1.5 max-w-lg text-[0.78rem] leading-5 text-indigo-200">
-              Per-employee monthly attendance and DSR summary. Click any employee to expand their daily log.
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Monthly Report</p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900">{activeReport.label} — Employee Reports</h1>
+            <p className="mt-1.5 max-w-xl text-sm leading-5 text-slate-500">
+              Review each employee&apos;s attendance, DSR submissions, task delivery, deadlines and completion time in one monthly record.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
             <button
-              className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-[0.73rem] font-bold text-white transition hover:bg-white/25"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               onClick={downloadCSV}
               type="button"
             >
@@ -465,7 +460,7 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
               Export CSV
             </button>
             <button
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[0.73rem] font-bold text-indigo-700 transition hover:bg-indigo-50"
+              className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
               onClick={() => window.print()}
               type="button"
             >
@@ -478,27 +473,42 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
         </div>
 
         {/* Search bar */}
-        <div className="flex flex-col gap-3 border-t border-white/10 bg-white/5 px-4 py-4 sm:flex-row sm:items-end sm:px-7">
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-end sm:px-6">
           <div className="relative flex flex-1 items-center">
-            <svg className="pointer-events-none absolute left-3.5 text-white/50" fill="none" height="13" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="13">
+            <svg className="pointer-events-none absolute left-3.5 text-slate-400" fill="none" height="13" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="13">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
             </svg>
             <input
-              className="w-full rounded-xl border border-white/15 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/30 focus:bg-white/15"
+              className="w-full rounded-md border border-slate-300 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
               placeholder="Search employee name or email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <div className="w-full sm:min-w-[220px] sm:w-auto">
-            <p className="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-indigo-200">Report Month</p>
+            <p className="mb-1 text-xs font-medium text-slate-700">Report Month</p>
             <select
-              className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white outline-none focus:border-white/30 scheme-dark"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
               value={activeReport.key}
               onChange={(e) => setSelectedMonthKey(e.target.value)}
             >
               {data.reportMonths.map((month) => (
-                <option key={month.key} value={month.key} style={{ background: "#1e1b4b" }}>{month.label}</option>
+                <option key={month.key} value={month.key}>{month.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="w-full sm:min-w-[220px] sm:w-auto">
+            <p className="mb-1 text-xs font-medium text-slate-700">Employee</p>
+            <select
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              value={selectedMonthlyReport?.id ?? ""}
+              onChange={(e) => {
+                setSelectedEmployeeId(e.target.value);
+                setExpandedEmployeeId(e.target.value || null);
+              }}
+            >
+              {filteredMonthlyReports.map((report) => (
+                <option key={report.id} value={report.id}>{report.employeeName}</option>
               ))}
             </select>
           </div>
@@ -508,33 +518,25 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {activeReport.summaryCards.map((card, i) => {
-          const g = SUMMARY_GRADS[i % SUMMARY_GRADS.length];
+          const tone = SUMMARY_TONES[i % SUMMARY_TONES.length];
           return (
             <div
               key={card.label}
-              className="relative overflow-hidden rounded-3xl p-5 text-white"
-              style={{ background: g.gradient, boxShadow: `0 8px 24px ${g.shadow}` }}
+              className={`rounded-xl border p-5 ${tone}`}
             >
-              <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
-              <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em] text-white/70">{card.label}</p>
-              <p className="mt-1 text-4xl font-black text-white">{card.value}</p>
-              <p className="mt-1 text-[0.68rem] text-white/60">{card.detail}</p>
+              <p className="text-xs font-medium text-slate-600">{card.label}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{card.value}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{card.detail}</p>
             </div>
           );
         })}
       </div>
 
       {/* Monthly Employee Reports — accordion */}
-      <div
-        className="overflow-hidden rounded-[1.8rem]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}
-      >
-        <div
-          className="px-6 py-5"
-          style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}
-        >
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Monthly Overview</p>
-          <h2 className="mt-0.5 text-2xl font-bold text-slate-800">Employee Attendance &amp; DSR</h2>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Monthly Overview</p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900">Employee Attendance &amp; DSR</h2>
           <p className="text-sm text-slate-500">Click an employee to view details and download their monthly Excel report.</p>
         </div>
 
@@ -552,8 +554,11 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
                 <div key={emp.id}>
                   {/* Summary row — clickable */}
                   <button
-                    className="w-full px-6 py-4 text-left transition-colors hover:bg-slate-50/70"
-                    onClick={() => setExpandedEmployeeId(isExpanded ? null : emp.id)}
+                    className={`w-full px-6 py-4 text-left transition-colors hover:bg-slate-50/70 ${selectedMonthlyReport?.id === emp.id ? "bg-indigo-50/30" : ""}`}
+                    onClick={() => {
+                      setSelectedEmployeeId(emp.id);
+                      setExpandedEmployeeId(isExpanded ? null : emp.id);
+                    }}
                     type="button"
                   >
                     <div className="flex items-center gap-4">
@@ -673,4 +678,3 @@ export function ReportsPanel({ data, simplifiedView = false }: ReportsPanelProps
     </div>
   );
 }
-

@@ -35,16 +35,16 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
 
   return (
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
-      <section className="overflow-hidden rounded-[2rem] border border-violet-100 bg-[linear-gradient(135deg,#f5f3ff_0%,#ffffff_52%,#f8fafc_100%)] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-6">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-semibold uppercase tracking-[0.26em] text-violet-600">HR Management</p>
-            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-tight text-slate-950">Payroll</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">HR Management</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Payroll</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
               Manage salary structures, generate monthly payslips, and track payments.
             </p>
           </div>
-          <span className="inline-flex w-fit shrink-0 rounded-full border border-violet-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+          <span className="inline-flex w-fit shrink-0 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
             {data.selectedMonthKey}
           </span>
         </div>
@@ -52,18 +52,18 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {data.summaryCards.map((card) => (
-          <article className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_16px_38px_rgba(15,23,42,0.05)]" key={card.label}>
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-violet-600">{card.label}</p>
+          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" key={card.label}>
+            <p className="text-xs font-medium text-slate-600">{card.label}</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{card.value}</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">{card.detail}</p>
           </article>
         ))}
       </section>
 
-      <div className="flex w-full gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-1 sm:w-fit">
+      <div className="flex w-full gap-1 overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-1 sm:w-fit">
         {(["structures", "payslips"] as const).map((tab) => (
           <button
-            className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === tab ? "bg-white text-slate-900 shadow" : "text-slate-500 hover:text-slate-700"}`}
+            className={`shrink-0 rounded-md px-4 py-2 text-sm font-medium transition ${activeTab === tab ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"}`}
             key={tab}
             onClick={() => setActiveTab(tab)}
             type="button"
@@ -74,7 +74,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
       </div>
 
       {activeTab === "structures" ? (
-        <section className="overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <PanelHeader
             action={canManage ? (
               <Button className="sm:w-auto" onClick={() => { setSelectedEmployee(null); setShowSetSalaryForm(true); }}>
@@ -86,7 +86,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
           />
 
           {showSetSalaryForm && canManage ? (
-            <div className="border-b border-slate-100 bg-violet-50/80 px-5 py-4 sm:px-6" key={selectedEmployee?.userId ?? "new"}>
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6" key={selectedEmployee?.userId ?? "new"}>
               <form action={salaryAction} className="space-y-4">
                 {salaryState.error ? <Feedback>{salaryState.error}</Feedback> : null}
                 {salaryState.success ? <Feedback tone="success">{salaryState.success}</Feedback> : null}
@@ -94,7 +94,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
                   {selectedEmployee ? (
                     <div>
                       <p className="mb-1 block text-xs font-medium text-slate-700">Employee</p>
-                      <div className="flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 py-2">
+                      <div className="flex items-center gap-2 rounded-md border border-indigo-200 bg-white px-3 py-2">
                         <span className="text-sm font-semibold text-slate-900">{selectedEmployee.employeeName}</span>
                         <span className="text-xs text-slate-400">{selectedEmployee.employeeEmail}</span>
                       </div>
@@ -154,7 +154,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
                       <td className="px-4 py-3"><StatusPill status={row.status} /></td>
                       <td className="px-4 py-3">
                         {canManage ? (
-                          <button className="rounded-full border border-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-600 transition hover:bg-violet-50 hover:text-violet-800" onClick={() => { setSelectedEmployee(row); setShowSetSalaryForm(true); }} type="button">
+                          <button className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100" onClick={() => { setSelectedEmployee(row); setShowSetSalaryForm(true); }} type="button">
                             Edit
                           </button>
                         ) : null}
@@ -169,7 +169,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
       ) : null}
 
       {activeTab === "payslips" ? (
-        <section className="overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <PanelHeader
             action={canManage ? <Button className="sm:w-auto" onClick={() => setShowGenerateForm((value) => !value)}>Generate Payslip</Button> : null}
             eyebrow="Monthly Payroll"
@@ -177,10 +177,10 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
           />
 
           {/* Month tabs — last 3 months */}
-          <div className="flex gap-1 overflow-x-auto border-b border-slate-100 bg-slate-50/60 px-5 py-2.5">
+          <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-5 py-2.5">
             {data.availableMonthKeys.map((mk) => (
               <button
-                className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${selectedPayslipMonth === mk ? "bg-white text-violet-700 shadow border border-violet-100" : "text-slate-500 hover:text-slate-700"}`}
+                className={`shrink-0 rounded-md px-4 py-2 text-sm font-medium transition ${selectedPayslipMonth === mk ? "bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-100" : "text-slate-500 hover:text-slate-700"}`}
                 key={mk}
                 onClick={() => { setSelectedPayslipMonth(mk); setShowGenerateForm(false); }}
                 type="button"
@@ -191,7 +191,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
           </div>
 
           {showGenerateForm && canManage ? (
-            <div className="border-b border-slate-100 bg-violet-50/80 px-5 py-4 sm:px-6">
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
               <form action={payslipAction} className="space-y-4">
                 {payslipState.error ? <Feedback>{payslipState.error}</Feedback> : null}
                 {payslipState.success ? <Feedback tone="success">{payslipState.success}</Feedback> : null}
@@ -245,7 +245,7 @@ function PanelHeader({ action, eyebrow, title }: { action: ReactNode; eyebrow: s
   return (
     <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
       <div>
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-violet-600">{eyebrow}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">{eyebrow}</p>
         <h3 className="mt-1 text-base font-semibold text-slate-900">{title}</h3>
       </div>
       {action}
@@ -284,7 +284,7 @@ function PayslipRow({
             <form action={paidAction} className="flex items-center gap-2">
               <input name="payslipId" type="hidden" value={slip.id} />
               <input
-                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-900 [color-scheme:light]"
+                className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-900 [color-scheme:light] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 defaultValue={new Date().toISOString().slice(0, 10)}
                 name="paidOn"
                 type="date"
@@ -293,7 +293,7 @@ function PayslipRow({
               <button className="text-xs text-slate-400" onClick={() => setShowMarkPaid(false)} type="button">Cancel</button>
             </form>
           ) : (
-            <button className="rounded-full border border-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-800" onClick={() => setShowMarkPaid(true)} type="button">
+            <button className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100" onClick={() => setShowMarkPaid(true)} type="button">
               Mark Paid
             </button>
           )
@@ -314,7 +314,7 @@ function StatusPill({ status }: { status: string }) {
           : "bg-amber-100 text-amber-700";
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>
+    <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ${className}`}>
       {status === "NOT_SET" ? "Not Set" : status}
     </span>
   );
@@ -325,7 +325,7 @@ function InputField({ label, name, type = "text", placeholder, defaultValue }: {
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-slate-700">{label}</span>
       <input
-        className={`w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100 ${type === "date" || type === "month" ? "[color-scheme:light]" : ""}`}
+        className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${type === "date" || type === "month" ? "[color-scheme:light]" : ""}`}
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
@@ -339,7 +339,7 @@ function SelectField({ label, name, options }: { label: string; name: string; op
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-slate-700">{label}</span>
-      <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100" name={name}>
+      <select className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" name={name}>
         <option value="">Select employee</option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
@@ -355,7 +355,7 @@ function TextAreaField({ label, name, placeholder }: { label: string; name: stri
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-slate-700">{label}</span>
-      <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100" name={name} placeholder={placeholder} />
+      <textarea className="min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" name={name} placeholder={placeholder} />
     </label>
   );
 }

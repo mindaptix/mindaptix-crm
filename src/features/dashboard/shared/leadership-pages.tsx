@@ -69,7 +69,7 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
     }
     case "tasks": {
       const data = await getTasksPageData(session);
-      return <TasksPanel canAssign data={data} readOnly={false} />;
+      return <TasksPanel canAssign canManageLifecycle={session.user.role === "SUPER_ADMIN"} data={data} readOnly={false} />;
     }
     case "dsr": {
       const data = await getDsrPageData(session);
@@ -115,5 +115,4 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
       notFound();
   }
 }
-
 

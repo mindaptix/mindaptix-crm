@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
-import { getProjectDetailData } from "@/features/dashboard/data";
+import { getProjectDetailData } from "@/features/dashboard/server/page-data";
 import { ProjectDetailPanel } from "@/features/dashboard/components/project-detail-panel";
 
 export const metadata = { title: "Project Details" };

@@ -258,7 +258,7 @@ export function EmployeesManagementPanel({
   }, [isEditModalOpen, lastUpdateSuccess, updateUserState.success]);
 
   return (
-    <div className="space-y-6 px-3 py-3 sm:px-7 sm:py-6">
+    <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map((card) => (
           <OverviewCard detail={card.detail} key={card.label} label={card.label} value={card.value} />
@@ -267,17 +267,18 @@ export function EmployeesManagementPanel({
 
 
       {shouldShowDirectory ? (
-        <section className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-6">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
 
           {/* Section header + tab bar */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
                 {readOnly ? "Workforce Overview" : "Team Management"}
               </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
                 {readOnly ? "Company Workforce" : "Employee Directory"}
               </h2>
+              <p className="mt-1 text-sm text-slate-500">Review ownership, role, attendance and account access from one workspace.</p>
             </div>
 
             {canManageWorkspace ? (
@@ -586,7 +587,7 @@ export function EmployeesManagementPanel({
 
           {/* DIRECTORY TAB (also shown for readOnly) */}
           {(!canManageWorkspace || activeTab === "directory") ? (
-            <div className="mt-5 space-y-5">
+            <div className="space-y-5 px-5 py-5 sm:px-6">
               {/* Search + filter row */}
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative flex-1 min-w-[200px]">
@@ -620,10 +621,11 @@ export function EmployeesManagementPanel({
               {filteredUsers.length > 0 ? (
                 <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
                   {/* Table header */}
-                  <div className="hidden grid-cols-[2fr_1.6fr_1fr_auto] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400 sm:grid">
-                    <span>Employee</span>
-                    <span>Role &amp; Status</span>
-                    <span>Contact</span>
+                  <div className="hidden grid-cols-[minmax(200px,1.7fr)_minmax(160px,1fr)_minmax(130px,.8fr)_minmax(130px,.8fr)_auto] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:grid">
+                    <span>Person</span>
+                    <span>Role &amp; department</span>
+                    <span>Active projects</span>
+                    <span>Today</span>
                     <span className="w-24 text-right">Action</span>
                   </div>
                   <div className="divide-y divide-slate-100">
@@ -1094,7 +1096,7 @@ function EmployeeRow({
 }) {
   return (
     <div
-      className="flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/60 sm:grid sm:grid-cols-[2fr_1.6fr_1fr_auto] sm:gap-4 sm:px-5"
+      className="flex flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-slate-50/70 sm:grid sm:grid-cols-[minmax(200px,1.7fr)_minmax(160px,1fr)_minmax(130px,.8fr)_minmax(130px,.8fr)_auto] sm:gap-4 sm:px-5"
     >
       {/* Col 1 — Avatar + Name */}
       <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-none">
@@ -1117,41 +1119,26 @@ function EmployeeRow({
         </div>
       </div>
 
-      {/* Col 2 — Role / Status / Tech */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* Col 2 — Role / department */}
+      <div className="min-w-0">
         <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] ${getRoleBadgeClass(user.role)}`}>
           {roleLabel(user.role)}
         </span>
-        <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] ${
-          user.status === "ACTIVE" ? "border-emerald-100 bg-emerald-50 text-emerald-600" : "border-rose-100 bg-rose-50 text-rose-600"
-        }`}>
-          {user.status}
-        </span>
-        <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.1em] ${
-          user.todayStatus === "Present"
-            ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-            : user.todayStatus === "On Leave"
-              ? "border-amber-100 bg-amber-50 text-amber-700"
-              : "border-rose-100 bg-rose-50 text-rose-600"
-        }`}>
-          {user.todayStatus}
-        </span>
-        {user.techStack.slice(0, 2).map((tech) => (
-          <span className="rounded-full border border-violet-100 bg-violet-50 px-2.5 py-0.5 text-[0.62rem] font-semibold text-violet-700" key={tech}>
-            {tech}
-          </span>
-        ))}
-        {user.techStack.length > 2 ? (
-          <span className="rounded-full border border-slate-100 bg-slate-50 px-2 py-0.5 text-[0.62rem] font-semibold text-slate-400">
-            +{user.techStack.length - 2}
-          </span>
-        ) : null}
+        <p className="mt-1 truncate text-xs text-slate-500">{user.department || user.designation || "Department not set"}</p>
       </div>
 
-      {/* Col 3 — Contact */}
+      {/* Col 3 — Projects */}
       <div className="hidden min-w-0 sm:block">
-        <p className="truncate text-xs font-medium text-slate-600">{user.phone || "—"}</p>
-        {user.joiningDate ? <p className="mt-0.5 text-xs text-slate-400">Joined {user.joiningDate}</p> : null}
+        <p className="text-sm font-semibold text-slate-700">{user.projectIds.length}</p>
+        <p className="mt-0.5 text-xs text-slate-400">assigned project{user.projectIds.length === 1 ? "" : "s"}</p>
+      </div>
+
+      {/* Col 4 — Current attendance and account state */}
+      <div className="hidden min-w-0 sm:block">
+        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[0.62rem] font-semibold ${
+          user.todayStatus === "Present" ? "border-emerald-100 bg-emerald-50 text-emerald-700" : user.todayStatus === "On Leave" ? "border-amber-100 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-500"
+        }`}>{user.todayStatus}</span>
+        <p className={`mt-1 text-xs font-medium ${user.status === "ACTIVE" ? "text-emerald-600" : "text-rose-600"}`}>{user.status === "ACTIVE" ? "Account active" : "Account suspended"}</p>
       </div>
 
       {/* Col 4 — Actions */}

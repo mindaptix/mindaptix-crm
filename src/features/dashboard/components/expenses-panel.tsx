@@ -43,11 +43,11 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* Page header */}
-      <section className="overflow-hidden rounded-[2rem] border border-orange-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_52%,#f8fafc_100%)] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-6">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-semibold uppercase tracking-[0.26em] text-orange-600">Finance</p>
-            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-tight text-slate-950">Expense Claims</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Finance</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Expense Claims</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
               {data.canReview
                 ? "Review and approve expense reimbursement requests from your team."
@@ -62,8 +62,8 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
         {/* Summary metrics */}
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           {data.summaryCards.map((card) => (
-            <div className="rounded-[1.2rem] border border-orange-100 bg-white px-4 py-3 shadow-sm" key={card.label}>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-orange-600">{card.label}</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3" key={card.label}>
+              <p className="text-xs font-medium text-slate-600">{card.label}</p>
               <p className="mt-1 text-2xl font-semibold text-slate-950">{card.value}</p>
               <p className="mt-0.5 text-xs text-slate-500">{card.detail}</p>
             </div>
@@ -73,13 +73,13 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
 
       {/* Submit form */}
       {showForm ? (
-        <section className="rounded-[1.8rem] border border-orange-200 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_100%)] p-5 shadow-[0_16px_36px_rgba(194,65,12,0.08)] sm:p-6">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 flex items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-orange-200 bg-orange-50 text-orange-700">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700">
               <ReceiptIcon />
             </div>
             <div>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-orange-600">New Claim</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">New Claim</p>
               <h3 className="text-base font-semibold text-slate-950">Submit Expense</h3>
             </div>
           </div>
@@ -91,7 +91,7 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <FieldShell label="Title">
                 <input
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   name="title"
                   placeholder="e.g. Client visit cab fare"
                   required
@@ -99,7 +99,7 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
               </FieldShell>
               <FieldShell label="Category">
                 <select
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   name="category"
                 >
                   {EXPENSE_CATEGORIES.map((c) => (
@@ -109,7 +109,7 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
               </FieldShell>
               <FieldShell label="Amount (₹)">
                 <input
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   min="0"
                   name="amount"
                   placeholder="0"
@@ -119,7 +119,7 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
               </FieldShell>
               <FieldShell label="Expense Date">
                 <input
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none [color-scheme:light] transition focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none [color-scheme:light] transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   name="expenseDate"
                   required
                   type="date"
@@ -127,14 +127,14 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
               </FieldShell>
               <FieldShell label="Receipt URL (optional)">
                 <input
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   name="receiptUrl"
                   placeholder="https://..."
                 />
               </FieldShell>
               <FieldShell label="Receipt File Name (optional)">
                 <input
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   name="receiptName"
                   placeholder="receipt.pdf"
                 />
@@ -143,7 +143,7 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
 
             <FieldShell label="Description (optional)">
               <textarea
-                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 name="description"
                 placeholder="Additional details about this expense..."
               />
@@ -163,15 +163,15 @@ export function ExpensesPanel({ data }: ExpensesPanelProps) {
       {paidState.success ? <Feedback tone="success">{paidState.success}</Feedback> : null}
 
       {/* Expense list */}
-      <section className="overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
           <div>
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-orange-600">Claims</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Claims</p>
             <h3 className="mt-0.5 text-base font-semibold text-slate-950">
               {data.canReview ? "All Expense Claims" : "My Expense Claims"}
             </h3>
           </div>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+          <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
             {data.expenses.length} claim{data.expenses.length !== 1 ? "s" : ""}
           </span>
         </div>
@@ -224,18 +224,18 @@ function ExpenseRow({
     <div className="px-5 py-4 transition hover:bg-slate-50/60 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] border border-orange-100 bg-orange-50 text-lg">
+          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-lg">
             {icon}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-semibold text-slate-900">{expense.title}</p>
-              <span className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] ${STATUS_STYLES[expense.status] ?? "border-slate-100 bg-slate-50 text-slate-500"}`}>
+              <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[expense.status] ?? "border-slate-100 bg-slate-50 text-slate-500"}`}>
                 {expense.status}
               </span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-              <span className="rounded-full border border-slate-100 bg-slate-50 px-2.5 py-0.5 text-[0.65rem] font-semibold text-slate-500">
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
                 {expense.category.replace(/_/g, " ")}
               </span>
               {canReview ? (
@@ -266,12 +266,12 @@ function ExpenseRow({
             <form action={reviewAction} className="flex flex-wrap items-center gap-2">
               <input name="expenseId" type="hidden" value={expense.id} />
               <input
-                className="min-w-40 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-orange-300"
+                className="min-w-40 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 name="reviewNote"
                 placeholder="Review note (optional)"
               />
               <button
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
                 disabled={reviewPending}
                 name="action"
                 type="submit"
@@ -280,7 +280,7 @@ function ExpenseRow({
                 Approve
               </button>
               <button
-                className="rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
                 disabled={reviewPending}
                 name="action"
                 type="submit"
@@ -315,13 +315,13 @@ function ExpenseRow({
             <form action={paidAction} className="flex flex-wrap items-center gap-2">
               <input name="expenseId" type="hidden" value={expense.id} />
               <input
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none [color-scheme:light]"
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none [color-scheme:light] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 defaultValue={new Date().toISOString().slice(0, 10)}
                 name="paidOn"
                 type="date"
               />
               <button
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
                 disabled={paidPending}
                 type="submit"
               >
@@ -353,7 +353,7 @@ function ExpenseRow({
 function FieldShell({ children, label }: { children: ReactNode; label: string }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
       {children}
     </label>
   );

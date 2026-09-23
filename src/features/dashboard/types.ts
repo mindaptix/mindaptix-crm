@@ -559,6 +559,8 @@ export type EmployeeMonthlyDsrReportRow = {
 };
 
 export type EmployeeMonthlyTaskReportRow = {
+  createdAt: string;
+  completedAt: string;
   deadlineAt: string;
   deadlineMissed: boolean;
   id: string;

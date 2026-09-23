@@ -62,9 +62,9 @@ function OptionalInputField({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-emerald-800">{label}</span>
+      <span className="mb-2 block text-xs font-medium text-emerald-800">{label}</span>
       <input
-        className="w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
@@ -83,7 +83,7 @@ function GeoFenceToggle({
 }) {
   const [enabled, setEnabled] = useState(defaultChecked);
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-white px-4 py-3">
+    <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white px-4 py-3">
       <div>
         <p className="text-sm font-semibold text-slate-800">Enable Location-Based Attendance</p>
         <p className="text-xs text-slate-500">
@@ -180,9 +180,9 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
   return (
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
       {/* Page header */}
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.26em] text-blue-600">Account Settings</p>
-        <h2 className="mt-2 text-[1.85rem] font-semibold tracking-tight text-slate-950">Profile &amp; Security</h2>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Account settings</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Profile &amp; security</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
           Update your personal information and manage your account security settings.
         </p>
@@ -235,7 +235,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       ) : null}
 
       {/* Identity banner */}
-      <div className="overflow-hidden rounded-[1.8rem] border border-blue-100 bg-[linear-gradient(135deg,#eff6ff_0%,#f0f9ff_55%,#f8fbff_100%)] shadow-[0_16px_40px_rgba(37,99,235,0.09)]">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-5 px-6 py-6">
           {/* Avatar + upload */}
           <form action={photoAction} className="relative shrink-0">
@@ -311,7 +311,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       {/* Profile + Password - 2 col */}
       <div className="grid gap-5 xl:grid-cols-2">
         {/* Edit Profile */}
-        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-blue-100 bg-blue-50 text-blue-600">
               <PersonIcon />
@@ -410,7 +410,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
         </section>
 
         {/* Change Password */}
-        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-amber-100 bg-amber-50 text-amber-600">
               <LockIcon />
@@ -455,7 +455,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       </div>
 
       {/* Bank & Financial Details */}
-      <section className="rounded-[1.8rem] border border-emerald-100 bg-white p-6 shadow-[0_16px_40px_rgba(16,185,129,0.07)]">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -598,7 +598,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
       {data.canManageCompany ? (
         <>
         {data.canManageAi ? (
-          <section className="rounded-[1.8rem] border border-indigo-100 bg-[linear-gradient(135deg,#f8faff_0%,#f5f3ff_100%)] p-6 shadow-[0_16px_40px_rgba(79,70,229,0.08)]">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-indigo-100 bg-indigo-50 text-indigo-600">
                 <svg fill="none" height="20" viewBox="0 0 24 24" width="20"><path d="M12 3a9 9 0 1 0 9 9" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8"/><path d="M12 7v5l3 2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8"/></svg>
@@ -613,20 +613,20 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
               {aiSettingsState.error ? <Feedback>{aiSettingsState.error}</Feedback> : null}
               {aiSettingsState.success ? <Feedback tone="success">{aiSettingsState.success}</Feedback> : null}
               <div className="grid gap-4 md:grid-cols-3">
-                <label className="block"><span className="mb-2 block text-sm font-medium text-slate-700">Chatbot Provider</span><select defaultValue={data.aiChatProvider} name="aiChatProvider" className="w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"><option value="GROQ">Groq (default)</option><option value="OPENAI">OpenAI</option></select></label>
+                <label className="block"><span className="mb-2 block text-xs font-medium text-slate-700">Chatbot provider</span><select defaultValue={data.aiChatProvider} name="aiChatProvider" className="w-full rounded-md border border-indigo-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"><option value="GROQ">Groq (default)</option><option value="OPENAI">OpenAI</option></select></label>
                 <InputField defaultValue={data.groqChatModel} label="Groq Model" name="groqChatModel" placeholder="openai/gpt-oss-120b" />
                 <InputField defaultValue={data.openAiChatModel} label="OpenAI Model" name="openAiChatModel" placeholder="gpt-4o-mini" />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="block"><span className="mb-2 block text-sm font-medium text-slate-700">Groq API Key {data.hasGroqApiKey ? <span className="text-emerald-600">(configured)</span> : <span className="text-amber-600">(required for Groq)</span>}</span><input autoComplete="off" className="w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" name="groqApiKey" placeholder={data.hasGroqApiKey ? "Leave blank to keep current key" : "gsk_..."} type="password" /></label>
-                <label className="block"><span className="mb-2 block text-sm font-medium text-slate-700">OpenAI API Key {data.hasOpenAiApiKey ? <span className="text-emerald-600">(configured)</span> : <span className="text-slate-400">(optional)</span>}</span><input autoComplete="off" className="w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" name="openAiApiKey" placeholder={data.hasOpenAiApiKey ? "Leave blank to keep current key" : "sk-..."} type="password" /></label>
+                <label className="block"><span className="mb-2 block text-xs font-medium text-slate-700">Groq API key {data.hasGroqApiKey ? <span className="text-emerald-600">(configured)</span> : <span className="text-amber-600">(required for Groq)</span>}</span><input autoComplete="off" className="w-full rounded-md border border-indigo-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" name="groqApiKey" placeholder={data.hasGroqApiKey ? "Leave blank to keep current key" : "gsk_..."} type="password" /></label>
+                <label className="block"><span className="mb-2 block text-xs font-medium text-slate-700">OpenAI API key {data.hasOpenAiApiKey ? <span className="text-emerald-600">(configured)</span> : <span className="text-slate-400">(optional)</span>}</span><input autoComplete="off" className="w-full rounded-md border border-indigo-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" name="openAiApiKey" placeholder={data.hasOpenAiApiKey ? "Leave blank to keep current key" : "sk-..."} type="password" /></label>
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600"><label className="flex items-center gap-2"><input name="clearGroqApiKey" type="checkbox" value="true" /> Remove saved Groq key</label><label className="flex items-center gap-2"><input name="clearOpenAiApiKey" type="checkbox" value="true" /> Remove saved OpenAI key</label><span>Keys are encrypted at rest and are never displayed after saving.</span></div>
               <Button className="sm:w-auto" disabled={aiSettingsPending} type="submit">{aiSettingsPending ? "Saving..." : "Save AI Settings"}</Button>
             </form>
           </section>
         ) : null}
-        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-emerald-100 bg-emerald-50 text-emerald-600">
               <BuildingIcon />
@@ -700,7 +700,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
             />
 
             {/* ── Geo-fence / Location Attendance ── */}
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-4">
+            <div className="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
               <div className="flex items-center gap-2.5">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-700">
                   <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
@@ -768,7 +768,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
         </section>
 
         {/* Holiday Calendar */}
-        <section className="rounded-[1.8rem] border border-slate-200/80 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[0.85rem] border border-violet-100 bg-violet-50 text-violet-600">
@@ -789,7 +789,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
           </div>
 
           {showHolidayForm && (
-            <form action={holidayAddAction} className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4 space-y-3">
+            <form action={holidayAddAction} className="mt-4 space-y-3 rounded-lg border border-violet-200 bg-violet-50 p-4">
               {holidayAddState.error ? <Feedback>{holidayAddState.error}</Feedback> : null}
               {holidayAddState.success ? <Feedback tone="success">{holidayAddState.success}</Feedback> : null}
               <div className="grid gap-3 sm:grid-cols-3">
@@ -797,7 +797,7 @@ export function SettingsPanel({ data }: SettingsPanelProps) {
                 <InputField label="Date" name="date" type="date" placeholder="" />
                 <div>
                   <label className="block mb-1 text-sm font-medium text-slate-700">Type</label>
-                  <select name="type" className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100">
+                  <select name="type" className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100">
                     {HOLIDAY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
@@ -842,7 +842,7 @@ function InputField({ defaultValue, label, name, placeholder, type = "text", req
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <input
-        className={`w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100 ${
+        className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
           type === "time" ? "[color-scheme:light]" : ""
         }`}
         defaultValue={defaultValue}
@@ -860,7 +860,7 @@ function TextAreaField({ defaultValue, label, name, placeholder }: Omit<InputFie
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <textarea
-        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+        className="min-h-28 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
@@ -875,7 +875,7 @@ function PasswordField({ defaultValue, label, name, placeholder }: Omit<InputFie
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <div className="flex items-center rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 transition focus-within:border-blue-300 focus-within:ring-4 focus-within:ring-blue-100">
+      <div className="flex items-center rounded-md border border-slate-300 bg-white px-3 py-2.5 transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
         <input
           className="min-w-0 flex-1 bg-transparent text-slate-900 outline-none"
           defaultValue={defaultValue}

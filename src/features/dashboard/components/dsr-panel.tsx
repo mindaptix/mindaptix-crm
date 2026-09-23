@@ -77,12 +77,10 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
       {/* ── Reminder alert ── */}
       {/* ── Assigned projects ── */}
       {data.projects.length > 0 && (
-      <div className="overflow-hidden rounded-[1.8rem]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
-        <div className="px-6 py-5"
-          style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
-          <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Assigned Projects</p>
-          <h2 className="mt-1 text-2xl font-bold text-slate-800">Project Details</h2>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Assigned Projects</p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900">Project Details</h2>
         </div>
         <div className="p-5">
           {data.projects.length ? (
@@ -102,16 +100,14 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
       )}
 
       {/* ── Submit DSR form ── */}
-      <div className="overflow-hidden rounded-[1.8rem]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
-        <div className="px-6 py-5"
-          style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
-          <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Daily Report</p>
-          <h2 className="mt-1 text-2xl font-bold text-slate-800">Submit DSR</h2>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Daily Report</p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900">Submit DSR</h2>
           <p className="mt-1 text-sm text-slate-500">Fill your daily status — what you did, any blockers, and tomorrow&apos;s plan.</p>
         </div>
 
-        <div className="p-6">
+        <div className="p-5 sm:p-6">
           <form action={formAction} className="space-y-5">
             {state.error   && <Feedback>{state.error}</Feedback>}
             {state.success && <Feedback tone="success">{state.success}</Feedback>}
@@ -183,8 +179,7 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
             </div>
 
             <button
-              className="w-full rounded-xl py-4 text-sm font-bold text-white transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-60 sm:w-auto sm:px-10"
-              style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 8px 24px rgba(99,102,241,0.35)" }}
+              className="w-full rounded-md bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60 sm:w-auto sm:px-6"
               disabled={pending}
               type="submit"
             >
@@ -195,15 +190,13 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
       </div>
 
       {/* ── DSR History ── */}
-      <div className="overflow-hidden rounded-[1.8rem]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5"
-          style={{ background: "linear-gradient(135deg,#f8faff 0%,#eef4ff 100%)", borderBottom: "1px solid rgba(99,102,241,0.1)" }}>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
           <div>
-            <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#6366f1" }}>Recent DSR</p>
-            <h2 className="mt-1 text-2xl font-bold text-slate-800">My History</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Recent DSR</p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-900">My History</h2>
           </div>
-          <span className="rounded-full px-3 py-1.5 text-[0.65rem] font-bold"
+          <span className="rounded-md px-3 py-1.5 text-xs font-medium"
             style={{ background: "rgba(99,102,241,0.1)", color: "#4f46e5" }}>
             {data.updates.length} entries
           </span>
@@ -260,7 +253,7 @@ function DsrReviewPanel({
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
       {/* Date picker bar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm">
         <div className="flex items-center gap-2 text-slate-500">
           <svg fill="none" height="15" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="15">
             <rect height="18" rx="2" width="18" x="3" y="4"/><line x1="3" x2="21" y1="10" y2="10"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="16" x2="16" y1="2" y2="6"/>
@@ -268,7 +261,7 @@ function DsrReviewPanel({
           <span className="text-sm font-semibold text-slate-600">DSR Date:</span>
         </div>
         <input
-          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 scheme-light"
+          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 scheme-light"
           max={data.todayKey}
           type="date"
           value={selectedDate}
@@ -276,7 +269,7 @@ function DsrReviewPanel({
         />
         {!isToday && (
           <button
-            className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
+            className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
             onClick={() => setSelectedDate(data.todayKey)}
             type="button"
           >
@@ -296,14 +289,12 @@ function DsrReviewPanel({
       </div>
 
       {/* Missing DSR employees */}
-      <div className="overflow-hidden rounded-[1.8rem]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
-        <div className="px-6 py-5"
-          style={{ background: "linear-gradient(135deg,#fffbf0 0%,#fef3c7 100%)", borderBottom: "1px solid rgba(245,158,11,0.15)" }}>
-          <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#d97706" }}>Pending</p>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Pending</p>
           <div className="mt-1 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-800">Missing DSR — {selectedDate}</h2>
-            <span className="rounded-full px-3 py-1.5 text-[0.65rem] font-bold"
+            <h2 className="text-xl font-semibold text-slate-900">Missing DSR — {selectedDate}</h2>
+            <span className="rounded-md px-3 py-1.5 text-xs font-semibold"
               style={{ background: "rgba(245,158,11,0.12)", color: "#d97706", border: "1px solid rgba(245,158,11,0.25)" }}>
               {missingForDate.length} pending
             </span>
@@ -337,14 +328,12 @@ function DsrReviewPanel({
       </div>
 
       {/* Submitted DSR cards */}
-      <div className="overflow-hidden rounded-[1.8rem]"
-        style={{ border: "1px solid rgba(226,232,240,0.8)", background: "#fff", boxShadow: "0 8px 40px rgba(15,23,42,0.07)" }}>
-        <div className="px-6 py-5"
-          style={{ background: "linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%)", borderBottom: "1px solid rgba(16,185,129,0.15)" }}>
-          <p className="text-[0.62rem] font-bold uppercase tracking-[0.28em]" style={{ color: "#059669" }}>Review Feed</p>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Review Feed</p>
           <div className="mt-1 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-800">Submissions — {selectedDate}</h2>
-            <div className="flex items-center gap-2 rounded-full px-3 py-1.5"
+            <h2 className="text-xl font-semibold text-slate-900">Submissions — {selectedDate}</h2>
+            <div className="flex items-center gap-2 rounded-md px-3 py-1.5"
               style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
               {isToday && <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />}
               <span className="text-[0.65rem] font-bold text-emerald-600">{filteredUpdates.length} submitted</span>
@@ -542,33 +531,18 @@ function EmployeeProjectCard({ project }: { project: EmployeeProjectView }) {
 function StatCard({ gradient, shadow, icon, label, value, detail }: {
   gradient: string; shadow: string; icon: ReactNode; label: string; value: string; detail: string;
 }) {
+  void gradient;
+  void shadow;
   return (
-    <div className="relative overflow-hidden rounded-3xl p-5 text-white"
-      style={{ background: gradient, boxShadow: `0 8px 24px ${shadow}` }}>
-      <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">{icon}</div>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">{icon}</div>
         <div className="min-w-0">
-          <p className="text-[0.6rem] font-bold uppercase tracking-[0.26em] text-white/70">{label}</p>
-          <p className="mt-0.5 text-3xl font-black leading-none text-white">{value}</p>
-          <p className="mt-1 text-[0.68rem] text-white/60 leading-4">{detail}</p>
+          <p className="text-xs font-medium text-slate-600">{label}</p>
+          <p className="mt-1 text-3xl font-semibold leading-none text-slate-900">{value}</p>
+          <p className="mt-2 text-xs leading-4 text-slate-500">{detail}</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ReminderBanner({ message }: { message: string }) {
-  const isPending = message.toLowerCase().includes("pending") || message.toLowerCase().includes("not yet");
-  return (
-    <div className="flex items-start gap-3 rounded-[1.3rem] px-5 py-4"
-      style={isPending
-        ? { background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }
-        : { background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.18)" }
-      }>
-      <span className="text-lg">{isPending ? "⏳" : "✅"}</span>
-      <p className="text-sm font-semibold" style={{ color: isPending ? "#d97706" : "#4f46e5" }}>{message}</p>
     </div>
   );
 }
@@ -579,11 +553,11 @@ function DsrField({ icon, label, name, placeholder, type = "text", defaultValue,
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>{label}</label>
-      <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
-        {icon && <span className="pointer-events-none absolute left-3.5 text-indigo-400">{icon}</span>}
+      <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={name}>{label}</label>
+      <div className="relative flex items-center rounded-md border border-slate-300 bg-white transition focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+        {icon && <span className="pointer-events-none absolute left-3.5 text-slate-400">{icon}</span>}
         <input
-          className={`min-w-0 flex-1 bg-transparent py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 ${icon ? "pl-9 pr-4" : "px-4"} ${type === "date" ? "scheme-light" : ""}`}
+          className={`min-w-0 flex-1 bg-transparent py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 ${icon ? "pl-9 pr-4" : "px-3"} ${type === "date" ? "scheme-light" : ""}`}
           defaultValue={defaultValue}
           id={name}
           name={name}
@@ -601,10 +575,10 @@ function DsrTextArea({ icon, label, name, placeholder, defaultValue, required = 
 }) {
   return (
     <div>
-      <label className="mb-1.5 flex items-center gap-1.5 text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>
+      <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-700" htmlFor={name}>
         <span>{icon}</span>{label}
       </label>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
+      <div className="rounded-md border border-slate-300 bg-white transition focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
         <textarea
           className="min-h-32 w-full bg-transparent px-4 py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
           defaultValue={defaultValue}
@@ -624,11 +598,11 @@ function DsrSelect({ icon, label, name, defaultValue, includePlaceholder, placeh
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-[0.2em] text-slate-500" htmlFor={name}>{label}</label>
-      <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
-        {icon && <span className="pointer-events-none absolute left-3.5 text-indigo-400">{icon}</span>}
+      <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={name}>{label}</label>
+      <div className="relative flex items-center rounded-md border border-slate-300 bg-white transition focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+        {icon && <span className="pointer-events-none absolute left-3.5 text-slate-400">{icon}</span>}
         <select
-          className={`w-full appearance-none bg-transparent py-3 pr-8 text-sm text-slate-800 outline-none ${icon ? "pl-9" : "pl-4"}`}
+          className={`w-full appearance-none bg-transparent py-2.5 pr-8 text-sm text-slate-800 outline-none ${icon ? "pl-9" : "pl-3"}`}
           defaultValue={defaultValue}
           id={name}
           name={name}
@@ -655,10 +629,10 @@ function getInitials(value: string) {
 }
 
 /* ── Icons ── */
-function FolderIcon()  { return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>; }
+function FolderIcon()  { return <svg fill="none" height="18" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>; }
 function FolderIcon2() { return <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>; }
-function CheckIcon()   { return <svg fill="none" height="18" stroke="#fff" strokeWidth="2.2" viewBox="0 0 24 24" width="18"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>; }
-function ClockIcon()   { return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>; }
-function DocIcon()     { return <svg fill="none" height="18" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" /></svg>; }
+function CheckIcon()   { return <svg fill="none" height="18" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" width="18"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>; }
+function ClockIcon()   { return <svg fill="none" height="18" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>; }
+function DocIcon()     { return <svg fill="none" height="18" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 1 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" /></svg>; }
 function CalIcon()     { return <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14"><rect height="18" rx="2" ry="2" width="18" x="3" y="4" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>; }
 function TitleIcon()   { return <svg fill="none" height="14" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="14"><line x1="21" x2="3" y1="6" y2="6" /><line x1="15" x2="3" y1="12" y2="12" /><line x1="17" x2="3" y1="18" y2="18" /></svg>; }

@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
-import { getEmployeeDetailData } from "@/features/dashboard/data";
+import { getEmployeeDetailData } from "@/features/dashboard/server/page-data";
 import { EmployeeDetailPanel } from "@/features/dashboard/components/employee-detail-panel";
 
 export const metadata = { title: "Employee Profile" };

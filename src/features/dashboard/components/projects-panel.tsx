@@ -115,16 +115,15 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
   return (
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
 
-      {/* ── Header gradient card ── */}
-      <section className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#0f172a_0%,#1e3a5f_52%,#0f4c81_100%)] p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white/50">Project Portfolio</p>
-            <h1 className="mt-2 text-[1.9rem] font-semibold tracking-tight text-white">Projects</h1>
-            <p className="mt-1.5 text-sm text-white/60">Track project status, team assignments, and delivery timelines.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Project Portfolio</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Projects</h1>
+            <p className="mt-1.5 text-sm text-slate-500">Track delivery health, team coverage, priority, and key dates across the portfolio.</p>
           </div>
           <button
-            className="shrink-0 rounded-2xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+            className="shrink-0 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
             onClick={() => setIsCreateOpen(true)}
             type="button"
           >
@@ -132,7 +131,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
           </button>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-6 grid grid-cols-2 gap-3 border-t border-slate-200 pt-5 sm:grid-cols-3 xl:grid-cols-5">
           <StatPill label="Total" value={String(data.projects.length)} color="blue" />
           <StatPill label="In Progress" value={String(inProgress)} color="emerald" pulse />
           <StatPill label="Completed" value={String(completed)} color="slate" />
@@ -143,8 +142,8 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
 
       {/* ── Employee-closed alert ── */}
       {closedByEmp > 0 ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-violet-200 bg-[linear-gradient(135deg,#f5f3ff_0%,#ede9fe_100%)] px-5 py-4 shadow-sm">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100">
+        <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-5 py-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100">
             <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
               <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="#7c3aed" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
             </svg>
@@ -156,7 +155,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
             <p className="mt-0.5 text-xs text-violet-600">Employees have self-reported these projects as completed. Review them below.</p>
           </div>
           <button
-            className="shrink-0 rounded-xl border border-violet-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+            className="shrink-0 rounded-md border border-violet-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
             onClick={() => setStatusFilter("CLOSED_BY_EMP")}
             type="button"
           >
@@ -173,16 +172,16 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
             <path d="m16.5 16.5 4 4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
           </svg>
           <input
-            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
+            className="w-full rounded-md border border-slate-300 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by name, tech, employee, status..."
             value={searchTerm}
           />
         </div>
-        <div className="flex overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-0.5">
+        <div className="flex overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-0.5">
           {STATUS_FILTERS.map((f) => (
             <button
-              className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition ${statusFilter === f ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`shrink-0 rounded-md px-3 py-2 text-xs font-medium transition ${statusFilter === f ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-900"}`}
               key={f}
               onClick={() => setStatusFilter(f)}
               type="button"
@@ -196,8 +195,8 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
 
       {/* ── Project cards grid ── */}
       {filteredProjects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-slate-50/50 py-20 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl shadow-inner">📁</div>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-20 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-slate-100 text-3xl">📁</div>
           <p className="text-base font-semibold text-slate-600">No projects match your filter</p>
           <p className="mt-1.5 text-sm text-slate-400">Try clearing the search or selecting a different status.</p>
         </div>
@@ -206,17 +205,6 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
           {filteredProjects.map((project) => {
             const s = STATUS_STYLES[project.status] ?? STATUS_STYLES.PLANNING;
             const overdue = project.dueDate ? project.dueDate < getTodayDate() && project.status !== "COMPLETED" : false;
-            const cardGradient =
-              project.closedByEmployeeId
-                ? "linear-gradient(135deg,#4c1d95 0%,#7c3aed 60%,#c4b5fd 100%)"
-                : project.status === "IN_PROGRESS"
-                  ? "linear-gradient(135deg,#064e3b 0%,#059669 60%,#a7f3d0 100%)"
-                  : project.status === "ON_HOLD"
-                    ? "linear-gradient(135deg,#78350f 0%,#d97706 62%,#fde68a 100%)"
-                    : project.status === "COMPLETED"
-                      ? "linear-gradient(135deg,#1e293b 0%,#475569 62%,#cbd5e1 100%)"
-                      : "linear-gradient(135deg,#1e3a8a 0%,#2563eb 62%,#bfdbfe 100%)";
-
             const avatarGradients = [
               "from-blue-500 to-indigo-600",
               "from-emerald-500 to-teal-600",
@@ -227,50 +215,38 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
 
             return (
               <article
-                className="group flex flex-col overflow-hidden rounded-[1.8rem] bg-white shadow-[0_8px_32px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_48px_rgba(15,23,42,0.14)]"
+                className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md"
                 key={project.id}
-                style={{ border: "1px solid rgba(226,232,240,0.7)" }}
               >
-                {/* ── Gradient card header ── */}
-                <div
-                  className="relative overflow-hidden px-5 pb-4 pt-5"
-                  style={{ background: cardGradient }}
-                >
-                  {/* Decorative circle */}
-                  <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
-                  <div className="pointer-events-none absolute -bottom-4 right-8 h-14 w-14 rounded-full bg-white/8" />
-
-                  {/* Status + Priority + Closed badge */}
+                <div className="border-b border-slate-100 px-5 py-4">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/15 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
-                      <span className={`h-1.5 w-1.5 rounded-full bg-white ${project.status === "IN_PROGRESS" ? "animate-pulse" : ""}`} />
+                    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${s.chip}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${s.dot} ${project.status === "IN_PROGRESS" ? "animate-pulse" : ""}`} />
                       {s.label}
                     </span>
-                    <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white/90 backdrop-blur-sm">
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
                       {project.priority}
                     </span>
                     {project.closedByEmployeeId ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700">
                         ✓ Closed by Employee
                       </span>
                     ) : null}
                     {overdue ? (
-                      <span className="rounded-full border border-rose-300/40 bg-rose-500/30 px-2.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider text-white">
+                      <span className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">
                         ⚠ Overdue
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Project name */}
-                  <h3 className="mt-3 text-[1.05rem] font-bold leading-snug text-white drop-shadow-sm">
+                  <h3 className="mt-3 text-base font-semibold leading-snug text-slate-900">
                     {project.name}
                   </h3>
 
-                  {/* Team avatar row in header */}
                   <div className="mt-3 flex items-center justify-between">
                     <div className="flex -space-x-2">
                       {project.assignedUserNames.length === 0 ? (
-                        <span className="text-[0.65rem] font-semibold text-white/60">No team assigned</span>
+                        <span className="text-xs font-medium text-slate-500">No team assigned</span>
                       ) : (
                         <>
                           {project.assignedUserNames.slice(0, 5).map((name, i) => {
@@ -278,7 +254,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
                             return photoUrl ? (
                               <Image
                                 alt={name}
-                                className="h-7 w-7 rounded-full border-2 border-white/30 object-cover shadow-md"
+                                className="h-7 w-7 rounded-full border-2 border-white object-cover"
                                 height={28}
                                 key={`${project.id}-av-${i}`}
                                 src={photoUrl}
@@ -287,7 +263,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
                               />
                             ) : (
                               <div
-                                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/30 bg-gradient-to-br ${avatarGradients[i % avatarGradients.length]} text-[0.55rem] font-bold text-white shadow-md`}
+                                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br ${avatarGradients[i % avatarGradients.length]} text-[0.55rem] font-bold text-white`}
                                 key={`${project.id}-av-${i}`}
                                 title={name}
                               >
@@ -296,11 +272,11 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
                             );
                           })}
                           {project.assignedUserNames.length > 5 ? (
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-[0.55rem] font-bold text-white">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[0.55rem] font-bold text-slate-600">
                               +{project.assignedUserNames.length - 5}
                             </div>
                           ) : null}
-                          <span className="ml-2 self-center text-[0.62rem] font-semibold text-white/70">
+                          <span className="ml-2 self-center text-xs font-medium text-slate-500">
                             {project.assignedUserNames.length} member{project.assignedUserNames.length !== 1 ? "s" : ""}
                           </span>
                         </>
@@ -361,13 +337,13 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
 
                     <div className="flex items-center gap-2">
                       <Link
-                        className="shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100"
+                        className="shrink-0 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
                         href={`/dashboard/projects/${project.id}`}
                       >
                         View Details
                       </Link>
                       <button
-                        className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                        className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                         onClick={() => setSelectedProjectId(project.id)}
                         type="button"
                       >
@@ -596,7 +572,7 @@ function EditModal({
             />
 
             <button
-              className="w-full rounded-2xl bg-[linear-gradient(135deg,#1d4ed8_0%,#0f172a_100%)] py-3 text-sm font-bold text-white shadow-[0_8px_24px_rgba(29,78,216,0.3)] transition hover:opacity-90 disabled:opacity-60"
+              className="w-full rounded-md bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
               disabled={updatePending}
               type="submit"
             >
@@ -760,7 +736,7 @@ function CreateModal({
             />
 
             <button
-              className="w-full rounded-2xl bg-[linear-gradient(135deg,#1d4ed8_0%,#0f172a_100%)] py-3 text-sm font-bold text-white shadow-[0_8px_24px_rgba(29,78,216,0.3)] transition hover:opacity-90 disabled:opacity-60"
+              className="w-full rounded-md bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
               disabled={createPending}
               type="submit"
             >
@@ -777,15 +753,15 @@ function CreateModal({
 /* ─── Sub-components ─── */
 
 function StatPill({ color, label, pulse = false, value }: { color: "blue" | "emerald" | "slate" | "rose" | "violet"; label: string; pulse?: boolean; value: string }) {
-  const bg = { blue: "bg-white/10", emerald: "bg-emerald-500/20", slate: "bg-white/8", rose: "bg-rose-500/20", violet: "bg-violet-500/20" }[color];
-  const dot = { blue: "bg-blue-300", emerald: "bg-emerald-300", slate: "bg-slate-400", rose: "bg-rose-300", violet: "bg-violet-300" }[color];
+  const bg = { blue: "border-blue-200 bg-blue-50", emerald: "border-emerald-200 bg-emerald-50", slate: "border-slate-200 bg-slate-50", rose: "border-rose-200 bg-rose-50", violet: "border-violet-200 bg-violet-50" }[color];
+  const dot = { blue: "bg-blue-500", emerald: "bg-emerald-500", slate: "bg-slate-500", rose: "bg-rose-500", violet: "bg-violet-500" }[color];
   return (
-    <div className={`rounded-2xl border border-white/10 px-4 py-3 ${bg}`}>
+    <div className={`rounded-lg border px-4 py-3 ${bg}`}>
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
-        <p className="text-[0.6rem] font-semibold uppercase tracking-[0.24em] text-white/50">{label}</p>
+        <p className="text-xs font-medium text-slate-600">{label}</p>
       </div>
-      <p className="mt-1.5 text-2xl font-bold text-white">{value}</p>
+      <p className="mt-1.5 text-2xl font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -804,9 +780,9 @@ function Field({ defaultValue, fallbackTodayForDate = false, label, name, placeh
   const val = type === "date" && fallbackTodayForDate ? (defaultValue || getTodayDate()) : defaultValue;
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
       <input
-        className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 ${type === "date" ? "[color-scheme:light]" : ""}`}
+        className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${type === "date" ? "[color-scheme:light]" : ""}`}
         defaultValue={val}
         name={name}
         placeholder={placeholder}
@@ -820,9 +796,9 @@ function Field({ defaultValue, fallbackTodayForDate = false, label, name, placeh
 function TextAreaField({ defaultValue, label, name, placeholder }: Omit<FieldProps, "type" | "fallbackTodayForDate">) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
       <textarea
-        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
+        className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
@@ -847,9 +823,9 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
       <select
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         defaultValue={defaultValue}
         name={name}
       >

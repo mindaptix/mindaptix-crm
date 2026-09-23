@@ -216,11 +216,45 @@ export async function reviewTask(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function closeTask(formData: FormData): Promise<{ error?: string }> {
+  const session = await getCurrentSession();
+  if (!session || session.user.role !== "SUPER_ADMIN") return { error: "Only the super admin can close tasks." };
+  const taskId = String(formData.get("taskId") ?? "").trim();
+  if (!taskId) return { error: "Task ID is required." };
+
+  await connectDb();
+  const task = await TaskModel.findById(taskId).lean();
+  if (!task) return { error: "Task not found." };
+  if (task.status === "CLOSED") return {};
+
+  const closedAt = new Date();
+  await TaskModel.findByIdAndUpdate(taskId, {
+    status: "CLOSED",
+    completedAt: task.completedAt ?? closedAt,
+    reviewedAt: closedAt,
+    ...(missedTaskDeadline(task, closedAt) ? { deadlineMissedAt: task.deadlineMissedAt ?? taskDeadline(task) } : {}),
+  });
+  if (task.assignedUserId !== session.user.id) {
+    await createNotificationsForUsers([task.assignedUserId], {
+      actorUserId: session.user.id,
+      type: "TASK_COMMENT",
+      title: "Task closed",
+      message: `"${task.title}" was closed by the super admin because it is no longer required.`,
+      actionUrl: "/dashboard/tasks",
+      sourceKey: `task-closed:${taskId}:${closedAt.getTime()}`,
+    });
+  }
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/reports");
+  revalidatePath("/dashboard");
+  return {};
+}
+
 export async function deleteTask(formData: FormData): Promise<{ error?: string }> {
   const session = await getCurrentSession();
 
-  if (!session || (session.user.role !== "MANAGER" && session.user.role !== "SUPER_ADMIN")) {
-    return { error: "Only admin can delete tasks." };
+  if (!session || session.user.role !== "SUPER_ADMIN") {
+    return { error: "Only the super admin can delete tasks." };
   }
 
   const taskId = String(formData.get("taskId") ?? "").trim();
