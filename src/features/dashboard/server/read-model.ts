@@ -787,6 +787,14 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
   };
 }
 
+export async function getClientsPageData(session: AuthenticatedSession) {
+  if (session.user.role !== "SUPER_ADMIN") throw new Error("Only the Super Admin can view clients.");
+  await connectDb();
+  const [clients, projects] = await Promise.all([SalesCustomerModel.find({}).sort({ updatedAt: -1 }).lean(), ProjectModel.find({}, { name: 1 }).sort({ name: 1 }).lean()]);
+  const projectNames = new Map(projects.map((project) => [project._id.toString(), project.name]));
+  return { projects: projects.map((project) => ({ id: project._id.toString(), name: project.name })), clients: clients.map((client) => ({ id: client._id.toString(), clientName: client.clientName, companyName: client.companyName ?? "", clientPhone: client.clientPhone ?? "", clientEmail: client.clientEmail ?? "", country: String((client as { country?: string }).country ?? ""), projectName: projectNames.get(String((client as { projectId?: string }).projectId ?? "")) ?? "", status: client.status })) };
+}
+
 export async function getAttendancePageData(session: AuthenticatedSession): Promise<AttendancePageData> {
   await connectDb();
 

@@ -43,6 +43,8 @@ const salesCustomerSchema = new mongoose.Schema(
       maxlength: 160,
       default: "",
     },
+    country: { type: String, trim: true, maxlength: 80, default: "" },
+    projectId: { type: String, trim: true, default: "", index: true },
     status: {
       type: String,
       enum: SALES_CUSTOMER_STATUSES,

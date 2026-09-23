@@ -106,8 +106,7 @@ export function DashboardShell({ children, session, employeeSessionControl, admi
                 <Image alt="Mindaptix logo" className="h-11 w-11 object-cover object-[center_34%]" height={44} src="/3.png" width={44} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[0.62rem] font-semibold uppercase tracking-[0.24em] text-cyan-100/68">Workspace</p>
-                <h2 className="mt-0.5 whitespace-nowrap text-[1.05rem] font-semibold leading-tight text-white">Mindaptix CRM</h2>
+                <h2 className="whitespace-nowrap text-[1.05rem] font-semibold leading-tight text-white">Mindaptix CRM</h2>
               </div>
             </div>
           </div>
@@ -299,8 +298,8 @@ function getServerHydrationSnapshot() {
 const NAV_GROUPS: { label: string | null; keys: DashboardNavKey[] }[] = [
   { label: null, keys: ["dashboard"] },
   { label: "People", keys: ["employees", "attendance", "leaves", "regularize"] },
+  { label: "Sales & Schedule", keys: ["client-pitches", "clients", "meetings"] },
   { label: "Work", keys: ["portfolio", "projects", "tasks", "dsr"] },
-  { label: "Sales & Schedule", keys: ["client-pitches", "meetings"] },
   { label: "Finance", keys: ["reports", "payroll", "expenses", "payments"] },
   { label: "Resources", keys: ["assets", "documents", "alldocs"] },
   { label: "Communication", keys: ["announcements", "holidays"] },
@@ -329,6 +328,7 @@ function getMenuIcon(key: DashboardNavKey) {
       return <CalendarIcon />;
     case "leaves":
       return <DocumentIcon />;
+    case "clients":
     case "client-pitches":
     case "tasks":
       return <BriefcaseIcon />;

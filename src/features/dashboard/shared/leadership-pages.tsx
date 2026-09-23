@@ -17,6 +17,7 @@ import { RegularizationPanel } from "@/features/dashboard/components/regularizat
 import { AssetsPanel } from "@/features/dashboard/components/assets-panel";
 import { AllDocumentsPanel } from "@/features/dashboard/components/all-documents-panel";
 import { HolidayCalendarPanel } from "@/features/dashboard/components/holiday-calendar-panel";
+import { ClientsPanel } from "@/features/dashboard/components/clients-panel";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import {
   getAnnouncementsPageData,
@@ -34,6 +35,7 @@ import {
   getAssetsPageData,
   getAllEmployeeDocumentsData,
   getHolidayCalendarData,
+  getClientsPageData,
 } from "@/features/dashboard/server/page-data";
 import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
@@ -111,6 +113,9 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
     }
     case "holidays": {
       return <HolidayCalendarPanel holidays={await getHolidayCalendarData()} />;
+    }
+    case "clients": {
+      return <ClientsPanel {...await getClientsPageData(session)} />;
     }
     case "settings": {
       const data = await getSettingsPageData(session);
