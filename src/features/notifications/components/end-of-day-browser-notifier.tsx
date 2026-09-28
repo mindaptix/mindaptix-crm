@@ -17,10 +17,10 @@ export function EndOfDayBrowserNotifier({ enabled }: { enabled: boolean }) {
     if (!enabled || !("Notification" in window)) return;
     setPermission(Notification.permission);
     let active = true;
-    const checkForReminder = async () => {
-      if (!active || indiaTimeKey() < "18:00") return;
+    const showReminder = async (url: string, onlyAfterSix = false) => {
+      if (!active || (onlyAfterSix && indiaTimeKey() < "18:00")) return;
       try {
-        const response = await fetch("/api/notifications/end-of-day", { cache: "no-store" });
+        const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) return;
         const { reminder } = await response.json() as ReminderResponse;
         if (!reminder) return;
@@ -34,7 +34,11 @@ export function EndOfDayBrowserNotifier({ enabled }: { enabled: boolean }) {
         // CRM notifications are still created by the server when browser delivery is unavailable.
       }
     };
-    void checkForReminder();
+    const checkForReminder = () => {
+      void showReminder("/api/notifications/pending-tasks");
+      void showReminder("/api/notifications/end-of-day", true);
+    };
+    checkForReminder();
     const interval = window.setInterval(checkForReminder, 60_000);
     return () => { active = false; window.clearInterval(interval); };
   }, [enabled, router]);

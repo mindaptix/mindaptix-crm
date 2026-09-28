@@ -10,7 +10,7 @@ import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/user";
 import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import { HolidayModel } from "@/database/mongodb/models/system/holiday";
-import { COMPANY_HOLIDAYS_2026, COMPANY_WORK_POLICY } from "@/features/dashboard/lib/work-calendar";
+import { COMPANY_HOLIDAYS_2026, COMPANY_WORK_POLICY, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 
 type CreateNotificationInput = {
   recipientUserId: string;
@@ -92,6 +92,38 @@ export type EndOfDayReminder = {
   sourceKey: string;
 };
 
+export type PendingTaskReminder = {
+  title: string;
+  message: string;
+  sourceKey: string;
+};
+
+/** Creates one reminder per working hour while an employee still has open tasks. */
+export async function createHourlyPendingTaskReminderForUser(userId: string, date = formatIndiaDateKey(), time = formatIndiaTimeKey()): Promise<PendingTaskReminder | null> {
+  await connectDb();
+
+  const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  const isWeeklyOff = COMPANY_WORK_POLICY.weeklyOffDays.includes(weekday as 0 | 6);
+  const isConfiguredHoliday = COMPANY_HOLIDAYS_2026.some((holiday) => holiday.date === date);
+  const isCustomHoliday = Boolean(await HolidayModel.exists({ date }));
+  if (isWeeklyOff || isConfiguredHoliday || isCustomHoliday || time < "10:00" || time >= "19:00") return null;
+
+  const pendingTasks = await TaskModel.find(
+    { assignedUserId: userId, status: { $nin: ["COMPLETED", "CLOSED"] } },
+    { _id: 1 },
+  ).lean();
+  if (!pendingTasks.length) return null;
+
+  const hourKey = time.slice(0, 2);
+  const reminder = {
+    title: "Pending tasks need attention",
+    message: `You still have ${pendingTasks.length} pending task${pendingTasks.length === 1 ? "" : "s"}. Please complete or update them as soon as possible.`,
+    sourceKey: `pending-task-reminder:${userId}:${date}:${hourKey}`,
+  };
+  await createNotification({ recipientUserId: userId, type: "PENDING_TASK_REMINDER", title: reminder.title, message: reminder.message, actionUrl: "/dashboard/tasks", sourceKey: reminder.sourceKey });
+  return reminder;
+}
+
 /** Creates one idempotent 6 PM reminder for an employee's unfinished due work and missing DSR. */
 export async function createEndOfDayReminderForUser(userId: string, date = formatIndiaDateKey()): Promise<EndOfDayReminder | null> {
   await connectDb();
@@ -129,6 +161,7 @@ export async function syncWorkflowNotifications(session: AuthenticatedSession) {
   await connectDb();
 
   const today = formatIndiaDateKey();
+  await syncUpcomingHolidayReminderForUser(session.user.id, today);
   const currentTime = formatIndiaTimeKey();
   const settings = await SettingModel.findOne({ key: "company" }, { workStart: 1 }).lean();
   const workStart = settings?.workStart ?? "10:00";
@@ -160,6 +193,7 @@ export async function syncWorkflowNotifications(session: AuthenticatedSession) {
     ]);
 
     if (currentTime >= "18:00") await createEndOfDayReminderForUser(session.user.id, today);
+    await createHourlyPendingTaskReminderForUser(session.user.id, today, currentTime);
 
     if (todayAttendance?.checkInAt && formatTimeKey(todayAttendance.checkInAt) > workStart) {
       const managerRecipients = session.user.managerId ? [session.user.managerId] : [];
@@ -192,6 +226,28 @@ export async function syncWorkflowNotifications(session: AuthenticatedSession) {
       ),
     );
   }
+}
+
+/** Creates a CRM notification on each of the three days leading up to a holiday. */
+async function syncUpcomingHolidayReminderForUser(userId: string, today: string) {
+  const threeDaysFromNow = addDaysToDate(today, 3);
+  const customHolidays = await HolidayModel.find({ date: { $gte: today, $lte: threeDaysFromNow } }, { name: 1, date: 1 }).lean();
+  const upcoming = mergeCompanyHolidays(customHolidays.map((holiday) => ({ name: holiday.name, date: holiday.date })))
+    .filter((holiday) => holiday.date > today && holiday.date <= threeDaysFromNow)
+    .sort((left, right) => left.date.localeCompare(right.date));
+  const holiday = upcoming[0];
+  if (!holiday) return;
+
+  const daysAway = Math.round((new Date(`${holiday.date}T00:00:00.000Z`).getTime() - new Date(`${today}T00:00:00.000Z`).getTime()) / 86_400_000);
+  await createNotification({
+    recipientUserId: userId,
+    actorUserId: "system",
+    type: "HOLIDAY_REMINDER",
+    title: `Holiday in ${daysAway} day${daysAway === 1 ? "" : "s"}`,
+    message: `${holiday.name} is on ${holiday.date}. The office will be closed.`,
+    actionUrl: "/dashboard/holidays",
+    sourceKey: `holiday-reminder:${holiday.date}:${today}:${userId}`,
+  });
 }
 
 function formatTimeKey(value: Date | string) {
