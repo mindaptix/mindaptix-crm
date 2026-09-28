@@ -1087,16 +1087,31 @@ export async function getTasksPageData(session: AuthenticatedSession): Promise<T
   const awaitingReviewCount = tasks.filter((task) => task.status === "COMPLETED").length;
   const closedCount = tasks.filter((task) => task.status === "CLOSED").length;
   const rejectedCount = tasks.filter((task) => task.status === "REJECTED").length;
+  const taskRows = tasks.map((task) => mapTaskRow(task, userMap));
+  // Keep urgent unfinished work at the top: overdue first, then the nearest
+  // deadlines. Completed and closed work stays below active work.
+  taskRows.sort((left, right) => {
+    const leftActive = !isTaskFinished(left.status);
+    const rightActive = !isTaskFinished(right.status);
+    const leftGroup = leftActive && left.isOverdue ? 0 : leftActive ? 1 : 2;
+    const rightGroup = rightActive && right.isOverdue ? 0 : rightActive ? 1 : 2;
+    if (leftGroup !== rightGroup) return leftGroup - rightGroup;
+    const leftDeadline = left.deadlineAt || "9999-12-31T23:59:59.999Z";
+    const rightDeadline = right.deadlineAt || "9999-12-31T23:59:59.999Z";
+    return leftDeadline.localeCompare(rightDeadline) || left.title.localeCompare(right.title);
+  });
+  const activeOverdueCount = taskRows.filter((task) => !isTaskFinished(task.status) && task.isOverdue).length;
 
   return {
     summaryCards: [
+      { label: "Overdue", value: String(activeOverdueCount), detail: "Open tasks that have crossed their deadline." },
       { label: "Pending", value: String(tasks.filter((task) => task.status === "PENDING").length), detail: "Tasks waiting to start." },
       { label: "In Progress", value: String(tasks.filter((task) => task.status === "IN_PROGRESS").length), detail: "Tasks currently being worked on." },
       { label: "Awaiting Review", value: String(awaitingReviewCount), detail: "Employee-submitted tasks pending admin review." },
       { label: "Closed", value: String(closedCount), detail: "Tasks accepted and closed by admin." },
       { label: "Rejected", value: String(rejectedCount), detail: "Tasks rejected by admin, need to be redone." },
     ],
-    tasks: tasks.map((task) => mapTaskRow(task, userMap)),
+    tasks: taskRows,
     assignedProjects: assignedProjects.map((project) => ({
       id: project._id.toString(),
       name: project.name,
@@ -3041,7 +3056,7 @@ function resolveProjectTechStack(project: { name?: string; summary?: string; tec
 
 export async function getRegularizationPageData(session: AuthenticatedSession): Promise<RegularizationPageData> {
   await connectDb();
-  const canReview = session.user.role === "SUPER_ADMIN" || session.user.role === "MANAGER";
+  const canReview = session.user.role === "SUPER_ADMIN";
 
   if (canReview) {
     const visibleIds = await getAllActiveEmployeeIds();

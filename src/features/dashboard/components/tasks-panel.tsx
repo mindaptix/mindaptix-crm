@@ -79,7 +79,9 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
   const filteredTasks = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return data.tasks.filter((task) => {
-      if (statusFilter !== "ALL" && task.status !== statusFilter) return false;
+      const isActiveOverdue = task.isOverdue && task.status !== "COMPLETED" && task.status !== "CLOSED";
+      if (statusFilter === "OVERDUE" && !isActiveOverdue) return false;
+      if (statusFilter !== "ALL" && statusFilter !== "OVERDUE" && task.status !== statusFilter) return false;
       if (priorityFilter !== "ALL" && task.priority !== priorityFilter) return false;
       if (labelFilter !== "ALL" && !task.labels.includes(labelFilter)) return false;
       if (!q) return true;
@@ -93,12 +95,14 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
   const awaiting_review_count = data.tasks.filter((t) => t.status === "COMPLETED").length;
   const closed_count         = data.tasks.filter((t) => t.status === "CLOSED").length;
   const rejected_count       = data.tasks.filter((t) => t.status === "REJECTED").length;
+  const overdue_count        = data.tasks.filter((t) => t.isOverdue && t.status !== "COMPLETED" && t.status !== "CLOSED").length;
 
   return (
     <div className="space-y-4 px-3 py-3 sm:px-7 sm:py-6">
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 text-sm">
           <span className="font-semibold text-slate-800">Task summary</span>
+          <SummaryCount label="Overdue" value={overdue_count} tone={overdue_count ? "text-rose-700" : "text-slate-700"} />
           <SummaryCount label="Open" value={pending_count + inprogress_count + rejected_count} tone="text-slate-700" />
           <SummaryCount label="In progress" value={inprogress_count} tone="text-violet-700" />
           <SummaryCount label="For review" value={awaiting_review_count} tone="text-amber-700" />
@@ -149,9 +153,9 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
             <FilterPill
               label="Status"
               value={statusFilter}
-              options={["ALL","PENDING","IN_PROGRESS","COMPLETED","CLOSED","REJECTED"]}
+              options={["ALL","OVERDUE","PENDING","IN_PROGRESS","COMPLETED","CLOSED","REJECTED"]}
               onChange={setStatusFilter}
-              labels={{ PENDING: "Pending", IN_PROGRESS: "In Progress", COMPLETED: "Awaiting Review", CLOSED: "Closed", REJECTED: "Rejected" }}
+              labels={{ OVERDUE: "Overdue", PENDING: "Pending", IN_PROGRESS: "In Progress", COMPLETED: "Awaiting Review", CLOSED: "Closed", REJECTED: "Rejected" }}
             />
             <FilterPill label="Priority" value={priorityFilter} options={["ALL","LOW","MEDIUM","HIGH"]}               onChange={setPriorityFilter} />
             <FilterPill label="Label"    value={labelFilter}    options={["ALL",...data.labelOptions]}                onChange={setLabelFilter} />

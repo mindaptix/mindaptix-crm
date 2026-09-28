@@ -7,6 +7,7 @@ import {
   submitRegularizationRequest,
 } from "@/features/dashboard/actions/regularization";
 import type { RegularizationPageData, RegularizationEntry } from "@/features/dashboard/types";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 
 const STATUS_CFG: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   PENDING:  { bg: "rgba(245,158,11,0.08)",  text: "#d97706", border: "rgba(245,158,11,0.25)",  dot: "#f59e0b" },
@@ -62,7 +63,7 @@ export function RegularizationPanel({ data }: Props) {
           <p className="mt-1 text-sm text-slate-500">
             {data.canReview
               ? "Review and approve employee attendance correction requests."
-              : "Missed marking attendance? Submit a regularization request for admin review."}
+              : "Missed attendance on an absent working day? Request special approval from the Super Admin."}
           </p>
         </div>
 
@@ -99,14 +100,16 @@ export function RegularizationPanel({ data }: Props) {
 
 function SubmitForm() {
   const [state, action, pending] = useActionState(submitRegularizationRequest, {});
-  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(`${formatIndiaDateKey()}T00:00:00.000Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const lastRequestableDate = yesterday.toISOString().slice(0, 10);
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">New Request</p>
-        <h2 className="mt-1 text-lg font-semibold text-slate-900">Submit Regularization</h2>
-        <p className="text-sm text-slate-500">Fill in the details for the day you missed marking attendance.</p>
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">Request missed attendance approval</h2>
+        <p className="text-sm text-slate-500">Use this only for a past working day where attendance is absent. A Super Admin must approve it before it is marked present.</p>
       </div>
 
       <form action={action} className="space-y-5 p-5 sm:p-6">
@@ -117,7 +120,7 @@ function SubmitForm() {
           <Field label="Date *" hint="The day you missed marking attendance">
             <input
               className={INPUT}
-              max={today}
+              max={lastRequestableDate}
               name="dateKey"
               required
               type="date"
