@@ -23,6 +23,7 @@ type DailyUpdateState = {
     projectId?: string;
     workDate?: string;
     githubRepoUrl?: string;
+    githubRepoUrls?: string[];
     githubUsername?: string;
     githubBranch?: string;
   };
@@ -48,20 +49,23 @@ export async function submitDailyUpdate(
   const nextPlan = String(formData.get("nextPlan") ?? "").trim();
   const projectId = String(formData.get("projectId") ?? "").trim();
   const workDate = String(formData.get("workDate") ?? "").trim();
-  const githubRepoUrl = String(formData.get("githubRepoUrl") ?? "").trim();
+  const githubRepoUrls = Array.from(new Set(
+    formData.getAll("githubRepoUrl").map((value) => String(value).trim()).filter(Boolean),
+  ));
   const githubUsername = String(formData.get("githubUsername") ?? "").trim();
   const githubBranch = String(formData.get("githubBranch") ?? "").trim();
-  const values = { summary, accomplishments, blockers, nextPlan, projectId, workDate, githubRepoUrl, githubUsername, githubBranch };
+  const values = { summary, accomplishments, blockers, nextPlan, projectId, workDate, githubRepoUrls, githubUsername, githubBranch };
   const attachmentFiles = formData
     .getAll("attachments")
     .filter((value): value is File => value instanceof File && value.size > 0);
-  const hasGithubEvidence = Boolean(githubRepoUrl || githubUsername || githubBranch);
-  const repo = hasGithubEvidence ? parseGithubRepository(githubRepoUrl) : null;
-  if (hasGithubEvidence && (!repo || !validGithubUsername(githubUsername) || !validGithubBranch(githubBranch))) {
-    return { error: "For GitHub verification, enter a valid repository link, your GitHub username and an optional valid branch.", values };
+  const hasGithubEvidence = Boolean(githubRepoUrls.length || githubUsername || githubBranch);
+  if (githubRepoUrls.length > 5) return { error: "Add up to 5 repositories in one DSR.", values };
+  const repositories = hasGithubEvidence ? githubRepoUrls.map(parseGithubRepository) : [];
+  if (hasGithubEvidence && (!repositories.length || repositories.some((repo) => !repo) || !validGithubUsername(githubUsername) || !validGithubBranch(githubBranch))) {
+    return { error: "For GitHub verification, add at least one valid repository link, your GitHub username and an optional valid branch.", values };
   }
   const screenshotFiles = attachmentFiles.filter((file) => file.type.startsWith("image/"));
-  if (!repo && screenshotFiles.length === 0) {
+  if (!repositories.length && screenshotFiles.length === 0) {
     return { error: "Add GitHub repository evidence or upload at least one work screenshot before submitting the DSR.", values };
   }
   try { workDateWindow(workDate); } catch { return { error: "Choose a valid work date.", values }; }
@@ -103,9 +107,10 @@ export async function submitDailyUpdate(
       blockers,
       nextPlan,
       attachments,
-      githubRepoUrl: repo?.url ?? "",
-      githubUsername: repo ? githubUsername : "",
-      githubBranch: repo ? githubBranch : "",
+      githubRepoUrl: repositories[0]?.url ?? "",
+      githubRepoUrls: repositories.map((repo) => repo!.url),
+      githubUsername: repositories.length ? githubUsername : "",
+      githubBranch: repositories.length ? githubBranch : "",
       reviewRevision: randomUUID(),
     },
     { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
@@ -139,8 +144,6 @@ export async function submitDailyUpdate(
 
   return {
     success: "Daily update saved.",
-    values: { workDate, projectId, githubRepoUrl: repo?.url ?? "", githubUsername: repo ? githubUsername : "", githubBranch: repo ? githubBranch : "" },
+    values: { workDate, projectId, githubRepoUrls: repositories.map((repo) => repo!.url), githubUsername: repositories.length ? githubUsername : "", githubBranch: repositories.length ? githubBranch : "" },
   };
 }
-
-

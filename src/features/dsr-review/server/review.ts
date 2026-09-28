@@ -13,7 +13,7 @@ export class ReviewError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 export function sourceHash(input: DsrReviewInput & { reviewRevision?: string }) {
-  return createHash("sha256").update(JSON.stringify([input.workDate, input.summary, input.accomplishments, input.blockers ?? "", input.githubRepoUrl ?? "", input.githubUsername ?? "", input.githubBranch ?? "", input.reviewRevision ?? ""])).digest("hex");
+  return createHash("sha256").update(JSON.stringify([input.workDate, input.summary, input.accomplishments, input.blockers ?? "", input.githubRepoUrls ?? [input.githubRepoUrl ?? ""], input.githubUsername ?? "", input.githubBranch ?? "", input.reviewRevision ?? ""])).digest("hex");
 }
 async function loadDsr(session: AuthenticatedSession, id: string) {
   if (!["SUPER_ADMIN", "MANAGER"].includes(session.user.role)) throw new ReviewError("Only admins can review DSR evidence.", 403);
@@ -38,7 +38,8 @@ export async function getDsrReview(session: AuthenticatedSession, id: string) {
 export async function runDsrReview(session: AuthenticatedSession, id: string, refresh: boolean): Promise<AiReviewResult> {
   const dsr = await loadDsr(session, id);
   const hash = sourceHash(dsr);
-  if (!dsr.githubRepoUrl || !dsr.githubUsername) throw new ReviewError("This DSR has no repository or GitHub username. Ask the employee to update it.");
+  const repositoryUrls = dsr.githubRepoUrls?.length ? dsr.githubRepoUrls : (dsr.githubRepoUrl ? [dsr.githubRepoUrl] : []);
+  if (!repositoryUrls.length || !dsr.githubUsername) throw new ReviewError("This DSR has no repository or GitHub username. Ask the employee to update it.");
   const missing = (await reviewConfiguration()).missing;
   if (missing.length) throw new ReviewError(`Configure ${missing.join(" and ")} on the server before running a review.`, 503);
   try { await DsrAiReviewModel.updateOne({ _id: id }, { $setOnInsert: { status: "idle" } }, { upsert: true }); }
@@ -55,7 +56,16 @@ export async function runDsrReview(session: AuthenticatedSession, id: string, re
   if (!locked) throw new ReviewError("Review is already running. Check again shortly.", 409);
   try {
     const signal = AbortSignal.timeout(150_000);
-    const evidence = await collectGithubEvidence(dsr.githubRepoUrl, dsr.githubUsername, dsr.githubBranch ?? "", dsr.workDate, signal);
+    const evidenceRows = await Promise.all(repositoryUrls.map((repoUrl) => collectGithubEvidence(repoUrl, dsr.githubUsername, dsr.githubBranch ?? "", dsr.workDate, signal)));
+    const evidence = {
+      repository: evidenceRows.map((row) => row.repository).join(", "),
+      branch: evidenceRows.map((row) => row.branch).join(", "),
+      author: dsr.githubUsername,
+      workDate: dsr.workDate,
+      commits: evidenceRows.flatMap((row) => row.commits),
+      limited: evidenceRows.some((row) => row.limited),
+      warnings: evidenceRows.flatMap((row) => row.warnings),
+    };
     const assessments: ProviderAssessment[] = [];
     const warnings = [...evidence.warnings];
     if (evidence.commits.length) {

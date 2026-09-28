@@ -6,7 +6,7 @@ import type { AiReviewResult } from "../types";
 type ReviewState = { result: AiReviewResult | null; running: boolean; error: string; missingConfiguration: string[] };
 const EMPTY: ReviewState = { result: null, running: false, error: "", missingConfiguration: [] };
 
-export function DsrAiReview({ dsrId, githubRepoUrl, githubUsername, githubBranch }: { dsrId: string; githubRepoUrl: string; githubUsername: string; githubBranch: string }) {
+export function DsrAiReview({ dsrId, githubRepoUrl, githubRepoUrls = [], githubUsername, githubBranch }: { dsrId: string; githubRepoUrl: string; githubRepoUrls?: string[]; githubUsername: string; githubBranch: string }) {
   const [state, setState] = useState<ReviewState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -61,8 +61,8 @@ export function DsrAiReview({ dsrId, githubRepoUrl, githubUsername, githubBranch
     <section className="rounded-lg border border-slate-200 bg-white p-4">
       <h4 className="font-semibold text-slate-900">AI evidence review</h4>
       <p className="mt-1 text-sm text-slate-600">Groq compares this DSR with GitHub changes on the same work date (IST).</p>
-      <p className="mt-2 break-all text-xs text-slate-500">{githubRepoUrl || "Repository not supplied"} · Author: {githubUsername || "Not supplied"} · Branch: {githubBranch || "Repository default"}</p>
-      {!githubRepoUrl || !githubUsername ? <p className="mt-3 text-sm text-amber-800">Ask the employee to update this DSR with a repository and GitHub username.</p> : (
+      <p className="mt-2 break-all text-xs text-slate-500">{(githubRepoUrls.length ? githubRepoUrls : [githubRepoUrl]).filter(Boolean).join(" · ") || "Repository not supplied"} · Author: {githubUsername || "Not supplied"} · Branch: {githubBranch || "Repository default"}</p>
+      {!(githubRepoUrls.length || githubRepoUrl) || !githubUsername ? <p className="mt-3 text-sm text-amber-800">Ask the employee to update this DSR with a repository and GitHub username.</p> : (
         <>
           <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1 accent-blue-700" />

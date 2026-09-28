@@ -36,6 +36,14 @@ const dailyUpdateSchema = new mongoose.Schema(
       trim: true,
     },
     githubRepoUrl: { type: String, default: "", maxlength: 300 },
+    githubRepoUrls: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (value: string[]) => value.every((url) => typeof url === "string" && url.length <= 300),
+        message: "Invalid GitHub repository URLs.",
+      },
+    },
     githubUsername: { type: String, default: "", maxlength: 39 },
     githubBranch: { type: String, default: "", maxlength: 160 },
     reviewRevision: { type: String, default: "" },

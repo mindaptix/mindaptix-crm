@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
 import { DailyPlanner } from "@/features/tasks/components/daily-planner";
 import { reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
@@ -274,10 +275,12 @@ const UNDO_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in ms
 
 
 export function AttendancePanel({ data }: AttendancePanelProps) {
+  const router = useRouter();
   const officeLocation = data.officeLocation ?? OFFICE_LOCATION;
   const [workMode, setWorkMode] = useState<WorkMode>("OFFICE");
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [attendanceMessage, setAttendanceMessage] = useState<string | null>(null);
   const [checkInPending, startCheckIn] = useTransition();
   // Checkout confirmation state: false = default, true = waiting for confirm
   const [confirmingCheckout, setConfirmingCheckout] = useState(false);
@@ -298,6 +301,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
   async function handleCheckIn() {
     setGeoError(null);
+    setAttendanceMessage(null);
 
     const fd = new FormData();
     fd.set("workMode", workMode);
@@ -342,7 +346,10 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
         const result = await checkInAttendance(fd);
         if (result?.error) {
           setGeoError(result.error);
+          return;
         }
+        setAttendanceMessage("Check-in recorded successfully.");
+        router.refresh();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Check-in failed. Please try again.";
         setGeoError(msg);
@@ -352,6 +359,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
   async function handleCheckOutConfirm() {
     setCheckOutError(null);
+    setAttendanceMessage(null);
     setConfirmingCheckout(false);
 
     const fd = new FormData();
@@ -395,6 +403,8 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
           setCheckOutError(result.error);
           return;
         }
+        setAttendanceMessage("Check-out recorded successfully.");
+        router.refresh();
         // Show undo button for 15 minutes
         setUndoVisible(true);
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
@@ -546,6 +556,14 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                 style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)" }}>
                 <span className="mt-0.5 shrink-0 text-base">📍</span>
                 <p className="text-[0.68rem] font-semibold leading-relaxed text-rose-300">{geoError}</p>
+              </div>
+            )}
+
+            {attendanceMessage && (
+              <div className="mx-6 mt-3 flex items-center gap-2.5 rounded-xl px-4 py-2.5"
+                style={{ background: "rgba(16,185,129,0.14)", border: "1px solid rgba(52,211,153,0.3)" }}>
+                <span className="text-base">✓</span>
+                <p className="text-[0.68rem] font-semibold leading-relaxed text-emerald-200">{attendanceMessage}</p>
               </div>
             )}
 

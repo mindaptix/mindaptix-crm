@@ -1154,6 +1154,7 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
         })),
       updates: updates.map((update) => ({
         githubRepoUrl: update.githubRepoUrl ?? "",
+        githubRepoUrls: update.githubRepoUrls?.length ? update.githubRepoUrls : (update.githubRepoUrl ? [update.githubRepoUrl] : []),
       githubUsername: update.githubUsername ?? "",
       githubBranch: update.githubBranch ?? "",
       id: update._id.toString(),
@@ -1218,6 +1219,7 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
     ],
     updates: updates.map((update) => ({
       githubRepoUrl: update.githubRepoUrl ?? "",
+      githubRepoUrls: update.githubRepoUrls?.length ? update.githubRepoUrls : (update.githubRepoUrl ? [update.githubRepoUrl] : []),
       githubUsername: update.githubUsername ?? "",
       githubBranch: update.githubBranch ?? "",
       id: update._id.toString(),

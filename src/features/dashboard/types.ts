@@ -301,6 +301,7 @@ export type FileAttachmentView = {
 
 export type DsrFeedEntry = {
   githubRepoUrl?: string;
+  githubRepoUrls?: string[];
   githubUsername?: string;
   githubBranch?: string;
   id: string;
@@ -476,6 +477,7 @@ export type EmployeeUpdateView = {
   nextPlan: string;
   projectId: string;
   projectName: string;
+  githubRepoUrls?: string[];
   attachments: FileAttachmentView[];
 };
 

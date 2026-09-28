@@ -125,13 +125,13 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <p className="mb-1 text-sm font-semibold text-slate-800">Work evidence <span className="text-red-600">*</span></p>
-              <p className="mb-3 text-xs leading-5 text-slate-500">Add GitHub evidence for an automatic code review, or upload at least one screenshot below for non-code work.</p>
-              <DsrField label="GitHub repository URL" name="githubRepoUrl" type="url" placeholder="https://github.com/company/project" defaultValue={state.values?.githubRepoUrl} required={false} />
+              <p className="mb-3 text-xs leading-5 text-slate-500">Add every repository you worked in today for one combined automatic code review, or upload at least one screenshot below for non-code work.</p>
+              <GithubRepositoryFields initialUrls={state.values?.githubRepoUrls} />
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <DsrField label="Your GitHub username" name="githubUsername" placeholder="Your commit author username" defaultValue={state.values?.githubUsername} required={false} />
                 <DsrField label="Branch (optional)" name="githubBranch" placeholder="Default branch if blank" defaultValue={state.values?.githubBranch} required={false} />
               </div>
-              <p className="mt-3 text-xs leading-5 text-slate-500">GitHub evidence lets the admin compare this DSR with your commits on the work date (IST). Bounded code diffs from approved repositories are sent to Groq for an evidence-alignment review.</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">GitHub evidence lets the admin compare this DSR with your commits across all listed repositories on the work date (IST). Bounded code diffs from approved repositories are sent to Groq for an evidence-alignment review.</p>
             </div>
 
             {/* Summary */}
@@ -364,6 +364,24 @@ function DsrReviewPanel({
    SUB-COMPONENTS
 ══════════════════════════════════════════════ */
 
+function GithubRepositoryFields({ initialUrls = [] }: { initialUrls?: string[] }) {
+  const [urls, setUrls] = useState(() => initialUrls.length ? initialUrls : [""]);
+
+  return (
+    <div className="space-y-2">
+      {urls.map((url, index) => (
+        <div key={`${index}-${url}`} className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <DsrField label={index === 0 ? "GitHub repository URL" : `GitHub repository URL ${index + 1}`} name="githubRepoUrl" type="url" placeholder="https://github.com/company/project" defaultValue={url} required={false} />
+          </div>
+          {urls.length > 1 && <button aria-label={`Remove repository ${index + 1}`} className="mb-0.5 rounded-md border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700" onClick={() => setUrls((current) => current.filter((_, currentIndex) => currentIndex !== index))} type="button">Remove</button>}
+        </div>
+      ))}
+      <button className="rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50" onClick={() => setUrls((current) => [...current, ""])} type="button">+ Add another repository</button>
+    </div>
+  );
+}
+
 function DsrHistoryCard({ entry }: { entry: { id: string; workDate: string; projectName: string; summary: string; accomplishments: string; blockers: string; nextPlan: string; attachments: { name: string; url: string }[] } }) {
   const [open, setOpen] = useState(false);
   return (
@@ -461,7 +479,7 @@ function AdminDsrCard({ entry }: { entry: Extract<DsrPageData, { mode: "review" 
           <DSRBlock icon="✅" label="What They Completed" text={entry.accomplishments} />
           <DSRBlock icon="⚠️" label="Blockers Reported" text={entry.blockers || "No blockers"} />
           <DSRBlock icon="📅" label="Tomorrow's Plan" text={entry.nextPlan || "Not added"} />
-          <div className="sm:col-span-3"><DsrAiReview dsrId={entry.id} githubRepoUrl={entry.githubRepoUrl ?? ""} githubUsername={entry.githubUsername ?? ""} githubBranch={entry.githubBranch ?? ""} /></div>
+          <div className="sm:col-span-3"><DsrAiReview dsrId={entry.id} githubRepoUrl={entry.githubRepoUrl ?? ""} githubRepoUrls={entry.githubRepoUrls ?? []} githubUsername={entry.githubUsername ?? ""} githubBranch={entry.githubBranch ?? ""} /></div>
           {entry.attachments.length > 0 && (
             <div className="sm:col-span-3">
               <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Proof Files</p>

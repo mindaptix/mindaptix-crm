@@ -64,8 +64,9 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
     if (state.success) {
       emitDashboardSync("task-created");
       setIsCreateOpen(false);
+      refreshView();
     }
-  }, [state.success]);
+  }, [refreshView, state.success]);
 
   // Auto-refresh when admin assigns a task (employee sees it instantly)
   useEffect(() => {

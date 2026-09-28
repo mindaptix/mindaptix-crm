@@ -50,6 +50,7 @@ export type DsrReviewInput = {
   accomplishments: string;
   blockers?: string;
   githubRepoUrl?: string;
+  githubRepoUrls?: string[];
   githubUsername?: string;
   githubBranch?: string;
 };
