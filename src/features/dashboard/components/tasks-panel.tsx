@@ -357,6 +357,7 @@ function TaskCard({
   onTaskUpdated: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.PENDING;
   const pc = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.LOW;
@@ -395,8 +396,9 @@ function TaskCard({
             </div>
 
             {/* Description */}
-            <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500 line-clamp-2">{task.description}</p>
-            {task.checklist.length > 0 && (
+            <p className={`mt-1.5 whitespace-pre-wrap break-words text-[0.82rem] leading-5 text-slate-500 ${detailsExpanded ? "" : "line-clamp-2"}`}>{task.description}</p>
+            {(task.description.length > 180 || task.checklist.length > 0) && <button className="mt-2 text-xs font-semibold text-violet-700 hover:text-violet-900 hover:underline" onClick={() => setDetailsExpanded((value) => !value)} type="button">{detailsExpanded ? "Hide details" : "Show details"}</button>}
+            {task.checklist.length > 0 && detailsExpanded && (
               <div className="mt-3 grid gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                 <p className="font-semibold text-slate-700">Daily checklist</p>
                 {task.checklist.map((item) => <p key={item.title} className={item.completed ? "text-emerald-700 line-through" : ""}>{item.completed ? "✓" : "○"} {item.title}</p>)}
