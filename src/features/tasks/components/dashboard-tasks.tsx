@@ -51,21 +51,21 @@ export function DashboardTasks({ tasks }: { tasks: DashboardTask[] }) {
   const nextTask = filtered?.today[0] ?? filtered?.upcoming[0] ?? null;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]" aria-label="Your work for today">
-      <header className="border-b border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 px-5 py-5 text-white sm:px-6">
+    <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_14px_40px_rgba(76,29,149,0.07)]" aria-label="Your work for today">
+      <header className="border-b border-violet-100 bg-gradient-to-br from-indigo-50 via-violet-50 to-rose-50 px-5 py-5 text-slate-900 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-violet-200">My workday</p>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-violet-600">My workday</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight">Focus on what needs to move today</h2>
-            <p className="mt-1.5 max-w-2xl text-sm text-slate-300">Deadlines update live in IST. Complete overdue work first, then move through today&apos;s planned tasks.</p>
+            <p className="mt-1.5 max-w-2xl text-sm text-slate-600">Deadlines update live in IST. Complete overdue work first, then move through today&apos;s planned tasks.</p>
           </div>
-          <Link href="/dashboard/tasks" className="rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-violet-50">Open task board <span aria-hidden="true">→</span></Link>
+          <Link href="/dashboard/tasks" className="rounded-lg bg-violet-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700">Open task board <span aria-hidden="true">→</span></Link>
         </div>
         {groups && (
           <div className="mt-5 grid gap-2 sm:grid-cols-3">
-            <Summary label="Due today" value={groups.today.length} detail="Tasks planned for today" tone="border-white/15 bg-white/10" />
-            <Summary label="Overdue" value={groups.overdue.length} detail={groups.overdue.length ? "Needs attention now" : "Nothing pending"} tone={groups.overdue.length ? "border-rose-300/30 bg-rose-500/20" : "border-white/15 bg-white/10"} />
-            <Summary label="Next deadline" value={nextTask ? countdown(new Date(nextTask.deadlineAt).getTime() - now!) : "—"} detail={nextTask?.title ?? "No upcoming deadline"} tone="border-violet-300/30 bg-violet-400/15" isTimer />
+            <Summary label="Due today" value={groups.today.length} detail="Tasks planned for today" tone="border-indigo-100 bg-indigo-100/70" />
+            <Summary label="Overdue" value={groups.overdue.length} detail={groups.overdue.length ? "Needs attention now" : "Nothing pending"} tone={groups.overdue.length ? "border-rose-200 bg-rose-100/80" : "border-emerald-100 bg-emerald-50"} />
+            <Summary label="Next deadline" value={nextTask ? countdown(new Date(nextTask.deadlineAt).getTime() - now!) : "—"} detail={nextTask?.title ?? "No upcoming deadline"} tone="border-violet-100 bg-violet-100/70" isTimer />
           </div>
         )}
       </header>
@@ -96,7 +96,7 @@ export function DashboardTasks({ tasks }: { tasks: DashboardTask[] }) {
 }
 
 function Summary({ label, value, detail, tone, isTimer = false }: { label: string; value: string | number; detail: string; tone: string; isTimer?: boolean }) {
-  return <div className={`rounded-xl border p-3.5 ${tone}`}><p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-300">{label}</p><p className={`mt-1.5 text-2xl font-semibold tracking-tight ${isTimer ? "tabular-nums" : ""}`}>{value}</p><p className="mt-1 truncate text-xs text-slate-300">{detail}</p></div>;
+  return <div className={`rounded-xl border p-3.5 ${tone}`}><p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p><p className={`mt-1.5 text-2xl font-semibold tracking-tight text-slate-900 ${isTimer ? "tabular-nums" : ""}`}>{value}</p><p className="mt-1 truncate text-xs text-slate-600">{detail}</p></div>;
 }
 
 function SectionHeading({ label, count, urgent = false }: { label: string; count: number; urgent?: boolean }) {

@@ -17,7 +17,7 @@ export async function getCurrentWork(session: AuthenticatedSession) {
   const [employees, projects, tasks, attendance, leaves, updates] = await Promise.all([
     UserModel.find({ role: "EMPLOYEE", status: "ACTIVE" }, { fullName: 1 }).sort({ fullName: 1 }).lean(),
     ProjectModel.find({}, { name: 1, summary: 1, status: 1, assignedUserIds: 1, dueDate: 1 }).sort({ dueDate: 1 }).lean(),
-    TaskModel.find({ status: { $in: ["PENDING", "IN_PROGRESS", "REJECTED"] } }, { title: 1, description: 1, assignedUserId: 1, status: 1, priority: 1, dueDate: 1, deadlineAt: 1 }).sort({ dueDate: 1 }).lean(),
+    TaskModel.find({ status: { $in: ["PENDING", "IN_PROGRESS", "REJECTED"] } }, { title: 1, description: 1, assignedUserId: 1, status: 1, priority: 1, labels: 1, dueDate: 1, deadlineAt: 1 }).sort({ dueDate: 1, deadlineAt: 1 }).lean(),
     AttendanceModel.find({ dateKey: today }, { userId: 1, checkInAt: 1, checkOutAt: 1 }).lean(),
     LeaveRequestModel.find({ status: "APPROVED", startDate: { $lte: today }, endDate: { $gte: today } }, { userId: 1 }).lean(),
     DailyUpdateModel.find({ workDate: today }, { userId: 1, projectId: 1, summary: 1 }).sort({ updatedAt: -1 }).lean(),
@@ -25,7 +25,7 @@ export async function getCurrentWork(session: AuthenticatedSession) {
   const projectMap = new Map(projects.map((project) => [String(project._id), project.name]));
   const mappedTasks = tasks.map((task) => ({
     id: String(task._id), title: task.title, description: task.description, status: task.status,
-    priority: task.priority, employeeId: task.assignedUserId, deadlineAt: taskDeadline(task)?.toISOString() ?? "",
+    priority: task.priority, labels: task.labels ?? [], employeeId: task.assignedUserId, deadlineAt: taskDeadline(task)?.toISOString() ?? "",
   }));
   const people = employees.map((employee) => {
     const id = String(employee._id);
