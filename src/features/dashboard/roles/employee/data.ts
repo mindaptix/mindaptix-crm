@@ -6,6 +6,7 @@ import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
 import { LeaveRequestModel } from "@/database/mongodb/models/leave-request";
 import { ProjectModel } from "@/database/mongodb/models/project";
 import { TaskModel } from "@/database/mongodb/models/task";
+import { UserModel } from "@/database/mongodb/models/workforce/user";
 import type { DashboardOverviewData } from "@/features/dashboard/types";
 import { formatIndiaTimeKey } from "@/shared/lib/india-time";
 import {
@@ -25,14 +26,21 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
     TaskModel.countDocuments({ assignedUserId: session.user.id, status: { $nin: ["COMPLETED", "CLOSED"] } }),
     ProjectModel.countDocuments({ assignedUserIds: session.user.id }),
     DailyUpdateModel.countDocuments({ userId: session.user.id, workDate: today }),
-    TaskModel.find({ assignedUserId: session.user.id }, { title: 1, description: 1, dueDate: 1, deadlineAt: 1, status: 1, priority: 1 }).sort({ dueDate: 1, deadlineAt: 1 }).lean(),
+    TaskModel.find({ assignedUserId: session.user.id }, { title: 1, description: 1, dueDate: 1, deadlineAt: 1, status: 1, priority: 1, assignedByUserId: 1 }).sort({ dueDate: 1, deadlineAt: 1 }).lean(),
   ]);
+  const creatorIds = Array.from(new Set(taskRows.map((task) => task.assignedByUserId).filter(Boolean)));
+  const taskCreators = creatorIds.length
+    ? await UserModel.find({ _id: { $in: creatorIds } }, { fullName: 1 }).lean()
+    : [];
+  const creatorNameById = new Map(taskCreators.map((user) => [user._id.toString(), user.fullName]));
 
   return {
     title: "My Workspace",
     assignedTasks: taskRows.filter((task) => !isTaskFinished(task.status)).map((task) => ({
       id: task._id.toString(), title: task.title, description: task.description,
       priority: task.priority, status: task.status, deadlineAt: taskDeadline(task)?.toISOString() ?? "",
+      assignedByName: creatorNameById.get(task.assignedByUserId) ?? "Unknown",
+      assignedBySelf: task.assignedByUserId === session.user.id,
     })).sort((a, b) => a.deadlineAt.localeCompare(b.deadlineAt)),
     description: "Quick access to attendance, tasks, DSR, and leave without duplicate widgets.",
     priorityAlert:
@@ -90,6 +98,4 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
 function getCurrentTimeKey() {
   return formatIndiaTimeKey(new Date());
 }
-
-
 

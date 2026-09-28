@@ -51,6 +51,8 @@ export type DashboardTask = {
   priority: string;
   status: string;
   deadlineAt: string;
+  assignedByName?: string;
+  assignedBySelf?: boolean;
 };
 
 /** Mutually exclusive deadline groups, using the workspace's India calendar. */

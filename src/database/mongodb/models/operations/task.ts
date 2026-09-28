@@ -62,6 +62,8 @@ const taskCommentSchema = new mongoose.Schema(
   { _id: true },
 );
 
+const taskChecklistItemSchema = new mongoose.Schema({ title: { type: String, required: true, trim: true, maxlength: 240 }, completed: { type: Boolean, default: false } }, { _id: false });
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -122,6 +124,7 @@ const taskSchema = new mongoose.Schema(
       type: [taskCommentSchema],
       default: [],
     },
+    checklist: { type: [taskChecklistItemSchema], default: [] },
     completedAt: {
       type: Date,
       default: null,

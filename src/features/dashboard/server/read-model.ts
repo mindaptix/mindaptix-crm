@@ -2622,6 +2622,7 @@ function mapTaskRow(task: {
   status: string;
   priority?: string;
   labels?: string[];
+  checklist?: Array<{ title?: string; completed?: boolean }>;
   attachments?: Array<{ name?: string; url?: string }>;
   comments?: Array<{ _id?: { toString(): string }; userName?: string; role?: string; message?: string; createdAt?: Date | null }>;
 }, userMap: Map<string, { fullName: string; profilePhotoUrl: string }>) {
@@ -2632,12 +2633,14 @@ function mapTaskRow(task: {
     assignedUserId: task.assignedUserId,
     assignedUserName: userMap.get(task.assignedUserId)?.fullName ?? "Unknown employee",
     assignedUserPhotoUrl: userMap.get(task.assignedUserId)?.profilePhotoUrl ?? "",
+    assignedByUserId: task.assignedByUserId,
     assignedByName: userMap.get(task.assignedByUserId)?.fullName ?? "Unknown admin",
     dueDate: task.dueDate,
     deadlineAt: taskDeadline(task)?.toISOString() ?? "",
     status: task.status,
     priority: task.priority ?? "MEDIUM",
     labels: task.labels ?? [],
+    checklist: (task.checklist ?? []).map((item) => ({ title: item.title ?? "", completed: Boolean(item.completed) })).filter((item) => item.title),
     isOverdue: !isTaskFinished(task.status) && missedTaskDeadline(task),
     attachments: mapAttachments(task.attachments),
     comments: (task.comments ?? []).map((comment, index) => ({

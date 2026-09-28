@@ -425,11 +425,13 @@ export type TaskEntry = {
   assignedUserId: string;
   assignedUserName: string;
   assignedUserPhotoUrl?: string;
+  assignedByUserId: string;
   assignedByName: string;
   dueDate: string;
   status: string;
   priority: string;
   labels: string[];
+  checklist: Array<{ title: string; completed: boolean }>;
   isOverdue: boolean;
   attachments: FileAttachmentView[];
   comments: TaskCommentView[];

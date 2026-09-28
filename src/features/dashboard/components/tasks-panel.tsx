@@ -158,7 +158,7 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
           </div>
 
           <div className="hidden grid-cols-[minmax(260px,2fr)_150px_175px_130px_110px] gap-4 border-b border-slate-200 bg-slate-50 px-6 py-2.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500 lg:grid">
-            <span>Task</span><span>Status</span><span>Owner</span><span>Due date</span><span>Priority</span>
+            <span>Task</span><span>Status</span><span>Owner & source</span><span>Due date</span><span>Priority</span>
           </div>
 
           {/* Task rows */}
@@ -396,16 +396,23 @@ function TaskCard({
 
             {/* Description */}
             <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-500 line-clamp-2">{task.description}</p>
+            {task.checklist.length > 0 && (
+              <div className="mt-3 grid gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                <p className="font-semibold text-slate-700">Daily checklist</p>
+                {task.checklist.map((item) => <p key={item.title} className={item.completed ? "text-emerald-700 line-through" : ""}>{item.completed ? "✓" : "○"} {item.title}</p>)}
+              </div>
+            )}
 
             {/* Meta row */}
             <div className="mt-3 flex flex-wrap items-center gap-3 text-[0.72rem] text-slate-500 lg:hidden">
-              {/* Assigned by */}
+              {/* Assignment source */}
               <span className="flex items-center gap-1">
                 <svg fill="none" height="12" stroke="#6366f1" strokeWidth="2" viewBox="0 0 24 24" width="12">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
                 </svg>
-                <span className="font-semibold text-indigo-600">{task.assignedByName || "Admin"}</span>
-                <span className="text-slate-400">assigned to</span>
+                <span className="text-slate-400">{task.assignedByUserId === task.assignedUserId ? "Created by" : "Assigned by"}</span>
+                <span className="font-semibold text-indigo-600">{task.assignedByName || "Unknown"}</span>
+                <span className="text-slate-400">·</span>
                 {task.assignedUserPhotoUrl ? (
                   <Image
                     alt={task.assignedUserName}
@@ -657,7 +664,7 @@ function TaskCard({
           </div>
           <div className="hidden min-w-0 items-center gap-2 lg:flex">
             {task.assignedUserPhotoUrl ? <Image alt={task.assignedUserName} className="h-7 w-7 shrink-0 rounded-full object-cover" height={28} src={task.assignedUserPhotoUrl} width={28} /> : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-semibold text-violet-700">{task.assignedUserName.slice(0, 1).toUpperCase()}</span>}
-            <span className="truncate text-sm text-slate-700">{task.assignedUserName}</span>
+            <span className="min-w-0"><span className="block truncate text-sm text-slate-700">{task.assignedUserName}</span><span className="block truncate text-xs text-slate-500">{task.assignedByUserId === task.assignedUserId ? "Created by" : "Assigned by"} {task.assignedByName || "Unknown"}</span></span>
           </div>
           <div className={`hidden text-sm lg:block ${task.isOverdue ? "font-medium text-red-700" : "text-slate-600"}`}>{dueDateDisplay || "No deadline"}</div>
           <div className="hidden lg:block"><span className="inline-flex rounded-md border px-2 py-1 text-xs font-semibold" style={{ background: pc.bg, color: pc.text, borderColor: pc.border }}>{pc.label}</span></div>
