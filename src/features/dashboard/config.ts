@@ -14,6 +14,7 @@ export type DashboardNavKey =
   | "dsr"
   | "reports"
   | "payroll"
+  | "salary"
   | "expenses"
   | "payments"
   | "assets"
@@ -49,7 +50,8 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   { key: "tasks", label: "Tasks", href: "/dashboard/tasks", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE", "SALES"] },
   { key: "dsr", label: "DSR", href: "/dashboard/dsr", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "reports", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
-  { key: "payroll", label: "Payroll", href: "/dashboard/payroll", allowedRoles: ["SUPER_ADMIN", "EMPLOYEE"] },
+  { key: "payroll", label: "Payroll", href: "/dashboard/payroll", allowedRoles: ["SUPER_ADMIN"] },
+  { key: "salary", label: "My Salary", href: "/dashboard/salary", allowedRoles: ["EMPLOYEE"] },
   { key: "expenses", label: "Expenses", href: "/dashboard/expenses", allowedRoles: ["SUPER_ADMIN", "MANAGER", "EMPLOYEE"] },
   { key: "payments", label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "MANAGER"] },
   { key: "assets", label: "Assets", href: "/dashboard/assets", allowedRoles: ["SUPER_ADMIN", "MANAGER", "SALES"] },

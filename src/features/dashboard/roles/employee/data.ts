@@ -7,8 +7,10 @@ import { LeaveRequestModel } from "@/database/mongodb/models/leave-request";
 import { ProjectModel } from "@/database/mongodb/models/project";
 import { TaskModel } from "@/database/mongodb/models/task";
 import { UserModel } from "@/database/mongodb/models/workforce/user";
+import { HolidayModel } from "@/database/mongodb/models/system/holiday";
 import type { DashboardOverviewData } from "@/features/dashboard/types";
 import { formatIndiaTimeKey } from "@/shared/lib/india-time";
+import { getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 import {
   buildOverviewCalendarItems,
   buildOverviewPerformanceRows,
@@ -20,14 +22,28 @@ import {
 export async function getEmployeeDashboardOverviewData(session: AuthenticatedSession): Promise<DashboardOverviewData> {
   const { notifications, today } = await getDashboardOverviewContext(session);
   const currentTime = getCurrentTimeKey();
-  const [attendanceRow, pendingLeaves, openTasks, projectCount, dsrCount, taskRows] = await Promise.all([
+  const monthPrefix = today.slice(0, 7);
+  const monthStart = `${monthPrefix}-01`;
+  const monthEnd = new Date(`${monthStart}T00:00:00.000Z`);
+  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+  monthEnd.setUTCDate(0);
+  const monthEndKey = monthEnd.toISOString().slice(0, 10);
+  const [attendanceRow, pendingLeaves, openTasks, projectCount, dsrCount, taskRows, monthlyAttendance, monthlyDsrCount, monthlyHolidays] = await Promise.all([
     AttendanceModel.findOne({ userId: session.user.id, dateKey: today }).lean(),
     LeaveRequestModel.countDocuments({ userId: session.user.id, status: "PENDING" }),
     TaskModel.countDocuments({ assignedUserId: session.user.id, status: { $nin: ["COMPLETED", "CLOSED"] } }),
     ProjectModel.countDocuments({ assignedUserIds: session.user.id }),
     DailyUpdateModel.countDocuments({ userId: session.user.id, workDate: today }),
     TaskModel.find({ assignedUserId: session.user.id }, { title: 1, description: 1, dueDate: 1, deadlineAt: 1, status: 1, priority: 1, assignedByUserId: 1 }).sort({ dueDate: 1, deadlineAt: 1 }).lean(),
+    AttendanceModel.find({ userId: session.user.id, dateKey: { $gte: monthStart, $lte: today } }, { dateKey: 1 }).lean(),
+    DailyUpdateModel.countDocuments({ userId: session.user.id, workDate: { $gte: monthStart, $lte: today } }),
+    HolidayModel.find({ date: { $gte: monthStart, $lte: monthEndKey } }, { date: 1 }).lean(),
   ]);
+  const holidayDates = mergeCompanyHolidays(monthlyHolidays).map((holiday) => holiday.date);
+  const workdaysThisMonth = getWorkdayBreakdown(monthStart, monthEndKey, holidayDates).workingDays;
+  const workdaysSoFar = getWorkdayBreakdown(monthStart, today, holidayDates).workingDays;
+  const presentDays = new Set(monthlyAttendance.map((record) => record.dateKey)).size;
+  const absentDays = Math.max(workdaysSoFar - presentDays, 0);
   const creatorIds = Array.from(new Set(taskRows.map((task) => task.assignedByUserId).filter(Boolean)));
   const taskCreators = creatorIds.length
     ? await UserModel.find({ _id: { $in: creatorIds } }, { fullName: 1 }).lean()
@@ -43,6 +59,11 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
       assignedBySelf: task.assignedByUserId === session.user.id,
     })).sort((a, b) => a.deadlineAt.localeCompare(b.deadlineAt)),
     description: "Quick access to attendance, tasks, DSR, and leave without duplicate widgets.",
+    monthlyInsights: [
+      { label: "Working days", value: String(workdaysThisMonth), detail: `${workdaysSoFar} working days completed so far this month.` },
+      { label: "Present", value: String(presentDays), detail: `${absentDays} absent or not marked so far.` },
+      { label: "DSR submitted", value: `${monthlyDsrCount} / ${workdaysSoFar}`, detail: `${Math.max(workdaysSoFar - monthlyDsrCount, 0)} DSR update${Math.max(workdaysSoFar - monthlyDsrCount, 0) === 1 ? "" : "s"} pending so far.` },
+    ],
     priorityAlert:
       !dsrCount && currentTime >= "19:00"
         ? {
@@ -98,4 +119,3 @@ export async function getEmployeeDashboardOverviewData(session: AuthenticatedSes
 function getCurrentTimeKey() {
   return formatIndiaTimeKey(new Date());
 }
-

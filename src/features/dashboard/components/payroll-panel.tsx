@@ -50,6 +50,8 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
         </div>
       </section>
 
+      {!canManage && data.salaryProjection ? <SalaryProjectionCard projection={data.salaryProjection} /> : null}
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {data.summaryCards.map((card) => (
           <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" key={card.label}>
@@ -239,6 +241,27 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
       ) : null}
     </div>
   );
+}
+
+function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollPageData["salaryProjection"]> }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_30px_rgba(76,29,149,0.07)]">
+      <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-br from-violet-50 via-indigo-50 to-emerald-50 px-5 py-5 sm:px-6">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">{projection.monthKey} estimate</p><h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Your expected salary</h2><p className="mt-1 text-sm text-slate-600">This is a live estimate based on attendance and DSRs submitted so far.</p></div>
+        <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-medium text-slate-500">Estimated payout</p><p className="mt-1 text-2xl font-semibold tracking-tight text-emerald-700">{formatCurrency(projection.projectedNetSalary)}</p></div>
+      </div>
+      <div className="grid gap-px bg-violet-100 md:grid-cols-2 xl:grid-cols-4">
+        <SalaryMetric label="Monthly salary" value={formatCurrency(projection.grossSalary)} detail="Before this month’s deductions." tone="bg-white" />
+        <SalaryMetric label="Attendance" value={`${projection.presentDays} present · ${projection.absentDays} absent`} detail={`Absent day deduction: ${formatCurrency(projection.perAbsentDayDeduction)} per day.`} tone="bg-sky-50/70" />
+        <SalaryMetric label="DSR coverage" value={`${projection.submittedDsrCount} / ${projection.expectedDsrCount}`} detail={`${projection.missingDsrCount} missing · ₹100 deduction per missing DSR.`} tone="bg-violet-50/70" />
+        <SalaryMetric label="Deductions so far" value={formatCurrency(projection.absentDeduction + projection.dsrDeduction + projection.fixedDeductions)} detail={`Absent ${formatCurrency(projection.absentDeduction)} · DSR ${formatCurrency(projection.dsrDeduction)}${projection.fixedDeductions ? ` · Other ${formatCurrency(projection.fixedDeductions)}` : ""}`} tone="bg-rose-50/70" />
+      </div>
+    </section>
+  );
+}
+
+function SalaryMetric({ detail, label, tone, value }: { detail: string; label: string; tone: string; value: string }) {
+  return <article className={`p-5 ${tone}`}><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{value}</p><p className="mt-2 text-xs leading-5 text-slate-600">{detail}</p></article>;
 }
 
 function PanelHeader({ action, eyebrow, title }: { action: ReactNode; eyebrow: string; title: string }) {

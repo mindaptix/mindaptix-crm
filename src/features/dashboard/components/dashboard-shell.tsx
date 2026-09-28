@@ -300,7 +300,7 @@ const NAV_GROUPS: { label: string | null; keys: DashboardNavKey[] }[] = [
   { label: "People", keys: ["employees", "attendance", "leaves", "regularize"] },
   { label: "Sales & Schedule", keys: ["client-pitches", "clients", "meetings"] },
   { label: "Work", keys: ["portfolio", "projects", "tasks", "dsr"] },
-  { label: "Finance", keys: ["reports", "payroll", "expenses", "payments"] },
+  { label: "Finance", keys: ["reports", "payroll", "salary", "expenses", "payments"] },
   { label: "Resources", keys: ["assets", "documents", "alldocs"] },
   { label: "Communication", keys: ["announcements", "holidays"] },
   { label: "Account", keys: ["settings"] },
@@ -337,6 +337,7 @@ function getMenuIcon(key: DashboardNavKey) {
     case "reports":
       return <ChartIcon />;
     case "payroll":
+    case "salary":
       return <PayrollIcon />;
     case "expenses":
       return <ExpenseIcon />;

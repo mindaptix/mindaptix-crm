@@ -48,6 +48,18 @@ export function EmployeeDashboardOverview({ overview, roleBadge }: EmployeeDashb
         />
       )}
 
+      {overview.monthlyInsights?.length ? (
+        <section className="overflow-hidden rounded-2xl border border-sky-100 bg-white shadow-[0_12px_30px_rgba(14,116,144,0.06)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-100 bg-gradient-to-r from-sky-50 via-indigo-50 to-violet-50 px-5 py-4">
+            <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-sky-700">My monthly progress</p><h2 className="mt-1 text-lg font-semibold text-slate-900">Attendance & DSR consistency</h2></div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-sky-100">Month to date</span>
+          </div>
+          <div className="grid gap-px bg-sky-100 sm:grid-cols-3">
+            {overview.monthlyInsights.map((card, index) => <MonthlyInsightCard card={card} index={index} key={card.label} />)}
+          </div>
+        </section>
+      ) : null}
+
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-slate-800">Workspace shortcuts</h2>
@@ -72,6 +84,12 @@ export function EmployeeDashboardOverview({ overview, roleBadge }: EmployeeDashb
 
     </div>
   );
+}
+
+function MonthlyInsightCard({ card, index }: { card: SummaryCard; index: number }) {
+  const tones = ["bg-sky-50/80", "bg-emerald-50/80", "bg-violet-50/80"];
+  const values = ["text-sky-700", "text-emerald-700", "text-violet-700"];
+  return <article className={`p-5 ${tones[index % tones.length]}`}><p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{card.label}</p><p className={`mt-2 text-3xl font-semibold tracking-tight ${values[index % values.length]}`}>{card.value}</p><p className="mt-2 text-xs leading-5 text-slate-600">{card.detail}</p></article>;
 }
 
 function CompactCard({ card, index }: { card: SummaryCard; index: number }) {

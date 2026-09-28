@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
-import { getDailyPlan } from "@/features/tasks/server/daily-plan";
 import { UserModel } from "@/database/mongodb/models/workforce/user";
 import { assertSuperAdmin } from "@/features/auth/lib/user-admin";
 import { SettingModel } from "@/database/mongodb/models/setting";
@@ -138,11 +137,6 @@ export async function checkInAttendance(formData: FormData): Promise<AttendanceA
   const isCustomHoliday = Boolean(await HolidayModel.exists({ date: dateKey }));
   if (isWeekend || isConfiguredHoliday || isCustomHoliday) {
     return { error: isWeekend ? "Today is a weekly off (Saturday/Sunday). Attendance is not required." : "Today is a company holiday. Attendance is not required." };
-  }
-
-  if (session.user.role === "EMPLOYEE") {
-    const plan = await getDailyPlan(session.user.id, dateKey);
-    if (!plan.ready) return { error: `Plan today's work before checking in. You need an assigned task for today or at least 2 self-created tasks (${plan.selfCount}/2 created).` };
   }
 
   const settings = await SettingModel.findOne({ key: "company" }).lean();

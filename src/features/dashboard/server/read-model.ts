@@ -5,7 +5,6 @@ import connectDb from "@/database/mongodb/connect";
 import { STAFF_ATTENDANCE_ROLES, getVisibleUserIdsForSession } from "@/features/dashboard/team-scope";
 import { syncWorkflowNotifications, getNotificationsForUser, getUnreadAssignmentsForUser } from "@/features/notifications/service";
 import { AttendanceModel } from "@/database/mongodb/models/attendance";
-import { getDailyPlan } from "@/features/tasks/server/daily-plan";
 import { DailyUpdateModel } from "@/database/mongodb/models/daily-update";
 import { LeaveRequestModel } from "@/database/mongodb/models/leave-request";
 import { ProjectModel } from "@/database/mongodb/models/project";
@@ -870,7 +869,6 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
 
   return {
     canMarkAttendance: session.user.role === "EMPLOYEE" || session.user.role === "SALES",
-    dailyPlan: session.user.role === "EMPLOYEE" ? await getDailyPlan(session.user.id, today) : undefined,
     canViewLocation,
     canManageOthers: session.user.role === "SUPER_ADMIN",
     monthlyWorkingDays,
@@ -1721,10 +1719,14 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
 
   if (session.user.role === "EMPLOYEE") {
     const userId = session.user.id;
-    const [myUser, mySalary, myPayslips] = await Promise.all([
+    const monthStart = `${currentMonthKey}-01`;
+    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays] = await Promise.all([
       UserModel.findById(userId, { fullName: 1, email: 1 }).lean(),
       SalaryModel.findOne({ userId, status: "ACTIVE" }).lean(),
       PayslipModel.find({ userId, monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
+      AttendanceModel.find({ userId, dateKey: { $gte: monthStart, $lte: today } }, { dateKey: 1 }).lean(),
+      DailyUpdateModel.countDocuments({ userId, workDate: { $gte: monthStart, $lte: today } }),
+      HolidayModel.find({ date: { $gte: monthStart, $lte: today } }, { date: 1 }).lean(),
     ]);
 
     const gross = mySalary
@@ -1732,6 +1734,15 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       : 0;
     const net = mySalary ? Math.max(0, gross - mySalary.tds - mySalary.providentFund - mySalary.otherDeductions) : 0;
     const thisMonthPayslip = myPayslips.find((p) => p.monthKey === currentMonthKey);
+    const expectedDsrCount = getWorkdayBreakdown(monthStart, today, mergeCompanyHolidays(monthlyHolidays).map((holiday) => holiday.date)).workingDays;
+    const presentDays = new Set(monthlyAttendance.map((row) => row.dateKey)).size;
+    const absentDays = Math.max(expectedDsrCount - presentDays, 0);
+    const missingDsrCount = Math.max(expectedDsrCount - submittedDsrCount, 0);
+    const perAbsentDayDeduction = gross / 30;
+    const absentDeduction = Math.round(absentDays * perAbsentDayDeduction);
+    const dsrDeduction = missingDsrCount * 100;
+    const fixedDeductions = mySalary ? mySalary.tds + mySalary.providentFund + mySalary.otherDeductions : 0;
+    const projectedNetSalary = Math.max(0, Math.round(gross - fixedDeductions - absentDeduction - dsrDeduction));
 
     const mapPayslip = (p: (typeof myPayslips)[number]) => ({
       id: p._id.toString(),
@@ -1793,6 +1804,20 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       employeeOptions: [],
       selectedMonthKey: currentMonthKey,
       availableMonthKeys: last3Months,
+      salaryProjection: {
+        monthKey: currentMonthKey,
+        grossSalary: gross,
+        presentDays,
+        absentDays,
+        expectedDsrCount,
+        submittedDsrCount,
+        missingDsrCount,
+        absentDeduction,
+        perAbsentDayDeduction,
+        dsrDeduction,
+        fixedDeductions,
+        projectedNetSalary,
+      },
     };
   }
 

@@ -61,7 +61,7 @@ export async function renderEmployeeDashboardPage(page: DashboardPageKey, sessio
       const data = await getExpensesPageData(session);
       return <ExpensesPanel data={data} />;
     }
-    case "payroll": {
+    case "salary": {
       const data = await getPayrollPageData(session);
       return <PayrollPanel data={data} canManage={false} />;
     }

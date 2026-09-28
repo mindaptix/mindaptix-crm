@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
-import { DailyPlanner } from "@/features/tasks/components/daily-planner";
 import { reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
 import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
 import type { AttendancePageData, RegularizationEntry } from "@/features/dashboard/types";
@@ -295,7 +294,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
   const checkedIn  = !!data.todayRecord?.checkInAt  && data.todayRecord.checkInAt  !== "Not marked";
   const checkedOut = !!data.todayRecord?.checkOutAt && data.todayRecord.checkOutAt !== "Not marked";
   const locating = geoStatus === "loading";
-  const checkInDisabled = checkInPending || locating || checkedIn || checkedOut || data.dailyPlan?.ready === false;
+  const checkInDisabled = checkInPending || locating || checkedIn || checkedOut;
   const checkOutDisabled = checkOutPending || locating || !checkedIn || checkedOut;
   const officeLocationRequired = true;
 
@@ -614,7 +613,6 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
             )}
 
             {/* Action buttons */}
-            {!checkedIn && data.dailyPlan && <div className="mx-4 text-slate-900"><DailyPlanner plan={data.dailyPlan} /></div>}
             <div className="mt-5 space-y-3 px-6 pb-6">
               {/* Check-in button — full width */}
               <button

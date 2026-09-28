@@ -103,6 +103,7 @@ export type DashboardDateFilter =
 
 export type DashboardOverviewData = {
   assignedTasks?: DashboardTask[];
+  monthlyInsights?: SummaryCard[];
   title: string;
   description: string;
   filterLabel?: string;
@@ -357,7 +358,6 @@ export type AttendanceMonthlyRow = {
 };
 
 export type AttendancePageData = {
-  dailyPlan?: import("@/features/tasks/daily-plan").DailyPlan;
   canMarkAttendance: boolean;
   canViewLocation: boolean;
   canManageOthers: boolean;
@@ -690,6 +690,20 @@ export type PayrollPageData = {
   employeeOptions: EmployeeOption[];
   selectedMonthKey: string;
   availableMonthKeys: string[];
+  salaryProjection?: {
+    monthKey: string;
+    grossSalary: number;
+    presentDays: number;
+    absentDays: number;
+    expectedDsrCount: number;
+    submittedDsrCount: number;
+    missingDsrCount: number;
+    absentDeduction: number;
+    perAbsentDayDeduction: number;
+    dsrDeduction: number;
+    fixedDeductions: number;
+    projectedNetSalary: number;
+  };
 };
 
 // ─── Leave Balance ──────────────────────────────────────────────────────────
