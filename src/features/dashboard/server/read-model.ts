@@ -35,6 +35,7 @@ import { AssetModel } from "@/database/mongodb/models/workforce/asset";
 import { EmployeeDocumentModel } from "@/database/mongodb/models/workforce/employee-document";
 import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import { getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
+import { getWeekStart } from "@/features/dsr-review/submission-window";
 import type {
   AnnouncementsPageData,
   AttendanceMonthlyRow,
@@ -1169,6 +1170,8 @@ export async function getDsrPageData(session: AuthenticatedSession): Promise<Dsr
         !hasTodayDsr && currentTime >= "19:00"
           ? "It is after 7 PM and your DSR is still pending. Submit it today to keep reporting discipline clean."
           : "Submit your DSR before day close so your admin can review progress without follow-up.",
+      earliestAllowedWorkDate: getWeekStart(today),
+      submissionPolicyMessage: "Missed DSRs can be submitted only until Friday of the same work week. After Friday, previous-week DSRs are locked.",
     };
   }
 

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { logoutUser } from "@/features/auth/actions";
 import { subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
+import { EndOfDayBrowserNotifier } from "@/features/notifications/components/end-of-day-browser-notifier";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import {
   getDashboardNavItemsForRole,
@@ -235,6 +236,7 @@ export function DashboardShell({ children, session, employeeSessionControl, admi
       </div>
       {adminAssistant}
       {announcementPopup}
+      <EndOfDayBrowserNotifier enabled={session.user.role === "EMPLOYEE"} />
     </main>
   );
 }

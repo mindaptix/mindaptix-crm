@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { parseGithubRepository, validGithubUsername, validGithubBranch, workDateWindow } from "@/features/dsr-review/validation";
+import { canEmployeeSubmitDsrForDate } from "@/features/dsr-review/submission-window";
 import { formatIndiaDateKey } from "@/shared/lib/india-time";
 import { isValidObjectId } from "mongoose";
 import { revalidatePath } from "next/cache";
@@ -70,6 +71,9 @@ export async function submitDailyUpdate(
   }
   try { workDateWindow(workDate); } catch { return { error: "Choose a valid work date.", values }; }
   if (workDate > formatIndiaDateKey()) return { error: "Work date cannot be in the future.", values };
+  if (!canEmployeeSubmitDsrForDate(workDate, formatIndiaDateKey())) {
+    return { error: "Missed DSRs can only be submitted until Friday of the same work week. This work date is now locked.", values };
+  }
   if (summary.length < 6 || summary.length > 200) {
     return {
       error: "Update title must be between 6 and 200 characters.",

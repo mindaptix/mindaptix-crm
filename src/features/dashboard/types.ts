@@ -496,6 +496,8 @@ export type DsrPageData =
       projects: EmployeeProjectView[];
       updates: EmployeeUpdateView[];
       reminderMessage: string;
+      earliestAllowedWorkDate: string;
+      submissionPolicyMessage: string;
     }
   | {
       mode: "review";

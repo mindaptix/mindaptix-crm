@@ -111,11 +111,12 @@ function EmployeeDsrPanel({ data }: { data: Extract<DsrPageData, { mode: "employ
           <form action={formAction} className="space-y-5">
             {state.error   && <Feedback>{state.error}</Feedback>}
             {state.success && <Feedback tone="success">{state.success}</Feedback>}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><span className="font-semibold">DSR deadline:</span> {data.submissionPolicyMessage}</div>
 
             {/* Row 1: date + project */}
             <div className="grid gap-4 sm:grid-cols-2">
               <DsrField icon={<CalIcon />} label="Work Date" name="workDate" placeholder="Select date" type="date"
-                defaultValue={state.values?.workDate} />
+                defaultValue={state.values?.workDate} min={data.earliestAllowedWorkDate} max={formatIndiaDateKey()} />
               <DsrSelect icon={<FolderIcon2 />} label="Project" name="projectId"
                 defaultValue={state.values?.projectId ?? ""}
                 includePlaceholder placeholder="General Update"
@@ -566,8 +567,8 @@ function StatCard({ gradient, shadow, icon, label, value, detail }: {
 }
 
 /* ── Form helpers ── */
-function DsrField({ icon, label, name, placeholder, type = "text", defaultValue, required = true }: {
-  icon?: ReactNode; label: string; name: string; placeholder: string; type?: string; defaultValue?: string; required?: boolean;
+function DsrField({ icon, label, name, placeholder, type = "text", defaultValue, required = true, min, max }: {
+  icon?: ReactNode; label: string; name: string; placeholder: string; type?: string; defaultValue?: string; required?: boolean; min?: string; max?: string;
 }) {
   return (
     <div>
@@ -579,6 +580,8 @@ function DsrField({ icon, label, name, placeholder, type = "text", defaultValue,
           defaultValue={defaultValue}
           id={name}
           name={name}
+          min={min}
+          max={max}
           placeholder={placeholder}
           required={required}
           type={type}
