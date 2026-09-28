@@ -2,6 +2,7 @@ export * from "@/database/mongodb/models/workforce/attendance";
 export * from "@/database/mongodb/models/workforce/leave-request";
 export * from "@/database/mongodb/models/workforce/leave-balance";
 export * from "@/database/mongodb/models/workforce/salary";
+export * from "@/database/mongodb/models/workforce/reward-claim";
 export * from "@/database/mongodb/models/workforce/payslip";
 export * from "@/database/mongodb/models/workforce/expense";
 export * from "@/database/mongodb/models/workforce/employee-document";

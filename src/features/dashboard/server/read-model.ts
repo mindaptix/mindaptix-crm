@@ -33,9 +33,11 @@ import { UserModel } from "@/database/mongodb/models/user";
 import { AttendanceRegularizationModel } from "@/database/mongodb/models/workforce/attendance-regularization";
 import { AssetModel } from "@/database/mongodb/models/workforce/asset";
 import { EmployeeDocumentModel } from "@/database/mongodb/models/workforce/employee-document";
+import { RewardClaimModel } from "@/database/mongodb/models/workforce/reward-claim";
 import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import { getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 import { getWeekStart } from "@/features/dsr-review/submission-window";
+import { calculateTaskOverdueDeduction } from "@/features/tasks/overdue-deduction";
 import type {
   AnnouncementsPageData,
   AttendanceMonthlyRow,
@@ -74,6 +76,7 @@ import type {
   RegularizationPageData,
   AssetsPageData,
   EmployeeDocumentsPageData,
+  EarnMorePageData,
 } from "@/features/dashboard/types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -1738,13 +1741,15 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
   if (session.user.role === "EMPLOYEE") {
     const userId = session.user.id;
     const monthStart = `${currentMonthKey}-01`;
-    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays] = await Promise.all([
+    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays, monthlyTasks, approvedRewards] = await Promise.all([
       UserModel.findById(userId, { fullName: 1, email: 1 }).lean(),
       SalaryModel.findOne({ userId, status: "ACTIVE" }).lean(),
       PayslipModel.find({ userId, monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
       AttendanceModel.find({ userId, dateKey: { $gte: monthStart, $lte: today } }, { dateKey: 1 }).lean(),
       DailyUpdateModel.countDocuments({ userId, workDate: { $gte: monthStart, $lte: today } }),
       HolidayModel.find({ date: { $gte: monthStart, $lte: today } }, { date: 1 }).lean(),
+      TaskModel.find({ assignedUserId: userId }, { dueDate: 1, deadlineAt: 1, reviewedAt: 1, status: 1 }).lean(),
+      RewardClaimModel.find({ userId, rewardMonthKey: currentMonthKey, status: "APPROVED" }, { amount: 1 }).lean(),
     ]);
 
     const gross = mySalary
@@ -1759,8 +1764,15 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
     const perAbsentDayDeduction = gross / 30;
     const absentDeduction = Math.round(absentDays * perAbsentDayDeduction);
     const dsrDeduction = missingDsrCount * 100;
+    const overdueTaskResult = calculateTaskOverdueDeduction({
+      tasks: monthlyTasks,
+      periodStart: monthStart,
+      periodEnd: today,
+      holidayDates: mergeCompanyHolidays(monthlyHolidays.map((holiday) => ({ date: holiday.date }))).map((holiday) => holiday.date),
+    });
     const fixedDeductions = mySalary ? mySalary.tds + mySalary.providentFund + mySalary.otherDeductions : 0;
-    const projectedNetSalary = Math.max(0, Math.round(gross - fixedDeductions - absentDeduction - dsrDeduction));
+    const approvedRewardAmount = approvedRewards.reduce((sum, reward) => sum + reward.amount, 0);
+    const projectedNetSalary = Math.max(0, Math.round(gross + approvedRewardAmount - fixedDeductions - absentDeduction - dsrDeduction - overdueTaskResult.deduction));
 
     const mapPayslip = (p: (typeof myPayslips)[number]) => ({
       id: p._id.toString(),
@@ -1780,7 +1792,10 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       leaveDeduction: p.leaveDeduction,
       lateDays: p.lateDays,
       lateDeduction: p.lateDeduction,
+      overdueTaskDays: p.overdueTaskDays ?? 0,
+      overdueTaskDeduction: p.overdueTaskDeduction ?? 0,
       otherDeductions: p.otherDeductions,
+      rewardAmount: p.rewardAmount ?? 0,
       totalDeductions: p.totalDeductions,
       netSalary: p.netSalary,
       presentDays: p.presentDays,
@@ -1833,6 +1848,10 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
         absentDeduction,
         perAbsentDayDeduction,
         dsrDeduction,
+        overdueTaskDays: overdueTaskResult.chargeableTaskDays,
+        overdueTaskDeduction: overdueTaskResult.deduction,
+        overdueTaskCount: overdueTaskResult.affectedTasks,
+        approvedRewardAmount,
         fixedDeductions,
         projectedNetSalary,
       },
@@ -1903,7 +1922,10 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
         leaveDeduction: p.leaveDeduction,
         lateDays: p.lateDays,
         lateDeduction: p.lateDeduction,
-        otherDeductions: p.otherDeductions,
+        overdueTaskDays: p.overdueTaskDays ?? 0,
+        overdueTaskDeduction: p.overdueTaskDeduction ?? 0,
+      otherDeductions: p.otherDeductions,
+        rewardAmount: p.rewardAmount ?? 0,
         totalDeductions: p.totalDeductions,
         netSalary: p.netSalary,
         presentDays: p.presentDays,
@@ -1916,6 +1938,36 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
     employeeOptions: employees.map((e) => ({ id: e._id.toString(), label: e.fullName })),
     selectedMonthKey: currentMonthKey,
     availableMonthKeys: last3Months,
+  };
+}
+
+export async function getEarnMorePageData(session: AuthenticatedSession): Promise<EarnMorePageData> {
+  await connectDb();
+  const canReview = session.user.role === "SUPER_ADMIN";
+  const currentMonthKey = getTodayDate().slice(0, 7);
+  const [claims, users] = await Promise.all([
+    RewardClaimModel.find(canReview ? {} : { userId: session.user.id }).sort({ createdAt: -1 }).limit(200).lean(),
+    canReview ? UserModel.find({}, { fullName: 1 }).lean() : Promise.resolve([]),
+  ]);
+  const names = new Map(users.map((user) => [user._id.toString(), user.fullName]));
+  return {
+    canReview,
+    claims: claims.map((claim) => ({
+      id: claim._id.toString(),
+      employeeName: canReview ? names.get(claim.userId) ?? "Unknown employee" : session.user.fullName,
+      type: claim.type as "CLIENT_FEEDBACK" | "CANDIDATE_REFERRAL" | "PUBLIC_REVIEW",
+      amount: claim.amount,
+      title: claim.title,
+      details: claim.details,
+      proofName: claim.proofName,
+      proofUrl: claim.proofUrl,
+      status: claim.status as "PENDING" | "APPROVED" | "REJECTED",
+      rewardMonthKey: claim.rewardMonthKey,
+      reviewNote: claim.reviewNote ?? "",
+      reviewedByName: claim.reviewedByName ?? "",
+    })),
+    pendingCount: claims.filter((claim) => claim.status === "PENDING").length,
+    approvedThisMonth: claims.filter((claim) => claim.status === "APPROVED" && claim.rewardMonthKey === currentMonthKey).reduce((sum, claim) => sum + claim.amount, 0),
   };
 }
 

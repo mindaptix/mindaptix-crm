@@ -18,6 +18,7 @@ import { AssetsPanel } from "@/features/dashboard/components/assets-panel";
 import { AllDocumentsPanel } from "@/features/dashboard/components/all-documents-panel";
 import { HolidayCalendarPanel } from "@/features/dashboard/components/holiday-calendar-panel";
 import { ClientsPanel } from "@/features/dashboard/components/clients-panel";
+import { EarnMorePanel } from "@/features/dashboard/components/earn-more-panel";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
 import {
   getAnnouncementsPageData,
@@ -36,6 +37,7 @@ import {
   getAllEmployeeDocumentsData,
   getHolidayCalendarData,
   getClientsPageData,
+  getEarnMorePageData,
 } from "@/features/dashboard/server/page-data";
 import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
@@ -98,6 +100,9 @@ export async function renderLeadershipDashboardPage(page: DashboardPageKey, sess
     case "payroll": {
       const data = await getPayrollPageData(session);
       return <PayrollPanel data={data} canManage={session.user.role === "SUPER_ADMIN"} />;
+    }
+    case "earn-more": {
+      return <EarnMorePanel data={await getEarnMorePageData(session)} />;
     }
     case "expenses": {
       const data = await getExpensesPageData(session);

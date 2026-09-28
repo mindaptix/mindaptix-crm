@@ -9,8 +9,14 @@ import { PayslipModel } from "@/database/mongodb/models/workforce/payslip";
 import { AttendanceModel } from "@/database/mongodb/models/workforce/attendance";
 import { LeaveRequestModel } from "@/database/mongodb/models/workforce/leave-request";
 import { UserModel } from "@/database/mongodb/models/workforce/user";
+import { TaskModel } from "@/database/mongodb/models/task";
+import { HolidayModel } from "@/database/mongodb/models/system/holiday";
+import { RewardClaimModel } from "@/database/mongodb/models/workforce/reward-claim";
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { headers } from "next/headers";
+import { calculateTaskOverdueDeduction } from "@/features/tasks/overdue-deduction";
+import { mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 
 type SalaryState = { error?: string; success?: string };
 
@@ -97,10 +103,15 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
   const endDate = new Date(year, month, 0);
   const endDateStr = `${monthKey}-${String(endDate.getDate()).padStart(2, "0")}`;
 
-  const attendance = await AttendanceModel.find({
-    userId,
-    dateKey: { $gte: startDate, $lte: endDateStr },
-  }).lean();
+  const calculationEndDate = monthKey === formatIndiaDateKey().slice(0, 7)
+    ? formatIndiaDateKey()
+    : endDateStr;
+  const [attendance, overdueTasks, holidays, approvedRewards] = await Promise.all([
+    AttendanceModel.find({ userId, dateKey: { $gte: startDate, $lte: endDateStr } }).lean(),
+    TaskModel.find({ assignedUserId: userId }, { dueDate: 1, deadlineAt: 1, reviewedAt: 1, status: 1 }).lean(),
+    HolidayModel.find({ date: { $gte: startDate, $lte: calculationEndDate } }, { date: 1 }).lean(),
+    RewardClaimModel.find({ userId, rewardMonthKey: monthKey, status: "APPROVED" }, { amount: 1 }).lean(),
+  ]);
 
   const presentDays = attendance.filter((a) => a.status === "COMPLETED").length;
   const lateDays = attendance.filter((a) => a.isLate).length;
@@ -121,8 +132,15 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
   const perDaySalary = grossSalary / workingDays;
   const leaveDeduction = leaveDays > 0 ? Math.round(perDaySalary * leaveDays) : 0;
   const lateDeduction = lateDays > 1 ? Math.round(perDaySalary * Math.floor(lateDays / 3)) : 0;
-  const totalDeductions = salary.tds + salary.providentFund + salary.otherDeductions + leaveDeduction + lateDeduction;
-  const netSalary = Math.max(0, grossSalary - totalDeductions);
+  const overdueTaskResult = calculateTaskOverdueDeduction({
+    tasks: overdueTasks,
+    periodStart: startDate,
+    periodEnd: calculationEndDate,
+    holidayDates: mergeCompanyHolidays(holidays.map((holiday) => ({ date: holiday.date }))).map((holiday) => holiday.date),
+  });
+  const rewardAmount = approvedRewards.reduce((sum, reward) => sum + reward.amount, 0);
+  const totalDeductions = salary.tds + salary.providentFund + salary.otherDeductions + leaveDeduction + lateDeduction + overdueTaskResult.deduction;
+  const netSalary = Math.max(0, grossSalary + rewardAmount - totalDeductions);
 
   await PayslipModel.findOneAndUpdate(
     { userId, monthKey },
@@ -141,6 +159,9 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
       leaveDeduction,
       lateDays,
       lateDeduction,
+      overdueTaskDays: overdueTaskResult.chargeableTaskDays,
+      overdueTaskDeduction: overdueTaskResult.deduction,
+      rewardAmount,
       otherDeductions: salary.otherDeductions,
       totalDeductions,
       netSalary,

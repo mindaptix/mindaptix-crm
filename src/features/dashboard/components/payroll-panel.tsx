@@ -247,14 +247,16 @@ function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollP
   return (
     <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_30px_rgba(76,29,149,0.07)]">
       <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-br from-violet-50 via-indigo-50 to-emerald-50 px-5 py-5 sm:px-6">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">{projection.monthKey} estimate</p><h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Your expected salary</h2><p className="mt-1 text-sm text-slate-600">This is a live estimate based on attendance and DSRs submitted so far.</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">{projection.monthKey} estimate</p><h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Your expected salary</h2><p className="mt-1 text-sm text-slate-600">This is a live estimate based on attendance, DSRs, and overdue tasks.</p></div>
         <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-medium text-slate-500">Estimated payout</p><p className="mt-1 text-2xl font-semibold tracking-tight text-emerald-700">{formatCurrency(projection.projectedNetSalary)}</p></div>
       </div>
-      <div className="grid gap-px bg-violet-100 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-px bg-violet-100 md:grid-cols-2 xl:grid-cols-3">
         <SalaryMetric label="Monthly salary" value={formatCurrency(projection.grossSalary)} detail="Before this month’s deductions." tone="bg-white" />
         <SalaryMetric label="Attendance" value={`${projection.presentDays} present · ${projection.absentDays} absent`} detail={`Absent day deduction: ${formatCurrency(projection.perAbsentDayDeduction)} per day.`} tone="bg-sky-50/70" />
         <SalaryMetric label="DSR coverage" value={`${projection.submittedDsrCount} / ${projection.expectedDsrCount}`} detail={`${projection.missingDsrCount} missing · ₹100 deduction per missing DSR.`} tone="bg-violet-50/70" />
-        <SalaryMetric label="Deductions so far" value={formatCurrency(projection.absentDeduction + projection.dsrDeduction + projection.fixedDeductions)} detail={`Absent ${formatCurrency(projection.absentDeduction)} · DSR ${formatCurrency(projection.dsrDeduction)}${projection.fixedDeductions ? ` · Other ${formatCurrency(projection.fixedDeductions)}` : ""}`} tone="bg-rose-50/70" />
+        <SalaryMetric label="Approved rewards" value={formatCurrency(projection.approvedRewardAmount)} detail="Approved Earn More claims added to this month's salary." tone="bg-emerald-50/70" />
+        <SalaryMetric label="Overdue tasks" value={`${projection.overdueTaskDays} chargeable day${projection.overdueTaskDays === 1 ? "" : "s"}`} detail={`${projection.overdueTaskCount} task${projection.overdueTaskCount === 1 ? "" : "s"} after the 2-working-day grace period · ₹200 per task per day.`} tone="bg-amber-50/70" />
+        <SalaryMetric label="Deductions so far" value={formatCurrency(projection.absentDeduction + projection.dsrDeduction + projection.overdueTaskDeduction + projection.fixedDeductions)} detail={`Absent ${formatCurrency(projection.absentDeduction)} · DSR ${formatCurrency(projection.dsrDeduction)} · Tasks ${formatCurrency(projection.overdueTaskDeduction)}${projection.fixedDeductions ? ` · Other ${formatCurrency(projection.fixedDeductions)}` : ""}`} tone="bg-rose-50/70" />
       </div>
     </section>
   );

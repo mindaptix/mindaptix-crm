@@ -10,6 +10,7 @@ export {
   getLeaveBalanceData,
   getLeavesPageData,
   getPayrollPageData,
+  getEarnMorePageData,
   getProjectsPageData,
   getReportsPageData,
   getSettingsPageData,

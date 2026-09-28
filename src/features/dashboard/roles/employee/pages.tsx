@@ -7,6 +7,7 @@ import { RegularizationPanel } from "@/features/dashboard/components/regularizat
 import { AssetsPanel } from "@/features/dashboard/components/assets-panel";
 import { EmployeeDocumentsPanel } from "@/features/dashboard/components/employee-documents-panel";
 import { HolidayCalendarPanel } from "@/features/dashboard/components/holiday-calendar-panel";
+import { EarnMorePanel } from "@/features/dashboard/components/earn-more-panel";
 import { ExpensesPanel } from "@/features/dashboard/components/expenses-panel";
 import { LeavesPanel } from "@/features/dashboard/components/leaves-panel";
 import { PayrollPanel } from "@/features/dashboard/components/payroll-panel";
@@ -31,6 +32,7 @@ import {
   getAssetsPageData,
   getEmployeeDocumentsData,
   getHolidayCalendarData,
+  getEarnMorePageData,
 } from "@/features/dashboard/server/page-data";
 import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
@@ -64,6 +66,9 @@ export async function renderEmployeeDashboardPage(page: DashboardPageKey, sessio
     case "salary": {
       const data = await getPayrollPageData(session);
       return <PayrollPanel data={data} canManage={false} />;
+    }
+    case "earn-more": {
+      return <EarnMorePanel data={await getEarnMorePageData(session)} />;
     }
     case "announcements": {
       const data = await getAnnouncementsPageData(session);

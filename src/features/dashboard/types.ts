@@ -675,6 +675,9 @@ export type PayslipEntry = {
   leaveDeduction: number;
   lateDays: number;
   lateDeduction: number;
+  overdueTaskDays: number;
+  overdueTaskDeduction: number;
+  rewardAmount: number;
   otherDeductions: number;
   totalDeductions: number;
   netSalary: number;
@@ -703,9 +706,35 @@ export type PayrollPageData = {
     absentDeduction: number;
     perAbsentDayDeduction: number;
     dsrDeduction: number;
+    overdueTaskDays: number;
+    overdueTaskDeduction: number;
+    overdueTaskCount: number;
+    approvedRewardAmount: number;
     fixedDeductions: number;
     projectedNetSalary: number;
   };
+};
+
+export type RewardClaimEntry = {
+  id: string;
+  employeeName: string;
+  type: "CLIENT_FEEDBACK" | "CANDIDATE_REFERRAL" | "PUBLIC_REVIEW";
+  amount: number;
+  title: string;
+  details: string;
+  proofName: string;
+  proofUrl: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  rewardMonthKey: string;
+  reviewNote: string;
+  reviewedByName: string;
+};
+
+export type EarnMorePageData = {
+  canReview: boolean;
+  claims: RewardClaimEntry[];
+  pendingCount: number;
+  approvedThisMonth: number;
 };
 
 // ─── Leave Balance ──────────────────────────────────────────────────────────

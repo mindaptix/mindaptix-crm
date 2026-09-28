@@ -302,7 +302,7 @@ const NAV_GROUPS: { label: string | null; keys: DashboardNavKey[] }[] = [
   { label: "People", keys: ["employees", "attendance", "leaves", "regularize"] },
   { label: "Sales & Schedule", keys: ["client-pitches", "clients", "meetings"] },
   { label: "Work", keys: ["portfolio", "projects", "tasks", "dsr"] },
-  { label: "Finance", keys: ["reports", "payroll", "salary", "expenses", "payments"] },
+  { label: "Finance", keys: ["reports", "payroll", "salary", "earn-more", "expenses", "payments"] },
   { label: "Resources", keys: ["assets", "documents", "alldocs"] },
   { label: "Communication", keys: ["announcements", "holidays"] },
   { label: "Account", keys: ["settings"] },
@@ -341,6 +341,8 @@ function getMenuIcon(key: DashboardNavKey) {
     case "payroll":
     case "salary":
       return <PayrollIcon />;
+    case "earn-more":
+      return <EarnMoreIcon />;
     case "expenses":
       return <ExpenseIcon />;
     case "payments":
@@ -366,6 +368,15 @@ function PaymentsIcon() {
     <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
       <rect height="14" rx="2" stroke="currentColor" strokeWidth="1.8" width="20" x="2" y="5" />
       <path d="M2 10h20" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function EarnMoreIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M14.5 8.8c-.5-.55-1.3-.9-2.4-.9-1.45 0-2.4.7-2.4 1.72 0 2.56 4.9 1.1 4.9 4.05 0 1.12-1.06 1.92-2.62 1.92-1.2 0-2.2-.42-2.85-1.1M12 6.3v11.4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
     </svg>
   );
 }
