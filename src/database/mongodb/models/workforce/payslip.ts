@@ -18,6 +18,8 @@ const payslipSchema = new mongoose.Schema(
     providentFund: { type: Number, default: 0 },
     leaveDays: { type: Number, default: 0 },
     leaveDeduction: { type: Number, default: 0 },
+    absentDays: { type: Number, default: 0 },
+    absentDeduction: { type: Number, default: 0 },
     lateDays: { type: Number, default: 0 },
     lateDeduction: { type: Number, default: 0 },
     overdueTaskDays: { type: Number, default: 0 },

@@ -38,6 +38,7 @@ import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/s
 import { getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 import { getWeekStart } from "@/features/dsr-review/submission-window";
 import { calculateTaskOverdueDeduction } from "@/features/tasks/overdue-deduction";
+import { getSalaryDeductionStart } from "@/features/payroll/deduction-policy";
 import type {
   AnnouncementsPageData,
   AttendanceMonthlyRow,
@@ -1735,21 +1736,23 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
   await connectDb();
 
   const today = getTodayDate();
+  const completedWorkdayEnd = getCurrentTimeKey() >= "19:00" ? today : addDaysToDate(today, -1);
   const currentMonthKey = today.slice(0, 7);
   const last3Months = getLast3MonthKeys();
 
   if (session.user.role === "EMPLOYEE") {
     const userId = session.user.id;
     const monthStart = `${currentMonthKey}-01`;
-    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays, monthlyTasks, approvedRewards] = await Promise.all([
+    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays, monthlyTasks, approvedRewards, approvedLeaves] = await Promise.all([
       UserModel.findById(userId, { fullName: 1, email: 1 }).lean(),
       SalaryModel.findOne({ userId, status: "ACTIVE" }).lean(),
       PayslipModel.find({ userId, monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
-      AttendanceModel.find({ userId, dateKey: { $gte: monthStart, $lte: today } }, { dateKey: 1 }).lean(),
-      DailyUpdateModel.countDocuments({ userId, workDate: { $gte: monthStart, $lte: today } }),
-      HolidayModel.find({ date: { $gte: monthStart, $lte: today } }, { date: 1 }).lean(),
+      AttendanceModel.find({ userId, dateKey: { $gte: monthStart, $lte: completedWorkdayEnd } }, { dateKey: 1, status: 1 }).lean(),
+      DailyUpdateModel.countDocuments({ userId, workDate: { $gte: monthStart, $lte: completedWorkdayEnd } }),
+      HolidayModel.find({ date: { $gte: monthStart, $lte: completedWorkdayEnd } }, { date: 1 }).lean(),
       TaskModel.find({ assignedUserId: userId }, { dueDate: 1, deadlineAt: 1, reviewedAt: 1, status: 1 }).lean(),
       RewardClaimModel.find({ userId, rewardMonthKey: currentMonthKey, status: "APPROVED" }, { amount: 1 }).lean(),
+      LeaveRequestModel.find({ userId, status: "APPROVED", startDate: { $lte: completedWorkdayEnd }, endDate: { $gte: monthStart } }, { startDate: 1, endDate: 1 }).lean(),
     ]);
 
     const gross = mySalary
@@ -1757,18 +1760,21 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       : 0;
     const net = mySalary ? Math.max(0, gross - mySalary.tds - mySalary.providentFund - mySalary.otherDeductions) : 0;
     const thisMonthPayslip = myPayslips.find((p) => p.monthKey === currentMonthKey);
-    const expectedDsrCount = getWorkdayBreakdown(monthStart, today, mergeCompanyHolidays(monthlyHolidays).map((holiday) => holiday.date)).workingDays;
-    const presentDays = new Set(monthlyAttendance.map((row) => row.dateKey)).size;
-    const absentDays = Math.max(expectedDsrCount - presentDays, 0);
+    const deductionStart = getSalaryDeductionStart(monthStart);
+    const holidayDates = mergeCompanyHolidays(monthlyHolidays).map((holiday) => holiday.date);
+    const expectedDsrCount = completedWorkdayEnd >= deductionStart ? getWorkdayBreakdown(deductionStart, completedWorkdayEnd, holidayDates).workingDays : 0;
+    const presentDays = new Set(monthlyAttendance.filter((row) => row.status === "COMPLETED" || row.status === "PRESENT").map((row) => row.dateKey)).size;
+    const approvedLeaveDays = approvedLeaves.reduce((total, leave) => total + getWorkingDaysInDateRange(leave.startDate < deductionStart ? deductionStart : leave.startDate, leave.endDate > completedWorkdayEnd ? completedWorkdayEnd : leave.endDate), 0);
+    const absentDays = Math.max(expectedDsrCount - presentDays - approvedLeaveDays, 0);
     const missingDsrCount = Math.max(expectedDsrCount - submittedDsrCount, 0);
     const perAbsentDayDeduction = gross / 30;
     const absentDeduction = Math.round(absentDays * perAbsentDayDeduction);
     const dsrDeduction = missingDsrCount * 100;
     const overdueTaskResult = calculateTaskOverdueDeduction({
       tasks: monthlyTasks,
-      periodStart: monthStart,
-      periodEnd: today,
-      holidayDates: mergeCompanyHolidays(monthlyHolidays.map((holiday) => ({ date: holiday.date }))).map((holiday) => holiday.date),
+      periodStart: deductionStart,
+      periodEnd: completedWorkdayEnd,
+      holidayDates,
     });
     const fixedDeductions = mySalary ? mySalary.tds + mySalary.providentFund + mySalary.otherDeductions : 0;
     const approvedRewardAmount = approvedRewards.reduce((sum, reward) => sum + reward.amount, 0);
@@ -1790,6 +1796,8 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       providentFund: p.providentFund,
       leaveDays: p.leaveDays,
       leaveDeduction: p.leaveDeduction,
+      absentDays: p.absentDays ?? 0,
+      absentDeduction: p.absentDeduction ?? 0,
       lateDays: p.lateDays,
       lateDeduction: p.lateDeduction,
       overdueTaskDays: p.overdueTaskDays ?? 0,
@@ -1922,6 +1930,8 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
         leaveDeduction: p.leaveDeduction,
         lateDays: p.lateDays,
         lateDeduction: p.lateDeduction,
+        absentDays: p.absentDays ?? 0,
+        absentDeduction: p.absentDeduction ?? 0,
         overdueTaskDays: p.overdueTaskDays ?? 0,
         overdueTaskDeduction: p.overdueTaskDeduction ?? 0,
       otherDeductions: p.otherDeductions,

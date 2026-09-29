@@ -15,8 +15,9 @@ import { RewardClaimModel } from "@/database/mongodb/models/workforce/reward-cla
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { headers } from "next/headers";
 import { calculateTaskOverdueDeduction } from "@/features/tasks/overdue-deduction";
-import { mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
-import { formatIndiaDateKey } from "@/shared/lib/india-time";
+import { COMPANY_WORK_POLICY, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
+import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time";
+import { getSalaryDeductionStart } from "@/features/payroll/deduction-policy";
 
 type SalaryState = { error?: string; success?: string };
 
@@ -103,8 +104,9 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
   const endDate = new Date(year, month, 0);
   const endDateStr = `${monthKey}-${String(endDate.getDate()).padStart(2, "0")}`;
 
-  const calculationEndDate = monthKey === formatIndiaDateKey().slice(0, 7)
-    ? formatIndiaDateKey()
+  const today = formatIndiaDateKey();
+  const calculationEndDate = monthKey === today.slice(0, 7)
+    ? (formatIndiaTimeKey() >= "19:00" ? today : addDaysToDate(today, -1))
     : endDateStr;
   const [attendance, overdueTasks, holidays, approvedRewards] = await Promise.all([
     AttendanceModel.find({ userId, dateKey: { $gte: startDate, $lte: endDateStr } }).lean(),
@@ -113,7 +115,7 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
     RewardClaimModel.find({ userId, rewardMonthKey: monthKey, status: "APPROVED" }, { amount: 1 }).lean(),
   ]);
 
-  const presentDays = attendance.filter((a) => a.status === "COMPLETED").length;
+  const presentDays = attendance.filter((a) => a.status === "COMPLETED" || a.status === "PRESENT").length;
   const lateDays = attendance.filter((a) => a.isLate).length;
 
   const approvedLeaves = await LeaveRequestModel.find({
@@ -122,24 +124,26 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
     $or: [{ startDate: { $gte: startDate, $lte: endDateStr } }, { endDate: { $gte: startDate, $lte: endDateStr } }],
   }).lean();
 
-  const leaveDays = approvedLeaves.reduce((acc, l) => {
-    const start = new Date(l.startDate);
-    const end = new Date(l.endDate);
-    return acc + Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
-  }, 0);
-
   const grossSalary = salary.basicSalary + salary.hra + salary.transportAllowance + salary.medicalAllowance + salary.otherAllowances;
-  const perDaySalary = grossSalary / workingDays;
+  const perDaySalary = grossSalary / 30;
+  const holidayDates = mergeCompanyHolidays(holidays.map((holiday) => ({ date: holiday.date }))).map((holiday) => holiday.date);
+  const deductionStart = getSalaryDeductionStart(startDate);
+  const deductionDates = calculationEndDate >= deductionStart ? getWorkingDateKeys(deductionStart, calculationEndDate, holidayDates) : [];
+  const presentDateKeys = new Set(attendance.filter((row) => (row.status === "COMPLETED" || row.status === "PRESENT") && row.dateKey >= deductionStart && row.dateKey <= calculationEndDate).map((row) => row.dateKey));
+  const leaveDateKeys = new Set(approvedLeaves.flatMap((leave) => getWorkingDateKeys(leave.startDate < deductionStart ? deductionStart : leave.startDate, leave.endDate > calculationEndDate ? calculationEndDate : leave.endDate, holidayDates)));
+  const leaveDays = leaveDateKeys.size;
+  const absentDays = deductionDates.filter((dateKey) => !presentDateKeys.has(dateKey) && !leaveDateKeys.has(dateKey)).length;
   const leaveDeduction = leaveDays > 0 ? Math.round(perDaySalary * leaveDays) : 0;
+  const absentDeduction = absentDays > 0 ? Math.round(perDaySalary * absentDays) : 0;
   const lateDeduction = lateDays > 1 ? Math.round(perDaySalary * Math.floor(lateDays / 3)) : 0;
   const overdueTaskResult = calculateTaskOverdueDeduction({
     tasks: overdueTasks,
     periodStart: startDate,
     periodEnd: calculationEndDate,
-    holidayDates: mergeCompanyHolidays(holidays.map((holiday) => ({ date: holiday.date }))).map((holiday) => holiday.date),
+    holidayDates,
   });
   const rewardAmount = approvedRewards.reduce((sum, reward) => sum + reward.amount, 0);
-  const totalDeductions = salary.tds + salary.providentFund + salary.otherDeductions + leaveDeduction + lateDeduction + overdueTaskResult.deduction;
+  const totalDeductions = salary.tds + salary.providentFund + salary.otherDeductions + leaveDeduction + absentDeduction + lateDeduction + overdueTaskResult.deduction;
   const netSalary = Math.max(0, grossSalary + rewardAmount - totalDeductions);
 
   await PayslipModel.findOneAndUpdate(
@@ -157,6 +161,8 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
       providentFund: salary.providentFund,
       leaveDays,
       leaveDeduction,
+      absentDays,
+      absentDeduction,
       lateDays,
       lateDeduction,
       overdueTaskDays: overdueTaskResult.chargeableTaskDays,
@@ -188,6 +194,23 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
 
   revalidatePath("/dashboard/payroll");
   return { success: `Payslip generated for ${employee.fullName} — ${monthKey}.` };
+}
+
+function addDaysToDate(dateKey: string, days: number) {
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function getWorkingDateKeys(startDate: string, endDate: string, holidayDates: Iterable<string>) {
+  if (endDate < startDate) return [];
+  const holidays = new Set(holidayDates);
+  const dates: string[] = [];
+  for (const cursor = new Date(`${startDate}T00:00:00.000Z`); cursor.toISOString().slice(0, 10) <= endDate; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const dateKey = cursor.toISOString().slice(0, 10);
+    if (!COMPANY_WORK_POLICY.weeklyOffDays.includes(cursor.getUTCDay() as 0 | 6) && !holidays.has(dateKey)) dates.push(dateKey);
+  }
+  return dates;
 }
 
 export async function markPayslipPaid(_prev: SalaryState, formData: FormData): Promise<SalaryState> {

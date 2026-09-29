@@ -1,11 +1,10 @@
 import { taskDeadline } from "@/features/tasks/deadline";
 import { COMPANY_WORK_POLICY } from "@/features/dashboard/lib/work-calendar";
 import { formatIndiaDateKey } from "@/shared/lib/india-time";
+import { SALARY_DEDUCTION_EFFECTIVE_DATE } from "@/features/payroll/deduction-policy";
 
 export const TASK_OVERDUE_GRACE_WORKDAYS = 2;
 export const TASK_OVERDUE_DEDUCTION_PER_DAY = 200;
-// The policy starts on 28 September 2026. Older tasks are never charged.
-export const TASK_OVERDUE_DEDUCTION_EFFECTIVE_DATE = "2026-09-28";
 
 type DeductionTask = {
   dueDate: string;
@@ -35,7 +34,7 @@ export function calculateTaskOverdueDeduction({ tasks, periodStart, periodEnd, h
     if (!deadline) continue;
 
     const deadlineDate = formatIndiaDateKey(deadline);
-    if (deadlineDate < TASK_OVERDUE_DEDUCTION_EFFECTIVE_DATE) continue;
+    if (deadlineDate < SALARY_DEDUCTION_EFFECTIVE_DATE) continue;
     const closedDate = task.status === "CLOSED" && task.reviewedAt
       ? formatIndiaDateKey(task.reviewedAt)
       : periodEnd;

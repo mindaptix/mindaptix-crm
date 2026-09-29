@@ -673,6 +673,8 @@ export type PayslipEntry = {
   providentFund: number;
   leaveDays: number;
   leaveDeduction: number;
+  absentDays: number;
+  absentDeduction: number;
   lateDays: number;
   lateDeduction: number;
   overdueTaskDays: number;
