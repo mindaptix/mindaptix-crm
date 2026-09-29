@@ -244,6 +244,8 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
 }
 
 function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollPageData["salaryProjection"]> }) {
+  const hasOverdueTaskPenalty = projection.overdueTaskDeduction > 0;
+
   return (
     <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_30px_rgba(76,29,149,0.07)]">
       <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-br from-violet-50 via-indigo-50 to-emerald-50 px-5 py-5 sm:px-6">
@@ -258,6 +260,19 @@ function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollP
         <SalaryMetric label="Overdue tasks" value={`${projection.overdueTaskDays} chargeable day${projection.overdueTaskDays === 1 ? "" : "s"}`} detail={`${projection.overdueTaskCount} task${projection.overdueTaskCount === 1 ? "" : "s"} after the 2-working-day grace period · ₹200 per task per day.`} tone="bg-amber-50/70" />
         <SalaryMetric label="Deductions so far" value={formatCurrency(projection.absentDeduction + projection.dsrDeduction + projection.overdueTaskDeduction + projection.fixedDeductions)} detail={`Absent ${formatCurrency(projection.absentDeduction)} · DSR ${formatCurrency(projection.dsrDeduction)} · Tasks ${formatCurrency(projection.overdueTaskDeduction)}${projection.fixedDeductions ? ` · Other ${formatCurrency(projection.fixedDeductions)}` : ""}`} tone="bg-rose-50/70" />
       </div>
+      {hasOverdueTaskPenalty ? (
+        <div className="border-t border-amber-200 bg-amber-50 px-5 py-4 sm:px-6" role="alert">
+          <div className="flex gap-3">
+            <span aria-hidden="true" className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-800">!</span>
+            <div>
+              <p className="text-sm font-semibold text-amber-950">Overdue task salary alert</p>
+              <p className="mt-1 text-sm leading-6 text-amber-900">
+                {projection.overdueTaskCount} overdue task{projection.overdueTaskCount === 1 ? " is" : "s are"} currently reducing this month&apos;s salary by {formatCurrency(projection.overdueTaskDeduction)}. If the task{projection.overdueTaskCount === 1 ? " remains" : "s remain"} open, the deduction increases by ₹200 per task for every additional working day after the two-day grace period. Your current projected payout is {formatCurrency(projection.projectedNetSalary)}.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
