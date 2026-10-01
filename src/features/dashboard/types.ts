@@ -340,6 +340,8 @@ export type AttendanceRecordView = {
   dateKey: string;
   checkInAt: string;
   checkOutAt: string;
+  checkInTime?: string;
+  checkOutTime?: string;
   status: string;
   workMode: string;
   isHalfDay: boolean;

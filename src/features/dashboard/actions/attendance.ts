@@ -344,6 +344,8 @@ export async function adminManualAttendance(
   if (!email) return { error: "Employee email required." };
   if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return { error: "Valid date required (YYYY-MM-DD)." };
   if (!checkInTime) return { error: "Check-in time required." };
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(checkInTime)) return { error: "Use a valid check-in time." };
+  if (checkOutTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkOutTime)) return { error: "Use a valid check-out time." };
 
   await connectDb();
 
@@ -362,6 +364,7 @@ export async function adminManualAttendance(
   if (checkOutTime) {
     const [outH, outM] = checkOutTime.split(":").map(Number);
     checkOutAt = new Date(`${dateKey}T${String(outH).padStart(2, "0")}:${String(outM ?? 0).padStart(2, "0")}:00+05:30`);
+    if (checkOutAt.getTime() <= checkInAt.getTime()) return { error: "Check-out time must be after check-in time." };
     workedMinutes = Math.max(0, Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60000));
     status = "COMPLETED";
   }
@@ -374,7 +377,8 @@ export async function adminManualAttendance(
         dateKey,
         workMode: VALID_WORK_MODES.includes(workMode) ? workMode : "OFFICE",
         checkInAt,
-        ...(checkOutAt ? { checkOutAt, workedMinutes } : {}),
+        checkOutAt,
+        workedMinutes,
         status,
       },
       $unset: { autoCheckoutAppliedAt: "", autoCheckoutPenaltyMinutes: "" },

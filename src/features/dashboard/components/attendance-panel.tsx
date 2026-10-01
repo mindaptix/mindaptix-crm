@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
+import { adminManualAttendance, cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
 import { reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
 import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
 import type { AttendancePageData, RegularizationEntry } from "@/features/dashboard/types";
@@ -289,6 +289,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
   const [undoPending, startUndo] = useTransition();
   const [undoError, setUndoError] = useState<string | null>(null);
   const [undoVisible, setUndoVisible] = useState(false);
+  const [editingAttendance, setEditingAttendance] = useState<AttendancePageData["todayRecords"][number] | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const checkedIn  = !!data.todayRecord?.checkInAt  && data.todayRecord.checkInAt  !== "Not marked";
@@ -735,6 +736,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                     {data.canViewLocation && (
                       <th className="px-4 py-3.5 text-left text-[0.62rem] font-bold uppercase tracking-[0.22em] text-slate-400">Location</th>
                     )}
+                    {data.canManageOthers ? <th className="px-4 py-3 text-right text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Action</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -779,6 +781,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                       </td>
                       <td className="px-4 py-4">
                         <AttendanceTimeCell datetime={record.checkOutAt} dimmed />
+                        {record.autoCheckoutPenaltyMinutes ? <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[0.6rem] font-bold text-amber-800">Auto closed · 2h adjusted</span> : null}
                       </td>
                       <td className="px-4 py-4">
                         <HoursCell minutes={record.workedMinutes} status={record.status} />
@@ -800,6 +803,13 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                           <LocationCell location={record.checkInLocation ?? null} status={record.status} />
                         </td>
                       )}
+                      {data.canManageOthers ? (
+                        <td className="px-4 py-4 text-right">
+                          <button className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100" onClick={() => setEditingAttendance(record)} type="button">
+                            Edit time
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -808,6 +818,8 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
           )}
         </div>
       </div>
+
+      {editingAttendance ? <AdminAttendanceEditModal record={editingAttendance} onClose={() => setEditingAttendance(null)} /> : null}
 
       {/* ── Pending Regularization Requests (admin only) ── */}
       {!data.canMarkAttendance && data.pendingRegularizations.length > 0 && (
@@ -881,6 +893,48 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
           })}
         </DashboardTable>
       </div>
+    </div>
+  );
+}
+
+function AdminAttendanceEditModal({ onClose, record }: { onClose: () => void; record: AttendancePageData["todayRecords"][number] }) {
+  const router = useRouter();
+  const [state, action, pending] = useActionState(adminManualAttendance, {});
+
+  useEffect(() => {
+    if (!state.success) return;
+    router.refresh();
+    onClose();
+  }, [onClose, router, state.success]);
+
+  return (
+    <div aria-modal="true" className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm" role="dialog">
+      <form action={action} className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Super Admin</p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">Edit attendance time</h2>
+            <p className="mt-1 text-sm text-slate-500">Correct a missed checkout or attendance time. Saving clears any automatic 2-hour adjustment.</p>
+          </div>
+          <button aria-label="Close" className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={onClose} type="button">✕</button>
+        </div>
+        <input name="email" type="hidden" value={record.employeeEmail} />
+        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <p className="text-sm font-semibold text-slate-900">{record.employeeName}</p>
+          <p className="text-xs text-slate-500">{record.employeeEmail}</p>
+        </div>
+        {state.error ? <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{state.error}</p> : null}
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-medium text-slate-700">Date<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 [color-scheme:light]" defaultValue={record.dateKey} name="dateKey" required type="date" /></label>
+          <label className="text-sm font-medium text-slate-700">Work mode<select className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900" defaultValue={record.workMode || "OFFICE"} name="workMode"><option value="OFFICE">Office</option><option value="WFH">WFH</option><option value="FIELD">Field</option></select></label>
+          <label className="text-sm font-medium text-slate-700">Check-in<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 [color-scheme:light]" defaultValue={record.checkInTime ?? ""} name="checkInTime" required type="time" /></label>
+          <label className="text-sm font-medium text-slate-700">Check-out<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 [color-scheme:light]" defaultValue={record.checkOutTime ?? ""} name="checkOutTime" type="time" /></label>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onClose} type="button">Cancel</button>
+          <button className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60" disabled={pending} type="submit">{pending ? "Saving..." : "Save attendance"}</button>
+        </div>
+      </form>
     </div>
   );
 }
