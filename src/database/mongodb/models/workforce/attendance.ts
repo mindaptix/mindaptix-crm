@@ -58,6 +58,15 @@ const attendanceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    autoCheckoutAppliedAt: {
+      type: Date,
+      default: null,
+    },
+    autoCheckoutPenaltyMinutes: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     regularizationReason: {
       type: String,
       trim: true,

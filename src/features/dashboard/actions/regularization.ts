@@ -140,6 +140,8 @@ export async function reviewRegularizationRequest(
         status: checkOutDate ? "COMPLETED" : "PRESENT",
         workMode: request.workMode ?? "OFFICE",
         regularizationReason: request.reason,
+        autoCheckoutAppliedAt: null,
+        autoCheckoutPenaltyMinutes: 0,
       },
       { upsert: true, new: true },
     );

@@ -347,6 +347,8 @@ export type AttendanceRecordView = {
   lateByMinutes: number;
   overtimeMinutes: number;
   workedMinutes: number;
+  autoCheckoutAppliedAt?: string;
+  autoCheckoutPenaltyMinutes?: number;
   checkInLocation?: { lat: number; lng: number; accuracy: number | null } | null;
 };
 

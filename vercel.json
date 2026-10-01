@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/holiday-reminders", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/end-of-day-reminders", "schedule": "30 12 * * *" }
+    { "path": "/api/cron/end-of-day-reminders", "schedule": "30 12 * * *" },
+    { "path": "/api/cron/auto-checkout-adjustment", "schedule": "30 16 * * *" }
   ]
 }

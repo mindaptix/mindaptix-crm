@@ -290,6 +290,10 @@ export async function cancelCheckout(): Promise<AttendanceActionResult> {
     return { error: "You are not checked out right now." };
   }
 
+  if (record.autoCheckoutAppliedAt) {
+    return { error: "This attendance was auto-closed at 10:00 PM because checkout was missed. Please request regularization if the recorded time needs correction." };
+  }
+
   const checkOutAt = record.checkOutAt ? new Date(record.checkOutAt) : null;
   if (!checkOutAt) {
     return { error: "Check-out time was not found." };
@@ -373,6 +377,7 @@ export async function adminManualAttendance(
         ...(checkOutAt ? { checkOutAt, workedMinutes } : {}),
         status,
       },
+      $unset: { autoCheckoutAppliedAt: "", autoCheckoutPenaltyMinutes: "" },
     },
     { upsert: true },
   );

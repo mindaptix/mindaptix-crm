@@ -293,6 +293,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
   const checkedIn  = !!data.todayRecord?.checkInAt  && data.todayRecord.checkInAt  !== "Not marked";
   const checkedOut = !!data.todayRecord?.checkOutAt && data.todayRecord.checkOutAt !== "Not marked";
+  const autoCheckoutApplied = (data.todayRecord?.autoCheckoutPenaltyMinutes ?? 0) > 0;
   const locating = geoStatus === "loading";
   const checkInDisabled = checkInPending || locating || checkedIn || checkedOut;
   const checkOutDisabled = checkOutPending || locating || !checkedIn || checkedOut;
@@ -502,7 +503,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                 style={{ border: checkedIn && !checkedOut ? "1px solid rgba(52,211,153,0.3)" : checkedOut ? "1px solid rgba(148,163,184,0.2)" : "1px solid rgba(251,113,133,0.3)" }}
               >
                 <span className={`h-2 w-2 rounded-full ${checkedOut ? "bg-slate-400" : checkedIn ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
-                {checkedOut ? "Checked Out" : checkedIn ? "Checked In" : "Not Checked In"}
+                {checkedOut ? autoCheckoutApplied ? "Auto Closed" : "Checked Out" : checkedIn ? "Checked In" : "Not Checked In"}
               </div>
             </div>
 
@@ -516,6 +517,13 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
             {data.todayRecord?.status === "COMPLETED" && data.todayRecord.workedMinutes > 0 && (
               <WorkedHoursStrip minutes={data.todayRecord.workedMinutes} />
             )}
+
+            {autoCheckoutApplied ? (
+              <div className="mx-6 mt-3 rounded-xl px-4 py-3" style={{ background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.3)" }}>
+                <p className="text-[0.68rem] font-bold text-amber-200">Checkout was missed</p>
+                <p className="mt-1 text-[0.64rem] leading-relaxed text-amber-100/80">Attendance was auto-closed at 10:00 PM. 2 hours were deducted from today&apos;s recorded work time. Request regularization if this needs correction.</p>
+              </div>
+            ) : null}
 
             {/* Work mode */}
             <div className="mt-5 px-6">

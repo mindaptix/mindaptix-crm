@@ -900,6 +900,8 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           ...getDisplayLateState(todayRecord.checkInAt, workStart, lateGraceMinutes),
           overtimeMinutes: readNumberLike(toRecord(todayRecord).overtimeMinutes) ?? 0,
           workedMinutes: readNumberLike(toRecord(todayRecord).workedMinutes) ?? 0,
+          autoCheckoutAppliedAt: formatDateTime(toRecord(todayRecord).autoCheckoutAppliedAt as Date | null | undefined),
+          autoCheckoutPenaltyMinutes: readNumberLike(toRecord(todayRecord).autoCheckoutPenaltyMinutes) ?? 0,
           checkInLocation: null,
         }
       : null,
@@ -950,6 +952,8 @@ export async function getAttendancePageData(session: AuthenticatedSession): Prom
           ...getDisplayLateState(record.checkInAt, workStart, lateGraceMinutes),
           overtimeMinutes: readNumberLike(toRecord(record).overtimeMinutes) ?? 0,
           workedMinutes: readNumberLike(toRecord(record).workedMinutes) ?? 0,
+          autoCheckoutAppliedAt: formatDateTime(toRecord(record).autoCheckoutAppliedAt as Date | null | undefined),
+          autoCheckoutPenaltyMinutes: readNumberLike(toRecord(record).autoCheckoutPenaltyMinutes) ?? 0,
           checkInLocation,
         };
       })

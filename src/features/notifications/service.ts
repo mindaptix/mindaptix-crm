@@ -98,6 +98,58 @@ export type PendingTaskReminder = {
   sourceKey: string;
 };
 
+const AUTO_CHECKOUT_TIME = "22:00";
+const MISSED_CHECKOUT_PENALTY_MINUTES = 120;
+
+/**
+ * At 10 PM IST, closes open attendance records and deducts two hours from the
+ * recorded duration. The update filter makes a repeated cron invocation safe.
+ */
+export async function applyMissedCheckoutAdjustment(date = formatIndiaDateKey(), now = new Date()) {
+  await connectDb();
+
+  if (formatIndiaTimeKey(now) < AUTO_CHECKOUT_TIME) {
+    return { adjusted: 0, reason: "Auto checkout runs after 10:00 PM IST." };
+  }
+
+  const cutoffAt = new Date(`${date}T${AUTO_CHECKOUT_TIME}:00+05:30`);
+  const openRecords = await AttendanceModel.find(
+    { dateKey: date, status: "PRESENT", checkInAt: { $ne: null }, checkOutAt: null },
+    { _id: 1, userId: 1, checkInAt: 1 },
+  ).lean();
+
+  let adjusted = 0;
+  await Promise.all(openRecords.map(async (record) => {
+    const rawWorkedMinutes = Math.max(0, Math.round((cutoffAt.getTime() - new Date(record.checkInAt).getTime()) / 60_000));
+    const workedMinutes = Math.max(0, rawWorkedMinutes - MISSED_CHECKOUT_PENALTY_MINUTES);
+    const result = await AttendanceModel.updateOne(
+      { _id: record._id, status: "PRESENT", checkOutAt: null },
+      {
+        $set: {
+          checkOutAt: cutoffAt,
+          status: "COMPLETED",
+          workedMinutes,
+          autoCheckoutAppliedAt: now,
+          autoCheckoutPenaltyMinutes: MISSED_CHECKOUT_PENALTY_MINUTES,
+        },
+      },
+    );
+    if (!result.modifiedCount) return;
+
+    adjusted += 1;
+    await createNotification({
+      recipientUserId: record.userId,
+      type: "AUTO_CHECKOUT",
+      title: "Attendance auto-closed at 10 PM",
+      message: `You did not check out on ${date}. Your attendance was auto-closed at 10:00 PM with a 2-hour adjustment. Recorded work time: ${Math.floor(workedMinutes / 60)}h ${workedMinutes % 60}m.`,
+      actionUrl: "/dashboard/attendance",
+      sourceKey: `auto-checkout:${record.userId}:${date}`,
+    });
+  }));
+
+  return { adjusted, cutoffAt: cutoffAt.toISOString(), penaltyMinutes: MISSED_CHECKOUT_PENALTY_MINUTES };
+}
+
 /** Creates one reminder per working hour while an employee still has open tasks. */
 export async function createHourlyPendingTaskReminderForUser(userId: string, date = formatIndiaDateKey(), time = formatIndiaTimeKey()): Promise<PendingTaskReminder | null> {
   await connectDb();
