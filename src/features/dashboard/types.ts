@@ -684,6 +684,7 @@ export type PayslipEntry = {
   overdueTaskDays: number;
   overdueTaskDeduction: number;
   rewardAmount: number;
+  manualDeduction?: number;
   otherDeductions: number;
   totalDeductions: number;
   netSalary: number;
@@ -717,6 +718,8 @@ export type PayrollPageData = {
     overdueTaskCount: number;
     approvedRewardAmount: number;
     fixedDeductions: number;
+    manualDeduction: number;
+    manualDeductionEntries: Array<{ id: string; amount: number; reason: string; effectiveDate: string }>;
     projectedNetSalary: number;
   };
 };

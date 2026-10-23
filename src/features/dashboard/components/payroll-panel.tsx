@@ -245,6 +245,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
 
 function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollPageData["salaryProjection"]> }) {
   const hasOverdueTaskPenalty = projection.overdueTaskDeduction > 0;
+  const hasManualDeduction = projection.manualDeduction > 0;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_30px_rgba(76,29,149,0.07)]">
@@ -258,8 +259,16 @@ function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollP
         <SalaryMetric label="DSR coverage" value={`${projection.submittedDsrCount} / ${projection.expectedDsrCount}`} detail={`${projection.missingDsrCount} missing · ₹100 deduction per missing DSR.`} tone="bg-violet-50/70" />
         <SalaryMetric label="Approved rewards" value={formatCurrency(projection.approvedRewardAmount)} detail="Approved Earn More claims added to this month's salary." tone="bg-emerald-50/70" />
         <SalaryMetric label="Overdue tasks" value={`${projection.overdueTaskDays} chargeable day${projection.overdueTaskDays === 1 ? "" : "s"}`} detail={`${projection.overdueTaskCount} task${projection.overdueTaskCount === 1 ? "" : "s"} after the 2-working-day grace period · ₹200 per task per day.`} tone="bg-amber-50/70" />
-        <SalaryMetric label="Deductions so far" value={formatCurrency(projection.absentDeduction + projection.dsrDeduction + projection.overdueTaskDeduction + projection.fixedDeductions)} detail={`Absent ${formatCurrency(projection.absentDeduction)} · DSR ${formatCurrency(projection.dsrDeduction)} · Tasks ${formatCurrency(projection.overdueTaskDeduction)}${projection.fixedDeductions ? ` · Other ${formatCurrency(projection.fixedDeductions)}` : ""}`} tone="bg-rose-50/70" />
+        <SalaryMetric label="Deductions so far" value={formatCurrency(projection.absentDeduction + projection.dsrDeduction + projection.overdueTaskDeduction + projection.fixedDeductions + projection.manualDeduction)} detail={`Absent ${formatCurrency(projection.absentDeduction)} · DSR ${formatCurrency(projection.dsrDeduction)} · Tasks ${formatCurrency(projection.overdueTaskDeduction)}${projection.manualDeduction ? ` · Manual ${formatCurrency(projection.manualDeduction)}` : ""}${projection.fixedDeductions ? ` · Other ${formatCurrency(projection.fixedDeductions)}` : ""}`} tone="bg-rose-50/70" />
       </div>
+      {hasManualDeduction ? (
+        <div className="border-t border-rose-200 bg-rose-50 px-5 py-4 sm:px-6" role="alert">
+          <p className="text-sm font-semibold text-rose-950">Salary adjustment</p>
+          <ul className="mt-2 space-y-2 text-sm leading-6 text-rose-900">
+            {projection.manualDeductionEntries.map((entry) => <li key={entry.id}><span className="font-semibold">{formatCurrency(entry.amount)}</span> deducted on {entry.effectiveDate}: {entry.reason}</li>)}
+          </ul>
+        </div>
+      ) : null}
       {hasOverdueTaskPenalty ? (
         <div className="border-t border-amber-200 bg-amber-50 px-5 py-4 sm:px-6" role="alert">
           <div className="flex gap-3">

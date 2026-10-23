@@ -25,6 +25,8 @@ const payslipSchema = new mongoose.Schema(
     overdueTaskDays: { type: Number, default: 0 },
     overdueTaskDeduction: { type: Number, default: 0 },
     rewardAmount: { type: Number, default: 0 },
+    manualDeduction: { type: Number, default: 0 },
+    manualDeductionDetails: { type: [{ effectiveDate: String, reason: String, amount: Number }], default: [] },
     otherDeductions: { type: Number, default: 0 },
     totalDeductions: { type: Number, required: true, default: 0 },
     netSalary: { type: Number, required: true, default: 0 },

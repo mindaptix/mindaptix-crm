@@ -25,6 +25,7 @@ import { SettingModel } from "@/database/mongodb/models/setting";
 import { HolidayModel } from "@/database/mongodb/models/system/holiday";
 import { AnnouncementModel } from "@/database/mongodb/models/system/announcement";
 import { SalaryModel } from "@/database/mongodb/models/workforce/salary";
+import { SalaryAdjustmentModel } from "@/database/mongodb/models/workforce/salary-adjustment";
 import { PayslipModel } from "@/database/mongodb/models/workforce/payslip";
 import { ExpenseModel } from "@/database/mongodb/models/workforce/expense";
 import { LeaveBalanceModel } from "@/database/mongodb/models/workforce/leave-balance";
@@ -1753,7 +1754,7 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
   if (session.user.role === "EMPLOYEE") {
     const userId = session.user.id;
     const monthStart = `${currentMonthKey}-01`;
-    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays, monthlyTasks, approvedRewards, approvedLeaves] = await Promise.all([
+    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays, monthlyTasks, approvedRewards, approvedLeaves, salaryAdjustments] = await Promise.all([
       UserModel.findById(userId, { fullName: 1, email: 1 }).lean(),
       SalaryModel.findOne({ userId, status: "ACTIVE" }).lean(),
       PayslipModel.find({ userId, monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
@@ -1763,6 +1764,7 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       TaskModel.find({ assignedUserId: userId }, { dueDate: 1, deadlineAt: 1, reviewedAt: 1, status: 1 }).lean(),
       RewardClaimModel.find({ userId, rewardMonthKey: currentMonthKey, status: "APPROVED" }, { amount: 1 }).lean(),
       LeaveRequestModel.find({ userId, status: "APPROVED", startDate: { $lte: completedWorkdayEnd }, endDate: { $gte: monthStart } }, { startDate: 1, endDate: 1 }).lean(),
+      SalaryAdjustmentModel.find({ userId, monthKey: currentMonthKey, kind: "DEDUCTION" }).sort({ effectiveDate: -1, createdAt: -1 }).lean(),
     ]);
 
     const gross = mySalary
@@ -1787,8 +1789,9 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       holidayDates,
     });
     const fixedDeductions = mySalary ? mySalary.tds + mySalary.providentFund + mySalary.otherDeductions : 0;
+    const manualDeduction = salaryAdjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
     const approvedRewardAmount = approvedRewards.reduce((sum, reward) => sum + reward.amount, 0);
-    const projectedNetSalary = Math.max(0, Math.round(gross + approvedRewardAmount - fixedDeductions - absentDeduction - dsrDeduction - overdueTaskResult.deduction));
+    const projectedNetSalary = Math.max(0, Math.round(gross + approvedRewardAmount - fixedDeductions - manualDeduction - absentDeduction - dsrDeduction - overdueTaskResult.deduction));
 
     const mapPayslip = (p: (typeof myPayslips)[number]) => ({
       id: p._id.toString(),
@@ -1814,6 +1817,7 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       overdueTaskDeduction: p.overdueTaskDeduction ?? 0,
       otherDeductions: p.otherDeductions,
       rewardAmount: p.rewardAmount ?? 0,
+      manualDeduction: p.manualDeduction ?? 0,
       totalDeductions: p.totalDeductions,
       netSalary: p.netSalary,
       presentDays: p.presentDays,
@@ -1871,6 +1875,8 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
         overdueTaskCount: overdueTaskResult.affectedTasks,
         approvedRewardAmount,
         fixedDeductions,
+        manualDeduction,
+        manualDeductionEntries: salaryAdjustments.map((adjustment) => ({ id: adjustment._id.toString(), amount: adjustment.amount, reason: adjustment.reason, effectiveDate: adjustment.effectiveDate })),
         projectedNetSalary,
       },
     };
