@@ -36,7 +36,7 @@ import { AssetModel } from "@/database/mongodb/models/workforce/asset";
 import { EmployeeDocumentModel } from "@/database/mongodb/models/workforce/employee-document";
 import { RewardClaimModel } from "@/database/mongodb/models/workforce/reward-claim";
 import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/shared/lib/india-time";
-import { getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
+import { currentPolicyHolidays, getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 import { getWeekStart } from "@/features/dsr-review/submission-window";
 import { calculateTaskOverdueDeduction } from "@/features/tasks/overdue-deduction";
 import { getSalaryDeductionStart } from "@/features/payroll/deduction-policy";
@@ -1695,14 +1695,14 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
     openAiChatModel: readString(toRecord(settings).openAiChatModel) ?? process.env.OPENAI_DSR_MODEL ?? "gpt-4o-mini",
     hasGroqApiKey: Boolean(readString(toRecord(settings).groqApiKeyEncrypted) || process.env.GROQ_API_KEY),
     hasOpenAiApiKey: Boolean(readString(toRecord(settings).openAiApiKeyEncrypted) || process.env.OPENAI_API_KEY),
-    holidays: mergeCompanyHolidays(holidays.map((h) => ({
+    holidays: currentPolicyHolidays(mergeCompanyHolidays(holidays.map((h) => ({
       id: h._id.toString(),
       name: h.name,
       date: h.date,
       year: h.year,
       type: h.type,
       description: h.description ?? "",
-    }))).map((holiday, index) => ({
+    })))).map((holiday, index) => ({
       id: "id" in holiday ? holiday.id : `company-holiday-${holiday.date}-${index}`,
       name: holiday.name,
       date: holiday.date,
@@ -1716,14 +1716,14 @@ export async function getSettingsPageData(session: AuthenticatedSession): Promis
 export async function getHolidayCalendarData() {
   await connectDb();
   const holidays = await HolidayModel.find({ year: 2026 }).sort({ date: 1 }).lean();
-  return mergeCompanyHolidays(holidays.map((holiday) => ({
+  return currentPolicyHolidays(mergeCompanyHolidays(holidays.map((holiday) => ({
     id: holiday._id.toString(),
     name: holiday.name,
     date: holiday.date,
     year: holiday.year,
     type: holiday.type,
     description: holiday.description ?? "",
-  }))).map((holiday, index) => ({
+  })))).map((holiday, index) => ({
     id: "id" in holiday ? holiday.id : `company-holiday-${holiday.date}-${index}`,
     name: holiday.name,
     date: holiday.date,

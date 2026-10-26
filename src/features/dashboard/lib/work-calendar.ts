@@ -14,9 +14,16 @@ export const COMPANY_HOLIDAYS_2026: CompanyHoliday[] = [
   ["Republic Day", "2026-01-26"], ["Holi", "2026-03-04"], ["Id-Ul-Fittr", "2026-03-21"],
   ["Shri Ram Navami", "2026-03-26"], ["Dr B R Ambedkar Jayanti", "2026-04-14"], ["Bakri Id (Id-Uz-Zuha)", "2026-05-28"],
   ["Independence Day", "2026-08-15"], ["Janmashtami", "2026-09-04"], ["Birthday Of Gandhiji", "2026-10-02"],
-  ["Dussehra", "2026-10-20"], ["Maharishi Valmiki Jayanti", "2026-10-26"], ["Gowardhan Puja", "2026-11-09"],
-  ["Guru Nanak Jayanti", "2026-11-24"], ["Christmas", "2026-12-25"],
+  ["Dussehra", "2026-10-20"], ["Diwali", "2026-11-08"],
 ].map(([name, date]) => ({ name, date, type: "PUBLIC" }));
+
+// Preserve the earlier calendar for historical attendance and payroll, while
+// showing only holidays that remain in the current policy.
+export const HOLIDAY_POLICY_EFFECTIVE_DATE = "2026-10-26";
+
+export function currentPolicyHolidays<T extends { date: string }>(holidays: T[]): T[] {
+  return holidays.filter((holiday) => holiday.date >= HOLIDAY_POLICY_EFFECTIVE_DATE);
+}
 
 const REPLACED_DEFAULT_HOLIDAY_DATES = new Set([
   "2026-01-15", "2026-01-16", "2026-01-26", "2026-03-03", "2026-03-19", "2026-03-21", "2026-03-27",
