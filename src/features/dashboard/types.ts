@@ -685,6 +685,7 @@ export type PayslipEntry = {
   overdueTaskDeduction: number;
   rewardAmount: number;
   manualDeduction?: number;
+  adjustmentsPending?: boolean;
   otherDeductions: number;
   totalDeductions: number;
   netSalary: number;

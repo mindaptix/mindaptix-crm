@@ -6,6 +6,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import { useRouter } from "next/navigation";
 import { adminManualAttendance, cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
 import { reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
+import { TaskCommitmentPopup } from "@/features/tasks/task-commitment-popup";
 import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
 import type { AttendancePageData, RegularizationEntry } from "@/features/dashboard/types";
 
@@ -442,6 +443,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
 
   return (
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
+      {data.canMarkAttendance && checkedIn ? <TaskCommitmentPopup /> : null}
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

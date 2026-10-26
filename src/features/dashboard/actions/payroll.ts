@@ -41,6 +41,7 @@ export async function addManualDeduction(_prev: SalaryState, formData: FormData)
   const existingPayslip = await PayslipModel.findOne({ userId, monthKey }, { status: 1 }).lean();
   if (existingPayslip?.status === "PAID") return { error: "This month's payslip is already paid. Use a different month for the adjustment." };
   await SalaryAdjustmentModel.create({ userId, monthKey, kind: "DEDUCTION", amount, reason, effectiveDate, sourceKey: `manual-deduction:${randomUUID()}`, createdByUserId: session.user.id });
+  await PayslipModel.updateOne({ userId, monthKey, status: "GENERATED" }, { $set: { adjustmentsPending: true } });
   const headerStore = await headers();
   await AuditLogModel.create({ actorUserId: session.user.id, actorName: session.user.fullName, actorRole: session.user.role, action: "SALARY_ADJUSTMENT_ADDED", targetUserId: userId, targetName: employee.fullName, detail: `₹${amount} deduction on ${effectiveDate}: ${reason}`.slice(0, 500), ipAddress: headerStore.get("x-forwarded-for") ?? "" });
   revalidatePath("/dashboard/payroll");
@@ -188,7 +189,8 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
       overdueTaskDeduction: 0,
       rewardAmount,
       manualDeduction,
-      manualDeductionDetails: manualDeductions.map((deduction) => ({ effectiveDate: deduction.effectiveDate, reason: deduction.reason, amount: deduction.amount })),
+      manualDeductionDetails: manualDeductions.map((deduction) => ({ effectiveDate: deduction.effectiveDate, reason: deduction.reason, amount: deduction.amount, sourceKey: deduction.sourceKey })),
+      adjustmentsPending: false,
       otherDeductions: salary.otherDeductions,
       totalDeductions,
       netSalary,
@@ -245,8 +247,8 @@ export async function markPayslipPaid(_prev: SalaryState, formData: FormData): P
 
   await connectDb();
 
-  const payslip = await PayslipModel.findByIdAndUpdate(payslipId, { status: "PAID", paidOn }, { new: true }).lean();
-  if (!payslip) return { error: "Payslip not found." };
+  const payslip = await PayslipModel.findOneAndUpdate({ _id: payslipId, status: "GENERATED", adjustmentsPending: { $ne: true } }, { status: "PAID", paidOn }, { new: true }).lean();
+  if (!payslip) return { error: "Payslip not found, already paid, or needs regeneration to include new adjustments." };
 
   revalidatePath("/dashboard/payroll");
   return { success: "Payslip marked as paid." };

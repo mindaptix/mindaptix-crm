@@ -346,7 +346,7 @@ function PayslipRow({
       <td className="px-4 py-3 text-red-600">{formatCurrency(slip.totalDeductions)}</td>
       <td className="px-4 py-3 font-semibold text-emerald-700">{formatCurrency(slip.netSalary)}</td>
       <td className="px-4 py-3">{slip.presentDays}/{slip.workingDays}</td>
-      <td className="px-4 py-3"><StatusPill status={slip.status} /></td>
+      <td className="px-4 py-3"><StatusPill status={slip.status} />{slip.adjustmentsPending ? <p className="mt-1 text-xs text-amber-700">Regenerate to apply new deductions</p> : null}</td>
       <td className="px-4 py-3 text-slate-500">{slip.paidOn || "-"}</td>
       <td className="px-4 py-3">
         {canManage && slip.status === "GENERATED" ? (
