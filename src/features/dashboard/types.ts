@@ -702,6 +702,8 @@ export type PayrollPageData = {
   employeeOptions: EmployeeOption[];
   selectedMonthKey: string;
   availableMonthKeys: string[];
+  manualDeductions?: Array<{ id: string; employeeName: string; effectiveDate: string; amount: number; reason: string }>;
+  employeeDeductionHistory?: Array<{ id: string; effectiveDate: string; amount: number; reason: string }>;
   salaryProjection?: {
     monthKey: string;
     grossSalary: number;
@@ -710,12 +712,6 @@ export type PayrollPageData = {
     expectedDsrCount: number;
     submittedDsrCount: number;
     missingDsrCount: number;
-    absentDeduction: number;
-    perAbsentDayDeduction: number;
-    dsrDeduction: number;
-    overdueTaskDays: number;
-    overdueTaskDeduction: number;
-    overdueTaskCount: number;
     approvedRewardAmount: number;
     fixedDeductions: number;
     manualDeduction: number;

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { ReactNode } from "react";
-import { generatePayslip, markPayslipPaid, setSalaryStructure } from "@/features/dashboard/actions/payroll";
+import { addManualDeduction, generatePayslip, markPayslipPaid, setSalaryStructure } from "@/features/dashboard/actions/payroll";
 import { Feedback } from "@/shared/ui/feedback";
 import { Button } from "@/shared/ui/button";
 import type { EmployeeOption, PayrollPageData, PayslipEntry, SalaryStructureEntry } from "@/features/dashboard/types";
@@ -32,6 +32,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
   const [salaryState, salaryAction, salaryPending] = useActionState(setSalaryStructure, SALARY_INITIAL);
   const [payslipState, payslipAction, payslipPending] = useActionState(generatePayslip, SALARY_INITIAL);
   const [paidState, paidAction, paidPending] = useActionState(markPayslipPaid, SALARY_INITIAL);
+  const [deductionState, deductionAction, deductionPending] = useActionState(addManualDeduction, SALARY_INITIAL);
 
   return (
     <div className="space-y-5 px-3 py-3 sm:px-7 sm:py-6">
@@ -51,6 +52,41 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
       </section>
 
       {!canManage && data.salaryProjection ? <SalaryProjectionCard projection={data.salaryProjection} /> : null}
+
+      {!canManage && data.employeeDeductionHistory?.length ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h3 className="text-base font-semibold text-slate-900">Previous salary adjustments</h3>
+          <ul className="mt-2 divide-y divide-slate-100 text-sm text-slate-600">
+            {data.employeeDeductionHistory.map((item) => <li className="py-2" key={item.id}><span className="font-medium text-slate-900">{formatCurrency(item.amount)} · {item.effectiveDate}</span> — {item.reason}</li>)}
+          </ul>
+        </section>
+      ) : null}
+
+      {canManage ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h3 className="text-base font-semibold text-slate-900">Add manual salary deduction</h3>
+          <p className="mt-1 text-sm text-slate-500">Choose the employee and deduction date, and enter the reason. Regenerate an existing unpaid payslip after adding an adjustment.</p>
+          <form action={deductionAction} className="mt-4 space-y-4">
+            {deductionState.error ? <Feedback>{deductionState.error}</Feedback> : null}
+            {deductionState.success ? <Feedback tone="success">{deductionState.success}</Feedback> : null}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <SelectField label="Employee" name="userId" options={data.employeeOptions} />
+              <InputField label="Amount (INR)" name="amount" placeholder="500" type="number" />
+              <InputField label="Deduction date" name="effectiveDate" placeholder="" type="date" />
+            </div>
+            <TextAreaField label="Reason" name="reason" placeholder="Explain why this amount is being deducted" />
+            <Button disabled={deductionPending} type="submit">{deductionPending ? "Saving..." : "Add deduction"}</Button>
+          </form>
+          {data.manualDeductions?.length ? (
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <h4 className="text-sm font-semibold text-slate-800">{data.selectedMonthKey} deductions</h4>
+              <ul className="mt-2 divide-y divide-slate-100 text-sm text-slate-600">
+                {data.manualDeductions.map((item) => <li className="py-2" key={item.id}><span className="font-medium text-slate-900">{item.employeeName} · {formatCurrency(item.amount)}</span> · {item.effectiveDate} — {item.reason}</li>)}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {data.summaryCards.map((card) => (
@@ -244,22 +280,20 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
 }
 
 function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollPageData["salaryProjection"]> }) {
-  const hasOverdueTaskPenalty = projection.overdueTaskDeduction > 0;
   const hasManualDeduction = projection.manualDeduction > 0;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_30px_rgba(76,29,149,0.07)]">
       <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-br from-violet-50 via-indigo-50 to-emerald-50 px-5 py-5 sm:px-6">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">{projection.monthKey} estimate</p><h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Your expected salary</h2><p className="mt-1 text-sm text-slate-600">This is a live estimate based on attendance, DSRs, and overdue tasks.</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">{projection.monthKey} estimate</p><h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Your expected salary</h2><p className="mt-1 text-sm text-slate-600">This estimate includes fixed salary deductions and any manually added adjustments.</p></div>
         <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-medium text-slate-500">Estimated payout</p><p className="mt-1 text-2xl font-semibold tracking-tight text-emerald-700">{formatCurrency(projection.projectedNetSalary)}</p></div>
       </div>
       <div className="grid gap-px bg-violet-100 md:grid-cols-2 xl:grid-cols-3">
         <SalaryMetric label="Monthly salary" value={formatCurrency(projection.grossSalary)} detail="Before this month’s deductions." tone="bg-white" />
-        <SalaryMetric label="Attendance" value={`${projection.presentDays} present · ${projection.absentDays} absent`} detail={`Absent day deduction: ${formatCurrency(projection.perAbsentDayDeduction)} per day.`} tone="bg-sky-50/70" />
-        <SalaryMetric label="DSR coverage" value={`${projection.submittedDsrCount} / ${projection.expectedDsrCount}`} detail={`${projection.missingDsrCount} missing · ₹100 deduction per missing DSR.`} tone="bg-violet-50/70" />
+        <SalaryMetric label="Attendance" value={`${projection.presentDays} present · ${projection.absentDays} absent`} detail="Attendance is shown for reference." tone="bg-sky-50/70" />
+        <SalaryMetric label="DSR coverage" value={`${projection.submittedDsrCount} / ${projection.expectedDsrCount}`} detail={`${projection.missingDsrCount} missing · no automatic salary deduction.`} tone="bg-violet-50/70" />
         <SalaryMetric label="Approved rewards" value={formatCurrency(projection.approvedRewardAmount)} detail="Approved Earn More claims added to this month's salary." tone="bg-emerald-50/70" />
-        <SalaryMetric label="Overdue tasks" value={`${projection.overdueTaskDays} chargeable day${projection.overdueTaskDays === 1 ? "" : "s"}`} detail={`${projection.overdueTaskCount} task${projection.overdueTaskCount === 1 ? "" : "s"} after the 2-working-day grace period · ₹200 per task per day.`} tone="bg-amber-50/70" />
-        <SalaryMetric label="Deductions so far" value={formatCurrency(projection.absentDeduction + projection.dsrDeduction + projection.overdueTaskDeduction + projection.fixedDeductions + projection.manualDeduction)} detail={`Absent ${formatCurrency(projection.absentDeduction)} · DSR ${formatCurrency(projection.dsrDeduction)} · Tasks ${formatCurrency(projection.overdueTaskDeduction)}${projection.manualDeduction ? ` · Manual ${formatCurrency(projection.manualDeduction)}` : ""}${projection.fixedDeductions ? ` · Other ${formatCurrency(projection.fixedDeductions)}` : ""}`} tone="bg-rose-50/70" />
+        <SalaryMetric label="Deductions so far" value={formatCurrency(projection.fixedDeductions + projection.manualDeduction)} detail={`Manual ${formatCurrency(projection.manualDeduction)} · Fixed ${formatCurrency(projection.fixedDeductions)}`} tone="bg-rose-50/70" />
       </div>
       {hasManualDeduction ? (
         <div className="border-t border-rose-200 bg-rose-50 px-5 py-4 sm:px-6" role="alert">
@@ -267,19 +301,6 @@ function SalaryProjectionCard({ projection }: { projection: NonNullable<PayrollP
           <ul className="mt-2 space-y-2 text-sm leading-6 text-rose-900">
             {projection.manualDeductionEntries.map((entry) => <li key={entry.id}><span className="font-semibold">{formatCurrency(entry.amount)}</span> deducted on {entry.effectiveDate}: {entry.reason}</li>)}
           </ul>
-        </div>
-      ) : null}
-      {hasOverdueTaskPenalty ? (
-        <div className="border-t border-amber-200 bg-amber-50 px-5 py-4 sm:px-6" role="alert">
-          <div className="flex gap-3">
-            <span aria-hidden="true" className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-800">!</span>
-            <div>
-              <p className="text-sm font-semibold text-amber-950">Overdue task salary alert</p>
-              <p className="mt-1 text-sm leading-6 text-amber-900">
-                {projection.overdueTaskCount} overdue task{projection.overdueTaskCount === 1 ? " is" : "s are"} currently reducing this month&apos;s salary by {formatCurrency(projection.overdueTaskDeduction)}. If the task{projection.overdueTaskCount === 1 ? " remains" : "s remain"} open, the deduction increases by ₹200 per task for every additional working day after the two-day grace period. Your current projected payout is {formatCurrency(projection.projectedNetSalary)}.
-              </p>
-            </div>
-          </div>
         </div>
       ) : null}
     </section>

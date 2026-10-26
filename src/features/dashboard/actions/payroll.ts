@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
+import mongoose from "mongoose";
 import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import { assertSuperAdmin } from "@/features/auth/lib/user-admin";
 import connectDb from "@/database/mongodb/connect";
@@ -10,17 +12,41 @@ import { SalaryAdjustmentModel } from "@/database/mongodb/models/workforce/salar
 import { AttendanceModel } from "@/database/mongodb/models/workforce/attendance";
 import { LeaveRequestModel } from "@/database/mongodb/models/workforce/leave-request";
 import { UserModel } from "@/database/mongodb/models/workforce/user";
-import { TaskModel } from "@/database/mongodb/models/task";
 import { HolidayModel } from "@/database/mongodb/models/system/holiday";
 import { RewardClaimModel } from "@/database/mongodb/models/workforce/reward-claim";
 import { AuditLogModel } from "@/database/mongodb/models/system/audit-log";
 import { headers } from "next/headers";
-import { calculateTaskOverdueDeduction } from "@/features/tasks/overdue-deduction";
 import { COMPANY_WORK_POLICY, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import { getSalaryDeductionStart } from "@/features/payroll/deduction-policy";
+import { calculateManualPayroll } from "@/features/payroll/manual-payroll";
 
 type SalaryState = { error?: string; success?: string };
+
+export async function addManualDeduction(_prev: SalaryState, formData: FormData): Promise<SalaryState> {
+  const session = await getCurrentSession();
+  assertSuperAdmin(session);
+  const userId = String(formData.get("userId") ?? "").trim();
+  const effectiveDate = String(formData.get("effectiveDate") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+  const amount = Number(formData.get("amount"));
+  const date = new Date(`${effectiveDate}T00:00:00.000Z`);
+  if (!mongoose.isValidObjectId(userId) || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== effectiveDate || !Number.isFinite(amount) || amount <= 0 || amount > 10000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001 || reason.length < 5 || reason.length > 500) {
+    return { error: "Select an employee and a valid date, amount and reason (5–500 characters)." };
+  }
+  await connectDb();
+  const employee = await UserModel.findOne({ _id: userId, role: { $in: ["EMPLOYEE", "MANAGER"] }, status: "ACTIVE" }, { fullName: 1 }).lean();
+  if (!employee) return { error: "Active employee not found." };
+  const monthKey = effectiveDate.slice(0, 7);
+  const existingPayslip = await PayslipModel.findOne({ userId, monthKey }, { status: 1 }).lean();
+  if (existingPayslip?.status === "PAID") return { error: "This month's payslip is already paid. Use a different month for the adjustment." };
+  await SalaryAdjustmentModel.create({ userId, monthKey, kind: "DEDUCTION", amount, reason, effectiveDate, sourceKey: `manual-deduction:${randomUUID()}`, createdByUserId: session.user.id });
+  const headerStore = await headers();
+  await AuditLogModel.create({ actorUserId: session.user.id, actorName: session.user.fullName, actorRole: session.user.role, action: "SALARY_ADJUSTMENT_ADDED", targetUserId: userId, targetName: employee.fullName, detail: `₹${amount} deduction on ${effectiveDate}: ${reason}`.slice(0, 500), ipAddress: headerStore.get("x-forwarded-for") ?? "" });
+  revalidatePath("/dashboard/payroll");
+  revalidatePath("/dashboard/salary");
+  return { success: `Deduction added for ${employee.fullName}.${existingPayslip ? " Regenerate the existing payslip to apply it." : ""}` };
+}
 
 export async function setSalaryStructure(_prev: SalaryState, formData: FormData): Promise<SalaryState> {
   const session = await getCurrentSession();
@@ -99,6 +125,8 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
 
   const salary = await SalaryModel.findOne({ userId, status: "ACTIVE" }).lean();
   if (!salary) return { error: "No active salary structure found for this employee. Set salary first." };
+  const existingPayslip = await PayslipModel.findOne({ userId, monthKey }, { status: 1 }).lean();
+  if (existingPayslip?.status === "PAID") return { error: "A paid payslip cannot be regenerated." };
 
   const [year, month] = monthKey.split("-").map(Number);
   const startDate = `${monthKey}-01`;
@@ -109,9 +137,8 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
   const calculationEndDate = monthKey === today.slice(0, 7)
     ? (formatIndiaTimeKey() >= "19:00" ? today : addDaysToDate(today, -1))
     : endDateStr;
-  const [attendance, overdueTasks, holidays, approvedRewards, manualDeductions] = await Promise.all([
+  const [attendance, holidays, approvedRewards, manualDeductions] = await Promise.all([
     AttendanceModel.find({ userId, dateKey: { $gte: startDate, $lte: endDateStr } }).lean(),
-    TaskModel.find({ assignedUserId: userId }, { dueDate: 1, deadlineAt: 1, reviewedAt: 1, status: 1 }).lean(),
     HolidayModel.find({ date: { $gte: startDate, $lte: calculationEndDate } }, { date: 1 }).lean(),
     RewardClaimModel.find({ userId, rewardMonthKey: monthKey, status: "APPROVED" }, { amount: 1 }).lean(),
     SalaryAdjustmentModel.find({ userId, monthKey, kind: "DEDUCTION" }).lean(),
@@ -127,7 +154,6 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
   }).lean();
 
   const grossSalary = salary.basicSalary + salary.hra + salary.transportAllowance + salary.medicalAllowance + salary.otherAllowances;
-  const perDaySalary = grossSalary / 30;
   const holidayDates = mergeCompanyHolidays(holidays.map((holiday) => ({ date: holiday.date }))).map((holiday) => holiday.date);
   const deductionStart = getSalaryDeductionStart(startDate);
   const deductionDates = calculationEndDate >= deductionStart ? getWorkingDateKeys(deductionStart, calculationEndDate, holidayDates) : [];
@@ -135,19 +161,9 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
   const leaveDateKeys = new Set(approvedLeaves.flatMap((leave) => getWorkingDateKeys(leave.startDate < deductionStart ? deductionStart : leave.startDate, leave.endDate > calculationEndDate ? calculationEndDate : leave.endDate, holidayDates)));
   const leaveDays = leaveDateKeys.size;
   const absentDays = deductionDates.filter((dateKey) => !presentDateKeys.has(dateKey) && !leaveDateKeys.has(dateKey)).length;
-  const leaveDeduction = leaveDays > 0 ? Math.round(perDaySalary * leaveDays) : 0;
-  const absentDeduction = absentDays > 0 ? Math.round(perDaySalary * absentDays) : 0;
-  const lateDeduction = lateDays > 1 ? Math.round(perDaySalary * Math.floor(lateDays / 3)) : 0;
-  const overdueTaskResult = calculateTaskOverdueDeduction({
-    tasks: overdueTasks,
-    periodStart: startDate,
-    periodEnd: calculationEndDate,
-    holidayDates,
-  });
   const rewardAmount = approvedRewards.reduce((sum, reward) => sum + reward.amount, 0);
   const manualDeduction = manualDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
-  const totalDeductions = salary.tds + salary.providentFund + salary.otherDeductions + manualDeduction + leaveDeduction + absentDeduction + lateDeduction + overdueTaskResult.deduction;
-  const netSalary = Math.max(0, grossSalary + rewardAmount - totalDeductions);
+  const { totalDeductions, netSalary } = calculateManualPayroll(grossSalary, salary.tds + salary.providentFund + salary.otherDeductions, manualDeduction, rewardAmount);
 
   await PayslipModel.findOneAndUpdate(
     { userId, monthKey },
@@ -163,13 +179,13 @@ export async function generatePayslip(_prev: SalaryState, formData: FormData): P
       tds: salary.tds,
       providentFund: salary.providentFund,
       leaveDays,
-      leaveDeduction,
+      leaveDeduction: 0,
       absentDays,
-      absentDeduction,
+      absentDeduction: 0,
       lateDays,
-      lateDeduction,
-      overdueTaskDays: overdueTaskResult.chargeableTaskDays,
-      overdueTaskDeduction: overdueTaskResult.deduction,
+      lateDeduction: 0,
+      overdueTaskDays: 0,
+      overdueTaskDeduction: 0,
       rewardAmount,
       manualDeduction,
       manualDeductionDetails: manualDeductions.map((deduction) => ({ effectiveDate: deduction.effectiveDate, reason: deduction.reason, amount: deduction.amount })),

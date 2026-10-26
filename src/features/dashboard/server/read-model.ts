@@ -38,8 +38,8 @@ import { RewardClaimModel } from "@/database/mongodb/models/workforce/reward-cla
 import { formatIndiaDateKey, formatIndiaDateTime, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import { currentPolicyHolidays, getWorkdayBreakdown, mergeCompanyHolidays } from "@/features/dashboard/lib/work-calendar";
 import { getWeekStart } from "@/features/dsr-review/submission-window";
-import { calculateTaskOverdueDeduction } from "@/features/tasks/overdue-deduction";
 import { getSalaryDeductionStart } from "@/features/payroll/deduction-policy";
+import { calculateManualPayroll } from "@/features/payroll/manual-payroll";
 import type {
   AnnouncementsPageData,
   AttendanceMonthlyRow,
@@ -1754,17 +1754,16 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
   if (session.user.role === "EMPLOYEE") {
     const userId = session.user.id;
     const monthStart = `${currentMonthKey}-01`;
-    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays, monthlyTasks, approvedRewards, approvedLeaves, salaryAdjustments] = await Promise.all([
+    const [myUser, mySalary, myPayslips, monthlyAttendance, submittedDsrCount, monthlyHolidays, approvedRewards, approvedLeaves, salaryAdjustments] = await Promise.all([
       UserModel.findById(userId, { fullName: 1, email: 1 }).lean(),
       SalaryModel.findOne({ userId, status: "ACTIVE" }).lean(),
       PayslipModel.find({ userId, monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
       AttendanceModel.find({ userId, dateKey: { $gte: monthStart, $lte: completedWorkdayEnd } }, { dateKey: 1, status: 1 }).lean(),
       DailyUpdateModel.countDocuments({ userId, workDate: { $gte: monthStart, $lte: completedWorkdayEnd } }),
       HolidayModel.find({ date: { $gte: monthStart, $lte: completedWorkdayEnd } }, { date: 1 }).lean(),
-      TaskModel.find({ assignedUserId: userId }, { dueDate: 1, deadlineAt: 1, reviewedAt: 1, status: 1 }).lean(),
       RewardClaimModel.find({ userId, rewardMonthKey: currentMonthKey, status: "APPROVED" }, { amount: 1 }).lean(),
       LeaveRequestModel.find({ userId, status: "APPROVED", startDate: { $lte: completedWorkdayEnd }, endDate: { $gte: monthStart } }, { startDate: 1, endDate: 1 }).lean(),
-      SalaryAdjustmentModel.find({ userId, monthKey: currentMonthKey, kind: "DEDUCTION" }).sort({ effectiveDate: -1, createdAt: -1 }).lean(),
+      SalaryAdjustmentModel.find({ userId, monthKey: { $in: last3Months }, kind: "DEDUCTION" }).sort({ effectiveDate: -1, createdAt: -1 }).lean(),
     ]);
 
     const gross = mySalary
@@ -1779,19 +1778,11 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
     const approvedLeaveDays = approvedLeaves.reduce((total, leave) => total + getWorkingDaysInDateRange(leave.startDate < deductionStart ? deductionStart : leave.startDate, leave.endDate > completedWorkdayEnd ? completedWorkdayEnd : leave.endDate), 0);
     const absentDays = Math.max(expectedDsrCount - presentDays - approvedLeaveDays, 0);
     const missingDsrCount = Math.max(expectedDsrCount - submittedDsrCount, 0);
-    const perAbsentDayDeduction = gross / 30;
-    const absentDeduction = Math.round(absentDays * perAbsentDayDeduction);
-    const dsrDeduction = missingDsrCount * 100;
-    const overdueTaskResult = calculateTaskOverdueDeduction({
-      tasks: monthlyTasks,
-      periodStart: deductionStart,
-      periodEnd: completedWorkdayEnd,
-      holidayDates,
-    });
     const fixedDeductions = mySalary ? mySalary.tds + mySalary.providentFund + mySalary.otherDeductions : 0;
-    const manualDeduction = salaryAdjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
+    const currentAdjustments = salaryAdjustments.filter((adjustment) => adjustment.monthKey === currentMonthKey);
+    const manualDeduction = currentAdjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
     const approvedRewardAmount = approvedRewards.reduce((sum, reward) => sum + reward.amount, 0);
-    const projectedNetSalary = Math.max(0, Math.round(gross + approvedRewardAmount - fixedDeductions - manualDeduction - absentDeduction - dsrDeduction - overdueTaskResult.deduction));
+    const projectedNetSalary = calculateManualPayroll(gross, fixedDeductions, manualDeduction, approvedRewardAmount).netSalary;
 
     const mapPayslip = (p: (typeof myPayslips)[number]) => ({
       id: p._id.toString(),
@@ -1859,6 +1850,7 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       employeeOptions: [],
       selectedMonthKey: currentMonthKey,
       availableMonthKeys: last3Months,
+      employeeDeductionHistory: salaryAdjustments.filter((adjustment) => adjustment.monthKey !== currentMonthKey).map((adjustment) => ({ id: adjustment._id.toString(), amount: adjustment.amount, reason: adjustment.reason, effectiveDate: adjustment.effectiveDate })),
       salaryProjection: {
         monthKey: currentMonthKey,
         grossSalary: gross,
@@ -1867,25 +1859,20 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
         expectedDsrCount,
         submittedDsrCount,
         missingDsrCount,
-        absentDeduction,
-        perAbsentDayDeduction,
-        dsrDeduction,
-        overdueTaskDays: overdueTaskResult.chargeableTaskDays,
-        overdueTaskDeduction: overdueTaskResult.deduction,
-        overdueTaskCount: overdueTaskResult.affectedTasks,
         approvedRewardAmount,
         fixedDeductions,
         manualDeduction,
-        manualDeductionEntries: salaryAdjustments.map((adjustment) => ({ id: adjustment._id.toString(), amount: adjustment.amount, reason: adjustment.reason, effectiveDate: adjustment.effectiveDate })),
+        manualDeductionEntries: currentAdjustments.map((adjustment) => ({ id: adjustment._id.toString(), amount: adjustment.amount, reason: adjustment.reason, effectiveDate: adjustment.effectiveDate })),
         projectedNetSalary,
       },
     };
   }
 
-  const [employees, salaryStructures, payslips] = await Promise.all([
+  const [employees, salaryStructures, payslips, manualDeductions] = await Promise.all([
     UserModel.find({ role: { $in: ["EMPLOYEE", "MANAGER"] }, status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean(),
     SalaryModel.find({ status: "ACTIVE" }).lean(),
     PayslipModel.find({ monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
+    SalaryAdjustmentModel.find({ monthKey: currentMonthKey, kind: "DEDUCTION" }).sort({ effectiveDate: -1, createdAt: -1 }).lean(),
   ]);
 
   const salaryMap = new Map(salaryStructures.map((s) => [s.userId, s]));
@@ -1962,6 +1949,7 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       };
     }),
     employeeOptions: employees.map((e) => ({ id: e._id.toString(), label: e.fullName })),
+    manualDeductions: manualDeductions.map((item) => ({ id: item._id.toString(), employeeName: userMap.get(item.userId)?.fullName ?? "Unknown", effectiveDate: item.effectiveDate, amount: item.amount, reason: item.reason })),
     selectedMonthKey: currentMonthKey,
     availableMonthKeys: last3Months,
   };

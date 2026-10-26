@@ -7,9 +7,9 @@ import ts from "typescript";
 
 const source = readFileSync(new URL("../lib/work-calendar.ts", import.meta.url), "utf8");
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
-const module = { exports: {} };
-vm.runInNewContext(compiled, { module, exports: module.exports, require: createRequire(import.meta.url), Date, Set });
-const { COMPANY_HOLIDAYS_2026, currentPolicyHolidays, getWorkdayBreakdown } = module.exports;
+const testModule = { exports: {} };
+vm.runInNewContext(compiled, { module: testModule, exports: testModule.exports, require: createRequire(import.meta.url), Date, Set });
+const { COMPANY_HOLIDAYS_2026, currentPolicyHolidays, getWorkdayBreakdown } = testModule.exports;
 
 test("the current 2026 holiday calendar contains only Diwali", () => {
   const current = currentPolicyHolidays(COMPANY_HOLIDAYS_2026);
