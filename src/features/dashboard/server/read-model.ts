@@ -726,7 +726,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
   const [projects, assignableUsers] = await Promise.all([
     ProjectModel.find(
       {},
-      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1 },
+      { name: 1, summary: 1, status: 1, priority: 1, dueDate: 1, techStack: 1, assignedUserIds: 1, createdByUserId: 1, closedByEmployeeId: 1, closedByEmployeeAt: 1, clientName: 1, clientBudget: 1, archivedAt: 1, repositoryUrls: 1 },
     )
       .sort({ updatedAt: -1 })
       .lean(),
@@ -773,6 +773,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
       closedByEmployeeAt: formatDate(project.closedByEmployeeAt ?? null),
       clientName: String((project as { clientName?: string }).clientName ?? ""),
       clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
+      repositoryUrls: project.repositoryUrls ?? [],
     })),
     archivedProjects: archivedProjects.map((project) => ({
       id: project._id.toString(), name: project.name, summary: project.summary, status: project.status, priority: project.priority,
@@ -781,6 +782,7 @@ export async function getProjectsPageData(session: AuthenticatedSession): Promis
       assignedUserPhotoUrls: (project.assignedUserIds ?? []).map((userId) => readString(toRecord(employeeMap.get(userId)).profilePhotoUrl) ?? ""),
       createdByUserId: project.createdByUserId ?? "", closedByEmployeeId: project.closedByEmployeeId ?? "", closedByEmployeeAt: formatDate(project.closedByEmployeeAt ?? null),
       clientName: String((project as { clientName?: string }).clientName ?? ""), clientBudget: Number((project as { clientBudget?: number }).clientBudget ?? 0),
+      repositoryUrls: project.repositoryUrls ?? [],
     })),
     canArchive: session.user.role === "SUPER_ADMIN",
     employeeOptions: employees.map((employee) => ({

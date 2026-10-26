@@ -43,6 +43,7 @@ const projectSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    repositoryUrls: { type: [String], default: [] },
     assignedUserIds: {
       type: [String],
       default: [],
@@ -83,6 +84,7 @@ export type ProjectRecord = InferSchemaType<typeof projectSchema> & {
 const cachedProjectModel = mongoose.models.Project as Model<ProjectRecord> | undefined;
 const hasLatestProjectFields =
   cachedProjectModel?.schema.path("techStack") &&
+  cachedProjectModel.schema.path("repositoryUrls") &&
   cachedProjectModel.schema.path("assignedUserIds") &&
   cachedProjectModel.schema.path("createdByUserId") &&
   cachedProjectModel.schema.path("closedByEmployeeId") &&

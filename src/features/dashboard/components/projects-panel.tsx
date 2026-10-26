@@ -303,6 +303,7 @@ export function ProjectsPanel({ data }: ProjectsPanelProps) {
                   <p className="line-clamp-2 text-[0.82rem] leading-5 text-slate-500">
                     {project.summary || "No description added."}
                   </p>
+                  {project.repositoryUrls?.length ? <div className="mt-3 space-y-1">{project.repositoryUrls.map((url) => <a className="block break-all text-xs font-medium text-indigo-700 hover:underline" href={url} key={url} rel="noopener noreferrer" target="_blank">{url.replace("https://github.com/", "")}</a>)}</div> : null}
 
                   {/* Tech stack */}
                   {project.techStack.length > 0 ? (

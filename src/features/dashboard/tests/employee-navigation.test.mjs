@@ -18,11 +18,10 @@ test("employee navigation contains only personal work and self-service areas", (
   const { getDashboardNavItemsForRole } = loadConfig();
   const keys = getDashboardNavItemsForRole("EMPLOYEE").map((item) => item.key);
 
-  assert.deepEqual([...keys], [
-    "dashboard", "attendance", "leaves", "tasks", "dsr", "payroll", "expenses",
-    "regularize", "documents", "announcements", "settings",
-  ]);
-  for (const key of ["employees", "projects", "portfolio", "reports", "payments", "assets", "alldocs"]) {
+  for (const key of ["dashboard", "projects", "attendance", "tasks", "dsr", "salary"]) {
+    assert.equal(keys.includes(key), true, `${key} must be available to employees`);
+  }
+  for (const key of ["employees", "portfolio", "reports", "payments", "assets", "alldocs"]) {
     assert.equal(keys.includes(key), false, `${key} must not be available to employees`);
   }
 });

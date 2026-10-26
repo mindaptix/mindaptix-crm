@@ -12,7 +12,7 @@ type PopupAnnouncement = {
 
 export function AnnouncementPopup({ announcements, dateKey, userId }: { announcements: PopupAnnouncement[]; dateKey: string; userId: string }) {
   const [open, setOpen] = useState(false);
-  const storageKey = `mindaptix:announcement-popup:${userId}:${dateKey}`;
+  const storageKey = `mindaptix:announcement-popup:${userId}:${dateKey}:${announcements.map((announcement) => announcement.id).join(",")}`;
 
   useEffect(() => {
     try {

@@ -1,4 +1,7 @@
 import "server-only";
+import connectDb from "@/database/mongodb/connect";
+import { ProjectModel } from "@/database/mongodb/models/project";
+import { EmployeeProjectsPanel } from "@/features/dashboard/components/employee-projects-panel";
 import { notFound } from "next/navigation";
 import { AnnouncementsPanel } from "@/features/dashboard/components/announcements-panel";
 import { AttendancePanel } from "@/features/dashboard/components/attendance-panel";
@@ -38,6 +41,11 @@ import type { DashboardPageKey } from "@/features/dashboard/shared/page-types";
 
 export async function renderEmployeeDashboardPage(page: DashboardPageKey, session: AuthenticatedSession) {
   switch (page) {
+    case "projects": {
+      await connectDb();
+      const projects = await ProjectModel.find({ assignedUserIds: session.user.id, archivedAt: null }, { name: 1, summary: 1, status: 1, repositoryUrls: 1 }).sort({ name: 1 }).lean();
+      return <EmployeeProjectsPanel projects={projects.map((project) => ({ id: String(project._id), name: project.name, summary: project.summary, status: project.status, repositoryUrls: project.repositoryUrls ?? [] }))} />;
+    }
     case "attendance": {
       const data = await getAttendancePageData(session);
       return <AttendancePanel data={data} />;

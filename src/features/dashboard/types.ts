@@ -187,6 +187,7 @@ export type EmployeeProjectEntry = {
   closedByEmployeeAt: string;
   clientName: string;
   clientBudget: number;
+  repositoryUrls?: string[];
 };
 
 export type SalesLeadEntry = {
