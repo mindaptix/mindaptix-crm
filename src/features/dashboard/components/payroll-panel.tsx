@@ -64,14 +64,14 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
 
       {canManage ? (
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h3 className="text-base font-semibold text-slate-900">Add manual salary deduction</h3>
-          <p className="mt-1 text-sm text-slate-500">Choose the employee and deduction date, and enter the reason. Regenerate an existing unpaid payslip after adding an adjustment.</p>
+          <h3 className="text-base font-semibold text-slate-900">Add manual salary deduction or warning</h3>
+          <p className="mt-1 text-sm text-slate-500">Choose the employee and deduction date, and enter the reason. Use ₹0 for a documented warning that does not change salary. Regenerate an existing unpaid payslip after adding an adjustment.</p>
           <form action={deductionAction} className="mt-4 space-y-4">
             {deductionState.error ? <Feedback>{deductionState.error}</Feedback> : null}
             {deductionState.success ? <Feedback tone="success">{deductionState.success}</Feedback> : null}
             <div className="grid gap-4 sm:grid-cols-3">
               <SelectField label="Employee" name="userId" options={data.employeeOptions} />
-              <InputField label="Amount (INR)" name="amount" placeholder="500" type="number" />
+              <InputField label="Amount (INR; 0 for warning)" name="amount" placeholder="500" type="number" />
               <InputField label="Deduction date" name="effectiveDate" placeholder="" type="date" />
             </div>
             <TextAreaField label="Reason" name="reason" placeholder="Explain why this amount is being deducted" />

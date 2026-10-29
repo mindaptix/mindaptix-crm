@@ -8,7 +8,9 @@ const salaryAdjustmentSchema = new mongoose.Schema(
     userId: { type: String, required: true, index: true },
     monthKey: { type: String, required: true, index: true },
     kind: { type: String, enum: SALARY_ADJUSTMENT_KINDS, required: true },
-    amount: { type: Number, required: true, min: 1 },
+    // A zero-value deduction is a documented warning: it remains visible in salary
+    // history without changing the employee's payable amount.
+    amount: { type: Number, required: true, min: 0 },
     reason: { type: String, required: true, trim: true, maxlength: 500 },
     effectiveDate: { type: String, required: true },
     sourceKey: { type: String, required: true, unique: true, maxlength: 180 },

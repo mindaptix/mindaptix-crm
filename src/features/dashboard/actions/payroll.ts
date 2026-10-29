@@ -31,7 +31,7 @@ export async function addManualDeduction(_prev: SalaryState, formData: FormData)
   const reason = String(formData.get("reason") ?? "").trim();
   const amount = Number(formData.get("amount"));
   const date = new Date(`${effectiveDate}T00:00:00.000Z`);
-  if (!mongoose.isValidObjectId(userId) || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== effectiveDate || !Number.isFinite(amount) || amount <= 0 || amount > 10000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001 || reason.length < 5 || reason.length > 500) {
+  if (!mongoose.isValidObjectId(userId) || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== effectiveDate || !Number.isFinite(amount) || amount < 0 || amount > 10000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001 || reason.length < 5 || reason.length > 500) {
     return { error: "Select an employee and a valid date, amount and reason (5–500 characters)." };
   }
   await connectDb();
