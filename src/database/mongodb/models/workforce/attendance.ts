@@ -73,6 +73,16 @@ const attendanceSchema = new mongoose.Schema(
       maxlength: 300,
       default: "",
     },
+    pendingTaskReason: {
+      type: String,
+      trim: true,
+      maxlength: 600,
+      default: "",
+    },
+    pendingTaskIds: {
+      type: [String],
+      default: [],
+    },
     checkInLocation: {
       lat: { type: Number, default: null },
       lng: { type: Number, default: null },

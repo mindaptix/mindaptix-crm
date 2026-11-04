@@ -42,7 +42,7 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">HR Management</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Payroll</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Manage salary structures, generate monthly payslips, and track payments.
+              Review current and previous month salaries, edit salary structures, and see every adjustment with its reason and date.
             </p>
           </div>
           <span className="inline-flex w-fit shrink-0 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
@@ -97,6 +97,21 @@ export function PayrollPanel({ data, canManage }: PayrollPanelProps) {
           </article>
         ))}
       </section>
+
+      {canManage && data.salarySnapshots?.length ? (
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <PanelHeader action={null} eyebrow="Salary history" title="Current & previous month" />
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Month</th><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Gross</th><th className="px-4 py-3">Deductions</th><th className="px-4 py-3">Bonuses</th><th className="px-4 py-3">Net salary</th><th className="px-4 py-3">Adjustments / reason</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.salarySnapshots.map((row) => <tr key={`${row.monthKey}-${row.employeeId}`} className="align-top hover:bg-slate-50/70"><td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">{formatMonthLabel(row.monthKey)}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900">{row.employeeName}</p><p className="text-xs text-slate-500">{row.employeeEmail}</p></td><td className="px-4 py-3">{formatCurrency(row.grossSalary)}</td><td className="px-4 py-3 font-semibold text-rose-700">{formatCurrency(row.totalDeductions)}</td><td className="px-4 py-3 font-semibold text-emerald-700">{formatCurrency(row.totalBonuses)}</td><td className="px-4 py-3 font-bold text-slate-900">{formatCurrency(row.netSalary)}</td><td className="min-w-[260px] px-4 py-3">{row.adjustments.length ? <ul className="space-y-1">{row.adjustments.map((item) => <li key={item.id} className={item.kind === "DEDUCTION" ? "text-rose-700" : "text-emerald-700"}><span className="font-semibold">{item.kind === "DEDUCTION" ? "−" : "+"}{formatCurrency(item.amount)}</span> · {item.effectiveDate} · {item.reason}</li>)}</ul> : <span className="text-slate-400">No manual adjustments</span>}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+          <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">Super Admin can edit salary structures above and add dated manual adjustments with reasons.</p>
+        </section>
+      ) : null}
 
       <div className="flex w-full gap-1 overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-1 sm:w-fit">
         {(["structures", "payslips"] as const).map((tab) => (

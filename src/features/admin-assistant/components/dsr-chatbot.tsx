@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 type Message = { role: "assistant" | "user"; text: string };
-const SUGGESTIONS = ["Aaj Gaurav ne kya kiya hai?", "Is week team ka summary do", "Is month kis employee ke DSR pending hain?"];
+const SUGGESTIONS = ["Aaj Gaurav ne kya kiya hai?", "Is week team ka summary do", "Aaj ke overdue tasks kaunse hain?"];
 
 export function DsrChatbot() {
   const [open, setOpen] = useState(false);
@@ -29,19 +29,19 @@ export function DsrChatbot() {
   return <div className="fixed bottom-5 right-5 z-50">
     {open && <section aria-label="DSR assistant" className="mb-3 flex h-[min(620px,calc(100dvh-7rem))] w-[min(390px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
       <header className="flex items-center justify-between border-b border-slate-200 bg-violet-50 px-4 py-3">
-        <div><p className="text-sm font-semibold text-slate-900">DSR assistant</p><p className="text-xs text-slate-500">Groq-powered reporting summary</p></div>
-        <button aria-label="Close DSR assistant" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-white hover:text-slate-800" onClick={() => setOpen(false)} type="button">×</button>
+        <div><p className="text-sm font-semibold text-slate-900">CRM assistant</p><p className="text-xs text-slate-500">Groq-powered CRM insights</p></div>
+        <button aria-label="Close CRM assistant" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-white hover:text-slate-800" onClick={() => setOpen(false)} type="button">×</button>
       </header>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.length === 0 && <><p className="text-sm leading-6 text-slate-600">Ask about today&apos;s work, or get weekly and monthly DSR summaries.</p><div className="space-y-2">{SUGGESTIONS.map((suggestion) => <button className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-xs text-slate-700 hover:border-violet-200 hover:bg-violet-50" key={suggestion} onClick={() => ask(suggestion)} type="button">{suggestion}</button>)}</div></>}
+        {messages.length === 0 && <><p className="text-sm leading-6 text-slate-600">Ask about DSRs, tasks, attendance, leave, or project activity.</p><div className="space-y-2">{SUGGESTIONS.map((suggestion) => <button className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-xs text-slate-700 hover:border-violet-200 hover:bg-violet-50" key={suggestion} onClick={() => ask(suggestion)} type="button">{suggestion}</button>)}</div></>}
         {messages.map((message, index) => <div className={`whitespace-pre-wrap rounded-xl px-3 py-2.5 text-sm leading-6 ${message.role === "user" ? "ml-8 bg-violet-600 text-white" : "mr-4 bg-slate-100 text-slate-700"}`} key={`${message.role}-${index}`}>{message.text}</div>)}
-        {pending && <div className="mr-4 rounded-xl bg-slate-100 px-3 py-2.5 text-sm text-slate-500">Reviewing DSR entries…</div>}
+        {pending && <div className="mr-4 rounded-xl bg-slate-100 px-3 py-2.5 text-sm text-slate-500">Reviewing CRM records…</div>}
       </div>
       <form className="border-t border-slate-200 p-3" onSubmit={(event) => { event.preventDefault(); void ask(question); }}>
-        <div className="flex gap-2"><input className="crm-input min-w-0 flex-1" disabled={pending} maxLength={800} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about DSRs…" value={question} /><button className="crm-primary shrink-0" disabled={pending || !question.trim()} type="submit">Send</button></div>
+        <div className="flex gap-2"><input className="crm-input min-w-0 flex-1" disabled={pending} maxLength={800} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about CRM work…" value={question} /><button className="crm-primary shrink-0" disabled={pending || !question.trim()} type="submit">Send</button></div>
       </form>
     </section>}
-    <button aria-expanded={open} aria-label="Open DSR assistant" className="flex h-12 items-center gap-2 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-lg shadow-violet-300 transition hover:bg-violet-700" onClick={() => setOpen((value) => !value)} type="button"><ChatIcon />DSR Assistant</button>
+    <button aria-expanded={open} aria-label="Open CRM assistant" className="flex h-12 items-center gap-2 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-lg shadow-violet-300 transition hover:bg-violet-700" onClick={() => setOpen((value) => !value)} type="button"><ChatIcon />CRM Assistant</button>
   </div>;
 }
 

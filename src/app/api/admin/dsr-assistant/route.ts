@@ -8,11 +8,18 @@ const headers = { "Cache-Control": "private, no-store" };
 function isSameRequestOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return true;
-  const requestUrl = new URL(request.url);
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const expectedOrigin = `${forwardedProtocol === "http" ? "http" : "https"}://${forwardedHost || requestUrl.host}`;
-  return origin === expectedOrigin || origin === requestUrl.origin;
+  try {
+    const originUrl = new URL(origin);
+    const requestUrl = new URL(request.url);
+    // Reverse proxies often forward the internal protocol as HTTP even when the
+    // browser is on HTTPS. Compare the public host (including port) instead of
+    // rejecting a valid same-site request because of that protocol rewrite.
+    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim().toLowerCase();
+    const hosts = new Set([requestUrl.host.toLowerCase(), request.headers.get("host")?.toLowerCase(), forwardedHost].filter(Boolean));
+    return (originUrl.protocol === "https:" || originUrl.protocol === "http:") && hosts.has(originUrl.host.toLowerCase());
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(request: Request) {

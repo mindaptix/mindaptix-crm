@@ -704,6 +704,18 @@ export type PayrollPageData = {
   employeeOptions: EmployeeOption[];
   selectedMonthKey: string;
   availableMonthKeys: string[];
+  salarySnapshots?: Array<{
+    monthKey: string;
+    employeeId: string;
+    employeeName: string;
+    employeeEmail: string;
+    grossSalary: number;
+    fixedDeductions: number;
+    adjustments: Array<{ id: string; kind: "DEDUCTION" | "BONUS"; amount: number; reason: string; effectiveDate: string }>;
+    totalDeductions: number;
+    totalBonuses: number;
+    netSalary: number;
+  }>;
   manualDeductions?: Array<{ id: string; employeeName: string; effectiveDate: string; amount: number; reason: string }>;
   employeeDeductionHistory?: Array<{ id: string; effectiveDate: string; amount: number; reason: string }>;
   salaryProjection?: {

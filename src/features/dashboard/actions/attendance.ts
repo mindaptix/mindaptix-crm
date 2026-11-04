@@ -8,12 +8,15 @@ import { UserModel } from "@/database/mongodb/models/workforce/user";
 import { assertSuperAdmin } from "@/features/auth/lib/user-admin";
 import { SettingModel } from "@/database/mongodb/models/setting";
 import { HolidayModel } from "@/database/mongodb/models/system/holiday";
+import { TaskModel } from "@/database/mongodb/models/task";
 import { formatIndiaDateKey, formatIndiaTimeKey } from "@/shared/lib/india-time";
 import { COMPANY_HOLIDAYS_2026, COMPANY_WORK_POLICY } from "@/features/dashboard/lib/work-calendar";
+import { dailyPlanFilter } from "@/features/tasks/daily-plan";
 
 const VALID_WORK_MODES = ["OFFICE", "WFH", "FIELD"] as const;
 type WorkMode = (typeof VALID_WORK_MODES)[number];
 type AttendanceActionResult = { ok?: true; error?: string };
+type CheckoutTask = { id: string; title: string; priority: string; dueDate: string };
 
 // Minutes within which a checkout can be undone
 const CHECKOUT_UNDO_WINDOW_MINUTES = 15;
@@ -84,6 +87,41 @@ function readLocationFromForm(formData: FormData | undefined) {
     lng: lng !== null && Number.isFinite(lng) ? lng : null,
     accuracy: accuracy !== null && Number.isFinite(accuracy) ? accuracy : null,
   };
+}
+
+async function findIncompleteTodayTasks(userId: string, dateKey: string): Promise<CheckoutTask[]> {
+  // Include the actual deadline window too, so a task assigned for today cannot
+  // bypass checkout even when its work-date field was not populated.
+  const dayStart = new Date(`${dateKey}T00:00:00+05:30`);
+  const nextDayStart = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const dailyFilter = dailyPlanFilter(userId, dateKey);
+  const tasks = await TaskModel.find(
+    {
+      assignedUserId: userId,
+      status: { $nin: ["COMPLETED", "CLOSED"] },
+      $or: [
+        ...dailyFilter.$or,
+        { deadlineAt: { $gte: dayStart, $lt: nextDayStart } },
+      ],
+    },
+    { title: 1, priority: 1, dueDate: 1 },
+  ).sort({ deadlineAt: 1, createdAt: 1 }).lean();
+
+  return tasks.map((task) => ({
+    id: task._id.toString(),
+    title: task.title,
+    priority: task.priority,
+    dueDate: task.dueDate,
+  }));
+}
+
+/** Pending daily tasks shown before an employee checks out. */
+export async function getCheckoutPendingTasks(): Promise<{ tasks: CheckoutTask[]; error?: string }> {
+  const session = await getCurrentSession();
+  if (!session) return { tasks: [], error: "Authentication required." };
+
+  await connectDb();
+  return { tasks: await findIncompleteTodayTasks(session.user.id, formatIndiaDateKey()) };
 }
 
 function validateOfficeLocation({
@@ -210,6 +248,7 @@ export async function checkOutAttendance(formData?: FormData): Promise<Attendanc
 
   const now = new Date();
   const dateKey = formatIndiaDateKey(now);
+  const pendingTaskReason = String(formData?.get("pendingTaskReason") ?? "").trim();
 
   const existingAttendance = await AttendanceModel.findOne({ userId: session.user.id, dateKey }).lean();
 
@@ -222,6 +261,11 @@ export async function checkOutAttendance(formData?: FormData): Promise<Attendanc
     revalidatePath("/dashboard/attendance");
     revalidatePath("/dashboard/reports");
     return { ok: true };
+  }
+
+  const incompleteTasks = await findIncompleteTodayTasks(session.user.id, dateKey);
+  if (incompleteTasks.length > 0 && pendingTaskReason.length < 10) {
+    return { error: "Please explain why today’s incomplete task(s) could not be completed before checking out. This explanation is mandatory. ₹200 may be deducted if a valid reason is not provided." };
   }
 
   const settings = await SettingModel.findOne({ key: "company" }).lean();
@@ -253,6 +297,8 @@ export async function checkOutAttendance(formData?: FormData): Promise<Attendanc
         checkOutAt: now,
         status: "COMPLETED",
         workedMinutes,
+        pendingTaskReason: incompleteTasks.length > 0 ? pendingTaskReason : "",
+        pendingTaskIds: incompleteTasks.map((task) => task.id),
       },
     },
   );

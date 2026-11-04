@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adminManualAttendance, cancelCheckout, checkInAttendance, checkOutAttendance } from "@/features/dashboard/actions/attendance";
+import { adminManualAttendance, cancelCheckout, checkInAttendance, checkOutAttendance, getCheckoutPendingTasks } from "@/features/dashboard/actions/attendance";
 import { reviewRegularizationRequest } from "@/features/dashboard/actions/regularization";
 import { TaskCommitmentPopup } from "@/features/tasks/task-commitment-popup";
 import { DashboardTable, DashboardTableCell } from "@/shared/ui/dashboard-table";
@@ -284,6 +284,8 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
   const [checkInPending, startCheckIn] = useTransition();
   // Checkout confirmation state: false = default, true = waiting for confirm
   const [confirmingCheckout, setConfirmingCheckout] = useState(false);
+  const [checkoutPendingTasks, setCheckoutPendingTasks] = useState<{ id: string; title: string; priority: string; dueDate: string }[]>([]);
+  const [pendingTaskReason, setPendingTaskReason] = useState("");
   const [checkOutPending, startCheckOut] = useTransition();
   const [checkOutError, setCheckOutError] = useState<string | null>(null);
   // Undo state
@@ -365,6 +367,7 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
     setConfirmingCheckout(false);
 
     const fd = new FormData();
+    fd.set("pendingTaskReason", pendingTaskReason.trim());
     const checkoutWorkMode = (data.todayRecord?.workMode ?? workMode) as WorkMode;
 
     if (checkoutWorkMode === "OFFICE") {
@@ -644,7 +647,20 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                   onClick={() => {
                     if (checkOutDisabled) return;
                     setCheckOutError(null);
-                    setConfirmingCheckout(true);
+                    startCheckOut(async () => {
+                      try {
+                        const result = await getCheckoutPendingTasks();
+                        if (result.error) {
+                          setCheckOutError(result.error);
+                          return;
+                        }
+                        setCheckoutPendingTasks(result.tasks);
+                        setPendingTaskReason("");
+                        setConfirmingCheckout(true);
+                      } catch {
+                        setCheckOutError("Could not verify today’s tasks. Please try again.");
+                      }
+                    });
                   }}
                   className="w-full rounded-xl py-3.5 text-sm font-bold transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ background: "linear-gradient(135deg,#3b82f6,#0ea5e9)", color: "#fff", border: "none", boxShadow: "0 8px 24px rgba(59,130,246,0.35)" }}
@@ -656,10 +672,28 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                   <p className="px-4 pt-3 text-[0.7rem] font-bold text-amber-300">
                     Are you sure you want to check out?
                   </p>
+                  {checkoutPendingTasks.length > 0 ? (
+                    <div className="mx-3 mt-3 rounded-lg p-3" style={{ background: "rgba(239,68,68,0.13)", border: "1px solid rgba(251,113,133,0.35)" }}>
+                      <p className="text-[0.68rem] font-bold text-rose-200">{checkoutPendingTasks.length} task{checkoutPendingTasks.length === 1 ? "" : "s"} still incomplete today</p>
+                      <ul className="mt-1.5 space-y-1 text-[0.64rem] text-rose-100/85">
+                        {checkoutPendingTasks.map((task) => <li key={task.id}>• {task.title}</li>)}
+                      </ul>
+                      <p className="mt-2 text-[0.62rem] leading-relaxed text-amber-200">Please give a reason before checkout. Without a valid reason, ₹200 may be deducted.</p>
+                      <label className="mt-2 block text-[0.6rem] font-bold uppercase tracking-wider text-rose-100">Reason is required
+                        <textarea
+                          value={pendingTaskReason}
+                          onChange={(event) => setPendingTaskReason(event.target.value)}
+                          maxLength={600}
+                          placeholder="Explain why the task could not be completed today…"
+                          className="mt-1.5 min-h-20 w-full resize-y rounded-lg border border-rose-200/30 bg-slate-950/20 px-3 py-2 text-xs text-white outline-none placeholder:text-white/40 focus:border-rose-200/70"
+                        />
+                      </label>
+                    </div>
+                  ) : null}
                   <div className="grid grid-cols-2 gap-2 p-3">
                     <button
                       type="button"
-                      disabled={checkOutDisabled}
+                      disabled={checkOutDisabled || (checkoutPendingTasks.length > 0 && pendingTaskReason.trim().length < 10)}
                       onClick={handleCheckOutConfirm}
                       className="rounded-lg py-2.5 text-xs font-bold transition-all disabled:opacity-50"
                       style={{ background: "linear-gradient(135deg,#3b82f6,#0ea5e9)", color: "#fff" }}
@@ -668,7 +702,11 @@ export function AttendancePanel({ data }: AttendancePanelProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirmingCheckout(false)}
+                      onClick={() => {
+                        setConfirmingCheckout(false);
+                        setCheckoutPendingTasks([]);
+                        setPendingTaskReason("");
+                      }}
                       className="rounded-lg py-2.5 text-xs font-bold text-white/60 hover:text-white/80 transition-colors"
                       style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
                     >

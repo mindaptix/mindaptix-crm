@@ -81,6 +81,12 @@ import type {
   EarnMorePageData,
 } from "@/features/dashboard/types";
 
+function getPreviousMonthKey(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, (month || 1) - 2, 1));
+  return date.toISOString().slice(0, 7);
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 function toRecord(value: unknown): UnknownRecord {
@@ -1871,11 +1877,13 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
     };
   }
 
-  const [employees, salaryStructures, payslips, manualDeductions] = await Promise.all([
+  const previousMonthKey = getPreviousMonthKey(currentMonthKey);
+  const [employees, salaryStructures, payslips, manualDeductions, allAdjustments] = await Promise.all([
     UserModel.find({ role: { $in: ["EMPLOYEE", "MANAGER"] }, status: "ACTIVE" }, { fullName: 1, email: 1 }).sort({ fullName: 1 }).lean(),
     SalaryModel.find({ status: "ACTIVE" }).lean(),
     PayslipModel.find({ monthKey: { $in: last3Months } }).sort({ monthKey: -1 }).lean(),
     SalaryAdjustmentModel.find({ monthKey: currentMonthKey, kind: "DEDUCTION" }).sort({ effectiveDate: -1, createdAt: -1 }).lean(),
+    SalaryAdjustmentModel.find({ monthKey: { $in: [currentMonthKey, previousMonthKey] } }).sort({ effectiveDate: -1, createdAt: -1 }).lean(),
   ]);
 
   const salaryMap = new Map(salaryStructures.map((s) => [s.userId, s]));
@@ -1953,7 +1961,16 @@ export async function getPayrollPageData(session: AuthenticatedSession): Promise
       };
     }),
     employeeOptions: employees.map((e) => ({ id: e._id.toString(), label: e.fullName })),
-    manualDeductions: manualDeductions.map((item) => ({ id: item._id.toString(), employeeName: userMap.get(item.userId)?.fullName ?? "Unknown", effectiveDate: item.effectiveDate, amount: item.amount, reason: item.reason })),
+    manualDeductions: manualDeductions.filter((item) => item.kind === "DEDUCTION").map((item) => ({ id: item._id.toString(), employeeName: userMap.get(item.userId)?.fullName ?? "Unknown", effectiveDate: item.effectiveDate, amount: item.amount, reason: item.reason })),
+    salarySnapshots: [currentMonthKey, previousMonthKey].flatMap((monthKey) => employees.map((emp) => {
+      const structure = salaryMap.get(emp._id.toString());
+      const grossSalary = structure ? structure.basicSalary + structure.hra + structure.transportAllowance + structure.medicalAllowance + structure.otherAllowances : 0;
+      const fixedDeductions = structure ? structure.tds + structure.providentFund + structure.otherDeductions : 0;
+      const adjustments = allAdjustments.filter((item) => item.userId === emp._id.toString() && item.monthKey === monthKey).map((item) => ({ id: item._id.toString(), kind: item.kind as "DEDUCTION" | "BONUS", amount: item.amount, reason: item.reason, effectiveDate: item.effectiveDate }));
+      const totalDeductions = fixedDeductions + adjustments.filter((item) => item.kind === "DEDUCTION").reduce((sum, item) => sum + item.amount, 0);
+      const totalBonuses = adjustments.filter((item) => item.kind === "BONUS").reduce((sum, item) => sum + item.amount, 0);
+      return { monthKey, employeeId: emp._id.toString(), employeeName: emp.fullName, employeeEmail: emp.email, grossSalary, fixedDeductions, adjustments, totalDeductions, totalBonuses, netSalary: Math.max(0, grossSalary - totalDeductions + totalBonuses) };
+    })),
     selectedMonthKey: currentMonthKey,
     availableMonthKeys: last3Months,
   };
