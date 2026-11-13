@@ -39,6 +39,7 @@ const STATUS_CONFIG: Record<string, { chip: string; chipText: string; dot: strin
   COMPLETED:      { chip: "rgba(249,115,22,0.12)",  chipText: "#ea580c", dot: "#f97316", label: "Awaiting Review" },
   CLOSED:         { chip: "rgba(16,185,129,0.12)",  chipText: "#059669", dot: "#10b981", label: "Closed" },
   REJECTED:       { chip: "rgba(239,68,68,0.12)",   chipText: "#dc2626", dot: "#ef4444", label: "Rejected" },
+  FAILED:         { chip: "rgba(239,68,68,0.12)",   chipText: "#dc2626", dot: "#ef4444", label: "Failed" },
 };
 
 const PRIORITY_CONFIG: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -79,7 +80,7 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
   const filteredTasks = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return data.tasks.filter((task) => {
-      const isActiveOverdue = task.isOverdue && task.status !== "COMPLETED" && task.status !== "CLOSED";
+      const isActiveOverdue = task.isOverdue && !["COMPLETED", "CLOSED", "FAILED"].includes(task.status);
       if (statusFilter === "OVERDUE" && !isActiveOverdue) return false;
       if (statusFilter !== "ALL" && statusFilter !== "OVERDUE" && task.status !== statusFilter) return false;
       if (priorityFilter !== "ALL" && task.priority !== priorityFilter) return false;
@@ -95,7 +96,8 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
   const awaiting_review_count = data.tasks.filter((t) => t.status === "COMPLETED").length;
   const closed_count         = data.tasks.filter((t) => t.status === "CLOSED").length;
   const rejected_count       = data.tasks.filter((t) => t.status === "REJECTED").length;
-  const overdue_count        = data.tasks.filter((t) => t.isOverdue && t.status !== "COMPLETED" && t.status !== "CLOSED").length;
+  const failed_count         = data.tasks.filter((t) => t.status === "FAILED").length;
+  const overdue_count        = data.tasks.filter((t) => t.isOverdue && !["COMPLETED", "CLOSED", "FAILED"].includes(t.status)).length;
 
   return (
     <div className="space-y-4 px-3 py-3 sm:px-7 sm:py-6">
@@ -106,7 +108,8 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
           <SummaryCount label="Open" value={pending_count + inprogress_count + rejected_count} tone="text-slate-700" />
           <SummaryCount label="In progress" value={inprogress_count} tone="text-violet-700" />
           <SummaryCount label="For review" value={awaiting_review_count} tone="text-amber-700" />
-          <SummaryCount label="Done" value={closed_count} tone="text-emerald-700" />
+          <SummaryCount label="Completed" value={closed_count} tone="text-emerald-700" />
+          <SummaryCount label="Failed" value={failed_count} tone="text-rose-700" />
         </div>
       </section>
 
@@ -153,9 +156,9 @@ export function TasksPanel({ canAssign, canManageLifecycle = false, data, readOn
             <FilterPill
               label="Status"
               value={statusFilter}
-              options={["ALL","OVERDUE","PENDING","IN_PROGRESS","COMPLETED","CLOSED","REJECTED"]}
+              options={["ALL","OVERDUE","PENDING","IN_PROGRESS","COMPLETED","CLOSED","REJECTED","FAILED"]}
               onChange={setStatusFilter}
-              labels={{ OVERDUE: "Overdue", PENDING: "Pending", IN_PROGRESS: "In Progress", COMPLETED: "Awaiting Review", CLOSED: "Closed", REJECTED: "Rejected" }}
+              labels={{ OVERDUE: "Overdue", PENDING: "Pending", IN_PROGRESS: "In Progress", COMPLETED: "Awaiting Review", CLOSED: "Closed", REJECTED: "Rejected", FAILED: "Failed" }}
             />
             <FilterPill label="Priority" value={priorityFilter} options={["ALL","LOW","MEDIUM","HIGH"]}               onChange={setPriorityFilter} />
             <FilterPill label="Label"    value={labelFilter}    options={["ALL",...data.labelOptions]}                onChange={setLabelFilter} />
@@ -490,7 +493,7 @@ function TaskCard({
             {/* Status update + comments + delete */}
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {/* Employee status dropdown — only for assigned user, only PENDING/IN_PROGRESS/COMPLETED */}
-              {!canAssign && !readOnly && task.status !== "CLOSED" && (
+              {!canAssign && !readOnly && task.status !== "CLOSED" && task.status !== "FAILED" && (
                 <form
                   action={async (formData) => {
                     await updateTaskStatus(formData);

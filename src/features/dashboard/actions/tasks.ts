@@ -138,6 +138,7 @@ export async function updateTaskStatus(formData: FormData) {
   }
 
   if (task.status === "CLOSED") throw new Error("Accepted tasks cannot be reopened.");
+  if (task.status === "FAILED") throw new Error("Failed tasks cannot be reopened by employees.");
   const now = new Date();
   await TaskModel.findByIdAndUpdate(taskId, {
     status,

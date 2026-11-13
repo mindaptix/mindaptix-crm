@@ -2,7 +2,7 @@ import mongoose, { type InferSchemaType, type Model } from "mongoose";
 import { baseSchemaOptions } from "@/database/mongodb/models/shared/schema-options";
 import { TASK_DESCRIPTION_MAX_LENGTH } from "@/features/tasks/constants";
 
-export const TASK_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED", "CLOSED", "REJECTED"] as const;
+export const TASK_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED", "CLOSED", "REJECTED", "FAILED"] as const;
 export const TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 export const TASK_LABELS = ["SEO", "DESIGN", "DEV", "ADS", "CONTENT", "SALES"] as const;
 
