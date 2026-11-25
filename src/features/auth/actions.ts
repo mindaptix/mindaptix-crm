@@ -275,7 +275,6 @@ export async function requestLogout(_previous: { error?: string }, formData: For
     const today = formatIndiaDateKey();
     const outstanding = await TaskModel.countDocuments({
       assignedUserId: session.user.id,
-      assignedByUserId: { $ne: session.user.id },
       dueDate: { $lte: today },
       status: { $nin: ["CLOSED", "FAILED"] },
     });

@@ -146,13 +146,15 @@ export async function updateTaskStatus(formData: FormData) {
     ...(missedTaskDeadline(task, now) ? { deadlineMissedAt: task.deadlineMissedAt ?? taskDeadline(task) } : {}),
   });
 
-  // When employee submits for review, notify the assigner (admin)
-  if (status === "COMPLETED" && session.user.id !== task.assignedByUserId) {
-    await createNotificationsForUsers([task.assignedByUserId], {
+  // Closure requests go to the only role authorized to approve them,
+  // including employee-created daily tasks and manager-assigned tasks.
+  if (status === "COMPLETED" && task.status !== "COMPLETED") {
+    const approvers = await UserModel.find({ role: "SUPER_ADMIN", status: "ACTIVE" }, { _id: 1 }).lean();
+    await createNotificationsForUsers(approvers.map((user) => user._id.toString()), {
       actorUserId: session.user.id,
       type: "TASK_COMMENT",
-      title: "Task submitted for review",
-      message: `${task.title} has been marked complete and is awaiting your review.`,
+      title: "Task closure requested",
+      message: `${session.user.fullName} requested closure of "${task.title}". Review and approve closure to allow normal logout.`,
       actionUrl: "/dashboard/tasks",
       sourceKey: `task-status:${taskId}:${status}:${Date.now()}`,
     });

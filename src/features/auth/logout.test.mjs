@@ -12,7 +12,7 @@ test("logout requires closure or explicit salary forfeiture, once per day", asyn
     "@/database/mongodb/connect": { default: async () => {} },
     "@/features/auth/lib/auth-session": { getCurrentSession: async () => ({ user: { id: "employee", role } }), clearCurrentSession: async () => { cleared++; } },
     "@/shared/lib/india-time": { formatIndiaDateKey: () => "2026-11-25" },
-    "@/database/mongodb/models/task": { TaskModel: { countDocuments: async (filter) => { assert.equal(filter.assignedUserId, "employee"); assert.equal(filter.dueDate.$lte, "2026-11-25"); assert.deepEqual(Array.from(filter.status.$nin), ["CLOSED", "FAILED"]); return outstanding; } } },
+    "@/database/mongodb/models/task": { TaskModel: { countDocuments: async (filter) => { assert.equal(filter.assignedUserId, "employee"); assert.equal(filter.assignedByUserId, undefined); assert.equal(filter.dueDate.$lte, "2026-11-25"); assert.deepEqual(Array.from(filter.status.$nin), ["CLOSED", "FAILED"]); return outstanding; } } },
     "@/database/mongodb/models/workforce/salary": { SalaryModel: { findOne: () => ({ sort: () => ({ lean: async () => ({ basicSalary: 18000, hra: 0, transportAllowance: 0, medicalAllowance: 0, otherAllowances: 0 }) }) }) } },
     "@/database/mongodb/models/workforce/payslip": { PayslipModel: { exists: async () => false, updateOne: async () => {} } },
     "@/database/mongodb/models/workforce/salary-adjustment": { SalaryAdjustmentModel: { init: async () => {}, updateOne: async ({ sourceKey }, update) => { if (!deductions.has(sourceKey)) deductions.set(sourceKey, update.$setOnInsert); } } },

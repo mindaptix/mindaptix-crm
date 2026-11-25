@@ -187,7 +187,7 @@ export function DashboardShell({ children, session, employeeSessionControl, admi
             </div>
             <p className="mt-2 break-all px-3.5 text-[0.68rem] text-blue-100/50">{session.user.email}</p>
             <div className="mt-3 border-t border-white/8 px-3 pb-3 pt-2.5">
-              <LogoutControl />
+              <LogoutControl employeePolicy={session.user.role === "EMPLOYEE"} />
             </div>
           </div>
         </aside>
