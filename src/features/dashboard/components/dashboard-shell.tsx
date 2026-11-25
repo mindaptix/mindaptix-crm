@@ -5,7 +5,7 @@ import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useR
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { logoutUser } from "@/features/auth/actions";
+import { LogoutControl } from "@/features/auth/components/logout-control";
 import { subscribeDashboardSync } from "@/features/dashboard/lib/live-sync";
 import { EndOfDayBrowserNotifier } from "@/features/notifications/components/end-of-day-browser-notifier";
 import type { AuthenticatedSession } from "@/features/auth/lib/auth-session";
@@ -187,15 +187,7 @@ export function DashboardShell({ children, session, employeeSessionControl, admi
             </div>
             <p className="mt-2 break-all px-3.5 text-[0.68rem] text-blue-100/50">{session.user.email}</p>
             <div className="mt-3 border-t border-white/8 px-3 pb-3 pt-2.5">
-              <form action={logoutUser}>
-                <button
-                  className="flex w-full items-center justify-center gap-2 rounded-[0.95rem] border border-white/12 bg-white/6 px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/12 hover:text-white"
-                  type="submit"
-                >
-                  <LogoutIcon />
-                  Sign Out
-                </button>
-              </form>
+              <LogoutControl />
             </div>
           </div>
         </aside>
@@ -414,15 +406,6 @@ function HamburgerIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
       <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-      <path d="m10 17 5-5-5-5M15 12H3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
     </svg>
   );
 }

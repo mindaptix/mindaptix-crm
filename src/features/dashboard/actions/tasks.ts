@@ -190,6 +190,7 @@ export async function reviewTask(formData: FormData) {
   }
 
   const newStatus = action === "ACCEPT" ? "CLOSED" : "REJECTED";
+  if (action === "ACCEPT" && session.user.role !== "SUPER_ADMIN") throw new Error("Only the Super Admin can close tasks.");
 
   await TaskModel.findByIdAndUpdate(taskId, {
     status: newStatus,

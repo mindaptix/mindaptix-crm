@@ -510,7 +510,7 @@ function TaskCard({
                   >
                     <option value="PENDING">Pending</option>
                     <option value="IN_PROGRESS">In Progress</option>
-                    <option value="COMPLETED">Submit for Review</option>
+                    <option value="COMPLETED">Request closure from Super Admin</option>
                   </select>
                   <FormActionButton
                     className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
@@ -523,7 +523,7 @@ function TaskCard({
               )}
 
               {/* Admin Accept / Reject — only for COMPLETED (awaiting review) tasks */}
-              {canAssign && task.status === "COMPLETED" && (
+              {canManageLifecycle && task.status === "COMPLETED" && (
                 <div className="flex items-center gap-2">
                   <form
                     action={async (formData) => {

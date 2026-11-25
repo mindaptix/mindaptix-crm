@@ -14,6 +14,11 @@ import { LoginAttemptModel } from "@/database/mongodb/models/workforce/login-att
 import { UserSessionModel } from "@/database/mongodb/models/user-session";
 import { PasswordResetTokenModel } from "@/database/mongodb/models/workforce/password-reset-token";
 import type { UserRole } from "@/features/auth/lib/rbac";
+import { TaskModel } from "@/database/mongodb/models/task";
+import { SalaryModel } from "@/database/mongodb/models/workforce/salary";
+import { SalaryAdjustmentModel } from "@/database/mongodb/models/workforce/salary-adjustment";
+import { PayslipModel } from "@/database/mongodb/models/workforce/payslip";
+import { formatIndiaDateKey } from "@/shared/lib/india-time";
 
 // ──────────────────────────────────────────────────────────────────
 //  Rate-limit constants
@@ -254,12 +259,47 @@ export async function loginUser(_previousState: AuthFormState, formData: FormDat
 //  Logout
 // ──────────────────────────────────────────────────────────────────
 export async function logoutUser() {
+  const result = await requestLogout({}, new FormData());
+  if (result.error) redirect("/dashboard/tasks");
+}
+
+export async function requestLogout(_previous: { error?: string }, formData: FormData): Promise<{ error?: string }> {
   const session = await getCurrentSession();
 
   if (!session) {
     redirect("/login");
   }
 
+  if (session.user.role === "EMPLOYEE") {
+    await connectDb();
+    const today = formatIndiaDateKey();
+    const outstanding = await TaskModel.countDocuments({
+      assignedUserId: session.user.id,
+      assignedByUserId: { $ne: session.user.id },
+      dueDate: { $lte: today },
+      status: { $nin: ["CLOSED", "FAILED"] },
+    });
+    if (outstanding) {
+      if (formData.get("logoutAnyway") !== "confirmed") return { error: `${outstanding} assigned task(s) still require Super Admin closure. Submit your work and request closure. If you choose Logout anyway, you will not receive salary for today.` };
+      const salary = await SalaryModel.findOne({ userId: session.user.id, status: "ACTIVE", effectiveFrom: { $lte: today } }).sort({ effectiveFrom: -1 }).lean();
+      if (!salary) return { error: "Salary is not configured. Contact the Super Admin before using Logout anyway." };
+      const monthKey = today.slice(0, 7);
+      if (await PayslipModel.exists({ userId: session.user.id, monthKey, status: "PAID" })) return { error: "This month's salary has already been paid. Contact the Super Admin to resolve your logout." };
+      const gross = salary.basicSalary + salary.hra + salary.transportAllowance + salary.medicalAllowance + salary.otherAllowances;
+      const sourceKey = `logout-anyway:${session.user.id}:${today}`;
+      await SalaryAdjustmentModel.init();
+      try {
+        await SalaryAdjustmentModel.updateOne({ sourceKey }, { $setOnInsert: {
+          userId: session.user.id, monthKey, kind: "DEDUCTION", amount: Math.round(gross / 30 * 100) / 100,
+          reason: `Employee confirmed Logout anyway on ${today} with ${outstanding} assigned task(s) awaiting Super Admin closure. One day's salary deducted (monthly gross / 30).`,
+          effectiveDate: today, sourceKey, createdByUserId: session.user.id,
+        } }, { upsert: true });
+      } catch (error) {
+        if (!(typeof error === "object" && error !== null && "code" in error && error.code === 11000)) throw error;
+      }
+      await PayslipModel.updateOne({ userId: session.user.id, monthKey, status: "GENERATED" }, { $set: { adjustmentsPending: true } });
+    }
+  }
   await clearCurrentSession();
   redirect("/login");
 }
