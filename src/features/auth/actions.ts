@@ -273,9 +273,17 @@ export async function requestLogout(_previous: { error?: string }, formData: For
   if (session.user.role === "EMPLOYEE") {
     await connectDb();
     const today = formatIndiaDateKey();
+    // Only count tasks that are actually due on/before today.
+    // Some legacy/invalid records can have an empty/missing dueDate, and
+    // `"" <= today` would incorrectly treat them as due (thus showing "future"
+    // tasks as outstanding during logout).
     const outstanding = await TaskModel.countDocuments({
       assignedUserId: session.user.id,
-      dueDate: { $lte: today },
+      $and: [
+        { dueDate: { $type: "string" } },
+        { dueDate: { $ne: "" } },
+        { dueDate: { $lte: today } },
+      ],
       status: { $nin: ["CLOSED", "FAILED"] },
     });
     if (outstanding) {
