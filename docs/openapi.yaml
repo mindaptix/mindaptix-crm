@@ -1,0 +1,423 @@
+openapi: 3.0.3
+info:
+  title: Mindaptix CRM API
+  version: "1.0.0"
+  description: |
+    REST API surface for app developers.
+    Auth uses an HTTP-only session cookie set by `POST /api/v1/auth/login`.
+servers:
+  - url: /api/v1
+tags:
+  - name: Auth
+  - name: Tasks
+  - name: Attendance
+  - name: DSR
+  - name: Notifications
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (creates session cookie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId: { type: string }
+                  expiresAt: { type: string, format: date-time }
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current session (or null)
+      responses:
+        "200":
+          description: Session payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    nullable: true
+                    type: object
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (clears session cookie)
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks (defaults to current user)
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, IN_PROGRESS, COMPLETED, CLOSED, REJECTED, FAILED]
+        - in: query
+          name: assignedUserId
+          schema: { type: string }
+          description: Only honored for SUPER_ADMIN/MANAGER.
+      responses:
+        "200":
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Task"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Tasks]
+      summary: Create a task (JSON-only; no attachments)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /tasks/{taskId}/status:
+    patch:
+      tags: [Tasks]
+      summary: Update my task status
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PENDING, IN_PROGRESS, COMPLETED]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tasks/{taskId}/comments:
+    post:
+      tags: [Tasks]
+      summary: Add a task comment
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, minLength: 2 }
+      responses:
+        "200":
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /attendance/check-in:
+    post:
+      tags: [Attendance]
+      summary: Check in attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckInRequest"
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /attendance/checkout-pending-tasks:
+    get:
+      tags: [Attendance]
+      summary: Get tasks that block checkout
+      responses:
+        "200":
+          description: Pending tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        title: { type: string }
+                        priority: { type: string }
+                        dueDate: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /attendance/check-out:
+    post:
+      tags: [Attendance]
+      summary: Check out attendance
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckOutRequest"
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /attendance/cancel-checkout:
+    post:
+      tags: [Attendance]
+      summary: Undo checkout (within allowed window)
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /dsr:
+    post:
+      tags: [DSR]
+      summary: Submit DSR (GitHub evidence supported)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DsrSubmitRequest"
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 8 }
+      responses:
+        "200":
+          description: Notifications list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /notifications/read:
+    post:
+      tags: [Notifications]
+      summary: Mark notifications as read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+components:
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean }
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooManyRequests:
+      description: Rate limited
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        code: { type: string }
+        details: {}
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        fullName: { type: string }
+        email: { type: string, format: email }
+        role: { type: string }
+        managerId: { type: string }
+        projectIds:
+          type: array
+          items: { type: string }
+        leadIds:
+          type: array
+          items: { type: string }
+    Task:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        status: { type: string }
+        priority: { type: string }
+        labels:
+          type: array
+          items: { type: string }
+        dueDate: { type: string }
+        deadlineAt: { type: string, nullable: true }
+    CreateTaskRequest:
+      type: object
+      required: [title, description, dueDate]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        assignedUserId: { type: string }
+        dueDate: { type: string, example: "2026-11-25" }
+        dueTime: { type: string, example: "23:59" }
+        priority: { type: string, enum: [LOW, MEDIUM, HIGH], default: MEDIUM }
+        labels:
+          type: array
+          items: { type: string }
+    CheckInRequest:
+      type: object
+      properties:
+        workMode: { type: string, enum: [OFFICE, WFH, FIELD] }
+        lat: { type: number }
+        lng: { type: number }
+        accuracy: { type: number }
+    CheckOutRequest:
+      type: object
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+        accuracy: { type: number }
+        pendingTaskReason: { type: string }
+    DsrSubmitRequest:
+      type: object
+      required: [workDate, summary, accomplishments]
+      properties:
+        workDate: { type: string, example: "2026-11-25" }
+        projectId: { type: string }
+        summary: { type: string }
+        accomplishments: { type: string }
+        blockers: { type: string }
+        nextPlan: { type: string }
+        githubRepoUrls:
+          type: array
+          items: { type: string }
+        githubUsername: { type: string }
+        githubBranch: { type: string }
+    Notification:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        title: { type: string }
+        message: { type: string }
+        actionUrl: { type: string }
+        readAt: { type: string, nullable: true }
+        createdAt: { type: string, nullable: true }
+
