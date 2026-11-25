@@ -95,10 +95,12 @@ async function findIncompleteTodayTasks(userId: string, dateKey: string): Promis
   const dayStart = new Date(`${dateKey}T00:00:00+05:30`);
   const nextDayStart = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const dailyFilter = dailyPlanFilter(userId, dateKey);
+  // workDate is the day a task was created, so it must not pull in tasks whose deadline is in the future.
   const tasks = await TaskModel.find(
     {
       assignedUserId: userId,
       status: { $nin: ["COMPLETED", "CLOSED"] },
+      dueDate: { $lte: dateKey },
       $or: [
         ...dailyFilter.$or,
         { deadlineAt: { $gte: dayStart, $lt: nextDayStart } },
