@@ -1,58 +1,56 @@
-import { NextResponse } from "next/server";
-import { getCurrentSession } from "@/features/auth/lib/auth-session";
 import connectDb from "@/database/mongodb/connect";
 import { TaskModel } from "@/database/mongodb/models/task";
+import { createNotificationsForUsers } from "@/features/notifications/service";
+import { requireSession, jsonError, jsonOk } from "@/app/api/v1/_lib/http";
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ taskId: string }> },
-) {
-  const session = await getCurrentSession();
-  if (!session) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+export async function POST(request: Request, { params }: { params: Promise<{ taskId: string }> }) {
+  const session = await requireSession();
+  const { taskId } = await params;
+
+  let body: { message?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return jsonError(400, { error: "Invalid JSON body." });
   }
 
-  const { taskId } = await context.params;
-  const body = (await request.json().catch(() => null)) as { message?: unknown } | null;
-  const message = String(body?.message ?? "").trim();
-
-  if (message.length < 2 || message.length > 600) {
-    return NextResponse.json(
-      { error: "Comment message must be between 2 and 600 characters." },
-      { status: 400 },
-    );
-  }
+  const message = String(body.message ?? "").trim();
+  if (message.length < 2) return jsonError(400, { error: "Comment message is too short." });
 
   await connectDb();
-  const task = await TaskModel.findById(taskId);
-  if (!task) {
-    return NextResponse.json({ error: "Task not found." }, { status: 404 });
-  }
+  const task = await TaskModel.findById(taskId).lean();
+  if (!task) return jsonError(404, { error: "Task not found." });
 
-  const canComment =
+  const canAccess =
+    session.user.role === "SUPER_ADMIN" ||
+    session.user.role === "MANAGER" ||
     task.assignedUserId === session.user.id ||
-    task.assignedByUserId === session.user.id ||
-    ["SUPER_ADMIN", "MANAGER"].includes(session.user.role);
-  if (!canComment) {
-    return NextResponse.json({ error: "You do not have access to this task." }, { status: 403 });
-  }
+    task.assignedByUserId === session.user.id;
+  if (!canAccess) return jsonError(403, { error: "You cannot comment on this task." });
 
-  task.comments.push({
-    userId: session.user.id,
-    userName: session.user.fullName,
-    role: session.user.role,
-    message,
-    createdAt: new Date(),
-  });
-  await task.save();
-
-  return NextResponse.json({
-    ok: true,
-    comment: {
-      userId: session.user.id,
-      userName: session.user.fullName,
-      message,
-      createdAt: new Date().toISOString(),
+  await TaskModel.findByIdAndUpdate(taskId, {
+    $push: {
+      comments: {
+        userId: session.user.id,
+        userName: session.user.fullName,
+        role: session.user.role,
+        message,
+        createdAt: new Date(),
+      },
     },
   });
+
+  const recipients = [task.assignedUserId, task.assignedByUserId].filter((id) => id && id !== session.user.id);
+  if (recipients.length) {
+    await createNotificationsForUsers(recipients, {
+      actorUserId: session.user.id,
+      type: "TASK_COMMENT",
+      title: "New task comment",
+      message: `${session.user.fullName} added an update on ${task.title}.`,
+      actionUrl: "/dashboard/tasks",
+    });
+  }
+
+  return jsonOk({ ok: true });
 }
+

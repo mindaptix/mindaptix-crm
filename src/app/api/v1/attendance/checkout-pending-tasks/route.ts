@@ -1,17 +1,13 @@
-import { NextResponse } from "next/server";
-import { getCurrentSession } from "@/features/auth/lib/auth-session";
+import { jsonError, jsonOk, requireSession } from "@/app/api/v1/_lib/http";
 import { getCheckoutPendingTasks } from "@/features/dashboard/actions/attendance";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET() {
-  const session = await getCurrentSession();
-  if (!session) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
-
+  await requireSession();
   const result = await getCheckoutPendingTasks();
-  if (result.error) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
-  }
-
-  return NextResponse.json({ tasks: result.tasks });
+  if (result.error) return jsonError(401, { error: result.error });
+  return jsonOk({ tasks: result.tasks });
 }
+

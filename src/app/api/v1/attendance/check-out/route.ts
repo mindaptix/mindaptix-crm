@@ -1,50 +1,27 @@
-import { NextResponse } from "next/server";
-import { getCurrentSession } from "@/features/auth/lib/auth-session";
+import { jsonError, jsonOk, requireSession } from "@/app/api/v1/_lib/http";
 import { checkOutAttendance } from "@/features/dashboard/actions/attendance";
-import connectDb from "@/database/mongodb/connect";
-import { AttendanceModel } from "@/database/mongodb/models/attendance";
-import { formatIndiaDateKey } from "@/shared/lib/india-time";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const session = await getCurrentSession();
-  if (!session) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  await requireSession();
+
+  let body: { lat?: number; lng?: number; accuracy?: number; pendingTaskReason?: string } = {};
+  try {
+    body = await request.json();
+  } catch {
+    // allow empty body
   }
 
-  const body = (await request.json().catch(() => null)) as {
-    lat?: unknown;
-    latitude?: unknown;
-    lng?: unknown;
-    longitude?: unknown;
-    accuracy?: unknown;
-    pendingTaskReason?: unknown;
-  } | null;
+  const form = new FormData();
+  if (body.lat !== undefined) form.set("lat", String(body.lat));
+  if (body.lng !== undefined) form.set("lng", String(body.lng));
+  if (body.accuracy !== undefined) form.set("accuracy", String(body.accuracy));
+  if (body.pendingTaskReason) form.set("pendingTaskReason", String(body.pendingTaskReason));
 
-  const lat = body?.lat ?? body?.latitude;
-  const lng = body?.lng ?? body?.longitude;
-
-  const formData = new FormData();
-  if (lat !== undefined && lat !== null) formData.append("lat", String(lat));
-  if (lng !== undefined && lng !== null) formData.append("lng", String(lng));
-  if (body?.accuracy !== undefined && body?.accuracy !== null) formData.append("accuracy", String(body.accuracy));
-  if (body?.pendingTaskReason) formData.append("pendingTaskReason", String(body.pendingTaskReason));
-
-  const result = await checkOutAttendance(formData);
-  if (result.error) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
-  }
-
-  await connectDb();
-  const attendance = await AttendanceModel.findOne({
-    userId: session.user.id,
-    dateKey: formatIndiaDateKey(),
-  }).lean();
-
-  return NextResponse.json({
-    ok: true,
-    status: attendance?.status ?? "COMPLETED",
-    date: attendance?.dateKey ?? formatIndiaDateKey(),
-    checkOutAt: attendance?.checkOutAt?.toISOString() ?? null,
-    workedMinutes: attendance?.workedMinutes ?? 0,
-  });
+  const result = await checkOutAttendance(form);
+  if (result.error) return jsonError(400, { error: result.error });
+  return jsonOk({ ok: true });
 }
+

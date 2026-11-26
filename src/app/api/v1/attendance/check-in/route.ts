@@ -1,52 +1,27 @@
-import { NextResponse } from "next/server";
-import { getCurrentSession } from "@/features/auth/lib/auth-session";
+import { jsonError, jsonOk, requireSession } from "@/app/api/v1/_lib/http";
 import { checkInAttendance } from "@/features/dashboard/actions/attendance";
-import connectDb from "@/database/mongodb/connect";
-import { AttendanceModel } from "@/database/mongodb/models/attendance";
-import { formatIndiaDateKey } from "@/shared/lib/india-time";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const session = await getCurrentSession();
-  if (!session) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  await requireSession();
+
+  let body: { workMode?: string; lat?: number; lng?: number; accuracy?: number };
+  try {
+    body = await request.json();
+  } catch {
+    return jsonError(400, { error: "Invalid JSON body." });
   }
 
-  const body = (await request.json().catch(() => null)) as {
-    workMode?: unknown;
-    lat?: unknown;
-    latitude?: unknown;
-    lng?: unknown;
-    longitude?: unknown;
-    accuracy?: unknown;
-  } | null;
+  const form = new FormData();
+  if (body.workMode) form.set("workMode", String(body.workMode));
+  if (body.lat !== undefined) form.set("lat", String(body.lat));
+  if (body.lng !== undefined) form.set("lng", String(body.lng));
+  if (body.accuracy !== undefined) form.set("accuracy", String(body.accuracy));
 
-  const lat = body?.lat ?? body?.latitude;
-  const lng = body?.lng ?? body?.longitude;
-
-  const formData = new FormData();
-  if (body?.workMode) formData.append("workMode", String(body.workMode));
-  if (lat !== undefined && lat !== null) formData.append("lat", String(lat));
-  if (lng !== undefined && lng !== null) formData.append("lng", String(lng));
-  if (body?.accuracy !== undefined && body?.accuracy !== null) formData.append("accuracy", String(body.accuracy));
-
-  const result = await checkInAttendance(formData);
-  if (result.error) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
-  }
-
-  await connectDb();
-  const attendance = await AttendanceModel.findOne({
-    userId: session.user.id,
-    dateKey: formatIndiaDateKey(),
-  }).lean();
-
-  return NextResponse.json({
-    ok: true,
-    status: attendance?.status ?? "PRESENT",
-    date: attendance?.dateKey ?? formatIndiaDateKey(),
-    checkInAt: attendance?.checkInAt?.toISOString() ?? null,
-    workMode: attendance?.workMode ?? String(body?.workMode ?? "OFFICE"),
-    isLate: attendance?.isLate ?? false,
-    lateByMinutes: attendance?.lateByMinutes ?? 0,
-  });
+  const result = await checkInAttendance(form);
+  if (result.error) return jsonError(400, { error: result.error });
+  return jsonOk({ ok: true });
 }
+
